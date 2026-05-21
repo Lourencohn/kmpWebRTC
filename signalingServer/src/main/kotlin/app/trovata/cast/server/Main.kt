@@ -33,15 +33,22 @@ fun Application.module() {
         anyHost()
         allowHeader("Content-Type")
         allowHeader("Authorization")
+        allowMethod(io.ktor.http.HttpMethod.Post)
+        allowMethod(io.ktor.http.HttpMethod.Get)
+        allowMethod(io.ktor.http.HttpMethod.Options)
     }
+
+    val baseUrl = System.getenv("PUBLIC_BUYER_URL")?.takeIf { it.isNotBlank() }
+        ?: "http://localhost:5173"
+    val store = SessionStore()
+
     routing {
-        get("/health") {
-            call.respondText("ok")
-        }
+        get("/health") { call.respondText("ok") }
         get("/version") {
             call.respond(Version(name = "trovatacast-signaling", version = "0.1.0"))
         }
     }
+    sessionRoutes(store, baseUrl)
 }
 
 @Serializable

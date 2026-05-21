@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS SessionEntity (
+    sessionId TEXT NOT NULL PRIMARY KEY,
+    token TEXT NOT NULL UNIQUE,
+    url TEXT NOT NULL,
+    sellerName TEXT NOT NULL,
+    collectionLabel TEXT NOT NULL,
+    clientName TEXT,
+    clientShop TEXT,
+    scheduledFor TEXT,
+    createdAtMs INTEGER NOT NULL,
+    expiresAtMs INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS SelectedProductEntity (
+    sessionId TEXT NOT NULL,
+    sku TEXT NOT NULL,
+    PRIMARY KEY (sessionId, sku),
+    FOREIGN KEY (sessionId) REFERENCES SessionEntity(sessionId) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_selected_session ON SelectedProductEntity(sessionId);
+
+insertSession:
+INSERT INTO SessionEntity(sessionId, token, url, sellerName, collectionLabel, clientName, clientShop, scheduledFor, createdAtMs, expiresAtMs)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+insertSelectedProduct:
+INSERT OR IGNORE INTO SelectedProductEntity(sessionId, sku) VALUES (?, ?);
+
+selectAllSessions:
+SELECT * FROM SessionEntity ORDER BY createdAtMs DESC;
+
+selectSessionByToken:
+SELECT * FROM SessionEntity WHERE token = ?;
+
+selectSelectedProducts:
+SELECT sku FROM SelectedProductEntity WHERE sessionId = ?;
+
+deleteSession:
+DELETE FROM SessionEntity WHERE sessionId = ?;

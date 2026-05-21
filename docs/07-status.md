@@ -11,8 +11,9 @@
 | M0 — Esqueleto e tooling | ✅ concluído | init scaffold | 5 superfícies sobem, 5 jobs CI verdes |
 | M1 — Componentes do design system | ✅ concluído | m1 design system | Pill, Btn, ProductCard, VideoTile, RemotePointer, TabBar, Garments, DesignSystemPreview |
 | M2 — Sessões (Home do vendedor) | ✅ concluído | m2 sessions | SellerHome + IncomingCall + SessionPrep + SessionsViewModel + SampleSessions |
-| M3 — Catálogo + convite (link da sessão) | 🚧 próximo | — | depende de M2 |
-| M4 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
+| M3 — Catálogo + convite (link da sessão) | ✅ concluído | m3 catalog & invite | CatalogPicker + Invite + Voyager nav + REST + SQLDelight + webBuyer arrival |
+| M4 — Web buyer mínimo | 🚧 próximo | — | parcialmente entregue em M3 (BuyerArrival); falta CTA de áudio integrado |
+| M5 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
 ---
 
@@ -126,16 +127,83 @@ trovatacast/
 
 ---
 
-## Próximo milestone — M3: Catálogo + convite (link da sessão)
+## O que foi entregue no M3
 
-Critério de aceitação: vendedor escolhe produtos para uma sessão, gera o link, e o cliente consegue abrir um placeholder no `webBuyer` que reage à entrada via sinalização Ktor.
+### Protocol (`protocol/`)
+- `SessionCreateRequest`, `SessionCreateResponse`, `SessionInfo`, `ErrorResponse` — DTOs serializáveis para criação/consulta de sessão.
+- Testes de round-trip JSON (`SessionDtoTest`).
 
-### A construir
-- `ui/screens/prep/CatalogPickerScreen.kt` — grid com seleção (chosen set, contador, bottom bar "Gerar link").
-- `ui/screens/prep/InviteScreen.kt` — link gerado, WhatsApp/share, validade/configuração.
-- `feature/catalog/CatalogViewModel.kt` — seleção persistida em SQLDelight (`SelectedProducts`).
-- `signalingServer` — endpoint `POST /session` (cria sala, devolve token + link curto).
-- Navegação: introduzir Voyager (`voyager-navigator`) e remover `DemoSwitcher` do `App.kt`.
+### Server (`signalingServer/`)
+- `SessionStore` — store em memória com `ConcurrentHashMap`, TTL 24h, tokens alfanuméricos de 9 chars (sem ambiguidade visual).
+- `POST /session` — cria sala, devolve `{ sessionId, token, url, expiresAtMs }`. URL aponta para `PUBLIC_BUYER_URL` (default `http://localhost:5173`).
+- `GET /session/{token}` — devolve `SessionInfo` ou 404 com `ErrorResponse`.
+- `SessionRoutesTest` — 4 cenários (criação, fetch, 404, payload vazio).
+
+### Persistência local (`composeApp/`)
+- Plugin `app.cash.sqldelight` ligado ao módulo.
+- Schema `Sessions.sq` com `SessionEntity` + `SelectedProductEntity` (FK ON DELETE CASCADE).
+- `DatabaseDriverFactory` (expect) + actuals Android (`AndroidSqliteDriver`) e iOS (`NativeSqliteDriver`).
+- `SessionsRepository` com `observeAll(): Flow<List<StoredSessionRecord>>`, `persistCreated(...)`, `selectedSkus(id)`.
+
+### HTTP client + remoto
+- `HttpClientFactory` (Ktor 3) com `ContentNegotiation`, `Logging`, `HttpTimeout` e `Accept: application/json`.
+- Engines: OkHttp no Android, Darwin no iOS.
+- `ServerConfig.baseUrl` por plataforma (`10.0.2.2:8080` Android, `localhost:8080` iOS).
+- `SessionsApi` com `SessionsApiResult<Ok|Fail>` mapeando 2xx vs corpo de erro.
+
+### Catálogo + convite (UI)
+- `CatalogPickerScreenModel` (Voyager `ScreenModel`) — produtos do `SampleCatalog`, seleção via `Set<String>`, filtros (`Todos`/`Novos`/`TopVenda`/`PréVenda`), submissão assíncrona (`isSubmitting`, `error`, `createdSession`).
+- `CatalogPickerScreen` — `LazyVerticalGrid` 2 colunas, chips de filtro, bottom bar "Gerar link" com contador de SKUs, banner de erro top-center.
+- `InviteScreen` — hero de sucesso, card com link mono e botões `Copiar link` + `Abrir teste`, CTAs `WhatsApp` / `Outro app`, próximos passos numerados, sticky "Concluir".
+- Quando `createdSession` aparece no state, `LaunchedEffect` empurra `InviteScreen(record)` no `Navigator`.
+
+### Navegação
+- Voyager 1.1.0-beta03: `Navigator(SellerHomeRoute) { SlideTransition(it) }`.
+- `navigation/Routes.kt`: `SellerHomeRoute`, `IncomingCallRoute`, `SessionPrepRoute(clientName)`. Cada Route consome `AppContainerHolder.current.sessionsViewModel` e empurra Telas dependentes.
+- `DemoSwitcher` removido do `App.kt`.
+
+### AppContainer (DI manual)
+- `AppContainer(DatabaseDriverFactory)` cria DB, HTTP, `SessionsRepository`, `SessionsApi`, `SessionsViewModel` compartilhado.
+- `AppContainerHolder` inicializado em `MainActivity` (Android) e `MainViewController` (iOS).
+- Koin propositalmente adiado para milestone com mais grafo (provavelmente M5+).
+
+### Web buyer (`webBuyer/`)
+- `main.ts` lê `?t=<token>`, faz `GET ${VITE_SIGNALING_BASE ?? http://localhost:8080}/session/{token}`.
+- `views/arrival.ts` renderiza 4 estados: landing (sem token), loading, arrival (com sessão), error (token inválido / 404).
+- CTA "Entrar com áudio" pede `getUserMedia({audio:true})` (sem pipe WebRTC ainda — entra em M5).
+- CSS estende `tokens.css` com cards, spinner, layout responsivo.
+
+### Aceitação validada
+- `./gradlew :protocol:jvmTest` ✅ (2 + 2 testes)
+- `./gradlew :signalingServer:test` ✅ (1 + 4 testes)
+- `./gradlew :composeApp:assembleDebug` ✅
+- `./gradlew :composeApp:compileKotlinIosSimulatorArm64` ✅
+- `(cd webBuyer && npm run build)` ✅ (`tsc --noEmit && vite build`)
+
+### Dívidas conhecidas
+- **Compartilhamento real do link** ainda é placeholder — botões WhatsApp / share intent precisam de plataforma (Android `ACTION_SEND`, iOS `UIActivityViewController`). Entra em M4 ou paralelo.
+- **WebRTC handshake**: não conectado ainda. webBuyer pede mic mas não negocia DC. Próximo no M5.
+- **TURN/STUN**: nada configurado. Idem M5.
+- **Persistência de DraftSelection**: hoje a seleção vive só no `ScreenModel`. Persistir rascunhos é não-objetivo do M3; entra em M4 se a UX exigir.
+- **Koin DI**: continua adiado.
+- **Coil**: declarado, não usado ainda (sem imagens reais de produto).
+
+---
+
+## Próximo milestone — M4: Web buyer mínimo
+
+Critério de aceitação: cliente abre o link gerado num celular real e vê tela de chegada com nome real do vendedor; CTA "Entrar com áudio" pede permissão de mic.
+
+### O que já está adiantado
+- Tela de chegada renderizada (parcialmente entregue no M3).
+- `GET /session/{token}` no servidor.
+- Pedido de mic via `getUserMedia`.
+
+### Falta
+- Share intent real Android + iOS (sair de placeholder).
+- QR code do link na `InviteScreen` (cliente lê com a câmera).
+- Estados de erro mais finos no webBuyer (rede offline, token expirado vs inválido).
+- Persistência de "ultima sessão aberta" no webBuyer para retomar após reload.
 
 ---
 
@@ -146,3 +214,4 @@ Critério de aceitação: vendedor escolhe produtos para uma sessão, gera o lin
 | 2026-05-20 | M0 fechado: estrutura KMP + 4 superfícies + CI |
 | 2026-05-20 | M1 fechado: design system completo (13 componentes + 47 ícones + 9 silhuetas + preview) |
 | 2026-05-21 | M2 fechado: SellerHome + IncomingCall + SessionPrep + ViewModel com StateFlow |
+| 2026-05-21 | M3 fechado: CatalogPicker + Invite + Voyager + REST `/session` + SQLDelight + webBuyer arrival |

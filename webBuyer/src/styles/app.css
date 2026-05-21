@@ -15,7 +15,7 @@ main#app {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 0 24px;
+  padding: 24px;
 }
 
 .wordmark {
@@ -49,3 +49,127 @@ main#app {
 
 .wordmark-text-a { color: var(--ink); }
 .wordmark-text-b { color: var(--brand); }
+
+.arrival {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-4);
+  padding: 28px 24px 24px;
+  box-shadow: var(--sh-2);
+}
+
+.arrival--landing,
+.arrival--loading,
+.arrival--error {
+  text-align: center;
+  align-items: center;
+}
+
+.arrival-eyebrow {
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-4);
+  margin-top: 4px;
+}
+
+.arrival-title {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0;
+}
+
+.arrival-text {
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink-3);
+  margin: 0;
+}
+
+.arrival-meta {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border-radius: var(--r-2);
+  display: grid;
+  gap: 8px;
+}
+
+.arrival-meta li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.arrival-meta span {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  color: var(--ink-4);
+}
+
+.arrival-meta code {
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.arrival-cta {
+  margin-top: 4px;
+  appearance: none;
+  border: none;
+  padding: 14px 18px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  color: white;
+  background: var(--brand);
+  border-radius: var(--r-3);
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.arrival-cta:hover:not([disabled]) { background: var(--brand-2); }
+.arrival-cta:active:not([disabled]) { transform: scale(0.985); }
+.arrival-cta[disabled] {
+  background: var(--surface-3);
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.arrival-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-4);
+  text-align: center;
+}
+
+.arrival-hint code {
+  font-family: var(--f-mono);
+  color: var(--ink-3);
+}
+
+.arrival-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid var(--brand-tint);
+  border-top-color: var(--brand);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
