@@ -10,8 +10,9 @@
 |---|---|---|---|
 | M0 — Esqueleto e tooling | ✅ concluído | init scaffold | 5 superfícies sobem, 5 jobs CI verdes |
 | M1 — Componentes do design system | ✅ concluído | m1 design system | Pill, Btn, ProductCard, VideoTile, RemotePointer, TabBar, Garments, DesignSystemPreview |
-| M2 — Sessões (Home do vendedor) | 🚧 próximo | — | depende de M1 |
-| M3 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
+| M2 — Sessões (Home do vendedor) | ✅ concluído | m2 sessions | SellerHome + IncomingCall + SessionPrep + SessionsViewModel + SampleSessions |
+| M3 — Catálogo + convite (link da sessão) | 🚧 próximo | — | depende de M2 |
+| M4 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
 ---
 
@@ -97,19 +98,44 @@ trovatacast/
 
 ---
 
-## Próximo milestone — M2: Sessões (Home do vendedor)
+## O que foi entregue no M2
 
-Critério de aceitação do roadmap: a Home do vendedor (`SellerHome`) renderiza com dados de sessão simulados, navega entre as 4 abas, e abre placeholders para chamadas recebidas e em preparação.
+### Sample data (commonMain/data/sample/)
+- `SampleSessions` — 8 clientes (Diego, Renata, Paulo, Marcia, Luciana, Eduardo, Helena, João) com `SessionClient(hue)`.
+- `LiveWaitingSession` — chamada em curso (Diego, sala aberta há 1m 12s).
+- `UpcomingSession` — 3 hoje (`Próximas`) + 3 nesta semana (`Esta semana`), com tags `Reposição` / `Primeira sessão` / `Top venda`.
+- `HistorySession` — 2 fechadas hoje (`Fechado` / `EmRevisao`).
+- `SessionPrepData` + `SessionChecklistItem` — checklist (catálogo, áudio, conexão, tabela) com toggle.
+
+### ViewModel (commonMain/feature/sessions/)
+- `SessionsViewModel` — 3 `StateFlow`s (`home`, `incoming`, `prep`) com `MutableStateFlow.update {}`.
+- Ações: `selectTab`, `acceptIncoming`, `declineIncoming`, `rescheduleIncoming`, `toggleChecklistItem`.
 
 ### Telas (commonMain/ui/screens/sessions/)
-1. **`SellerHomeScreen`** — header com saudação + métrica do dia, lista de "Próximas" + "Esta semana" + "Histórico", FAB "Convidar cliente".
-2. **`IncomingCallScreen`** — preview ao receber chamada com `Atender` (Jade) / `Recusar` (Danger) + `Reagendar`.
-3. **`SessionPrepScreen`** — checklist pré-chamada (catálogo, áudio, conexão) antes de entrar ao vivo.
+1. **`SellerHomeScreen`** — header com wordmark mark + eyebrow "Atelier Norte · Outono 26", "Iniciar nova sessão" (primary lg), `Agora` (card live com Atender Jade), `Próximas`, `Esta semana`, `Histórico`, FAB flutuante "Convidar cliente" e `TabBar` fixa.
+2. **`IncomingCallScreen`** — fundo dark, avatar pulsante, info do cliente, `Recusar` (Danger lg) + `Atender` (Jade lg) lado a lado, `Reagendar` (Dark md). Mostra banner de status após cada ação.
+3. **`SessionPrepScreen`** — header de voltar, card de cliente com horário, checklist clicável (toggle de pronto/falta), sugestões TrovataCast, sticky bar com "Chamar agora" (Jade quando tudo pronto, Soft+disabled caso contrário).
 
-### Dependências
-- Sample data: `data/sample/SampleSessions.kt` (espelha o protótipo).
-- ViewModels com `StateFlow`: `feature/sessions/SessionsViewModel.kt`.
-- Navegação: ainda placeholder em `ui/nav/` (Voyager ou compose-navigation-multiplatform virão em M3).
+### App shell
+- `App.kt` — `DemoSwitcher` flutuante no topo com 4 abas (`Home / Atender / Preparar / Design`) até M3 trazer navegação real.
+
+### Aceitação validada
+- `./gradlew :composeApp:assembleDebug` ✅
+- `./gradlew :composeApp:compileKotlinIosSimulatorArm64` ✅
+- 4 telas alternáveis em runtime via switcher; estado preservado entre trocas (ViewModel em `remember`).
+
+---
+
+## Próximo milestone — M3: Catálogo + convite (link da sessão)
+
+Critério de aceitação: vendedor escolhe produtos para uma sessão, gera o link, e o cliente consegue abrir um placeholder no `webBuyer` que reage à entrada via sinalização Ktor.
+
+### A construir
+- `ui/screens/prep/CatalogPickerScreen.kt` — grid com seleção (chosen set, contador, bottom bar "Gerar link").
+- `ui/screens/prep/InviteScreen.kt` — link gerado, WhatsApp/share, validade/configuração.
+- `feature/catalog/CatalogViewModel.kt` — seleção persistida em SQLDelight (`SelectedProducts`).
+- `signalingServer` — endpoint `POST /session` (cria sala, devolve token + link curto).
+- Navegação: introduzir Voyager (`voyager-navigator`) e remover `DemoSwitcher` do `App.kt`.
 
 ---
 
@@ -119,3 +145,4 @@ Critério de aceitação do roadmap: a Home do vendedor (`SellerHome`) renderiza
 |---|---|
 | 2026-05-20 | M0 fechado: estrutura KMP + 4 superfícies + CI |
 | 2026-05-20 | M1 fechado: design system completo (13 componentes + 47 ícones + 9 silhuetas + preview) |
+| 2026-05-21 | M2 fechado: SellerHome + IncomingCall + SessionPrep + ViewModel com StateFlow |
