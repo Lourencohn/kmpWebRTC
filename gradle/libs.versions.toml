@@ -23,7 +23,7 @@ kotlinx-immutable = "0.3.8"
 ktor = "3.0.3"
 
 # DI
-koin = "4.0.0"
+koin = "4.2.1"
 
 # Local DB
 sqldelight = "2.0.2"
