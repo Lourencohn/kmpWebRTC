@@ -55,6 +55,8 @@ Detalhes e racional em `docs/03-stack-kmp-webrtc.md`.
 
 ## 3. O que está pronto vs. o que falta
 
+> Status detalhado em `docs/07-status.md` (atualizar a cada milestone).
+
 ✅ **Pronto** (neste repositório)
 - Conceito + premissas
 - Sistema visual (cores, tipografia, componentes-chave)
@@ -62,17 +64,13 @@ Detalhes e racional em `docs/03-stack-kmp-webrtc.md`.
 - Catálogo de exemplo (moda atacado — Coleção Outono 26 da "Atelier Norte")
 - Roadmap priorizado de fluxos adicionais
 - Decisões de stack documentadas
+- **Milestone 0**: esqueleto KMP completo (`composeApp/`, `iosApp/`, `webBuyer/`, `signalingServer/`, `protocol/`) + CI + tokens do design system + wordmark renderizando nas 4 superfícies
 
 🚧 **A construir** (pelo Claude Code)
-- Esqueleto KMP (`composeApp/` + `shared/` + `iosApp/` + `webBuyer/` + `signalingServer/`)
-- Telas do app do vendedor a partir do protótipo
-- Web app do cliente (catálogo sincronizado via WebRTC data channel)
-- Servidor de sinalização (Ktor + WebSocket)
-- Integração WebRTC (mídia + data channel + ICE/STUN/TURN)
-- Persistência local com SQLDelight (catálogo, sessões, pedidos)
-- Lógica de co-presença (scroll/pointer/cart sync via data channel)
+- M1: componentes Compose do design system (Pill, Btn, ProductCard, VideoTile, RemotePointer)
+- M2+: telas do vendedor, integração WebRTC, persistência, co-presença ao vivo
 
-Ordem sugerida: ver `docs/06-roadmap.md`.
+Ordem detalhada: `docs/06-roadmap.md`. Status corrente: `docs/07-status.md`.
 
 ---
 
@@ -131,3 +129,16 @@ Cada cena é um par "iPhone do vendedor" + "Navegador do cliente" lado a lado. C
 ## 8. Contato com a fonte conceitual
 
 O documento conceitual original (português, escrito pelo product owner) está preservado em `docs/00-concept.md`. Quando houver conflito entre o que está nos outros docs e o conceito original, **o conceito vence**. Os outros docs são derivações.
+
+Não adicione comentários durante os códigos, preservo muito o código limpo e organizado.
+
+---
+
+## 9. Convenções de commits e versionamento
+
+- **Mensagens de commit curtas e sucintas.** Conventional Commits: `tipo(escopo): descrição em uma linha`. Sem corpo a não ser que indispensável; quando precisar, máximo 3 linhas.
+- **Nada de `Co-Authored-By: Claude ...`** nem assinaturas tipo "🤖 Generated with Claude Code". Commits são meus.
+- Escopo é o nome do módulo: `composeApp`, `iosApp`, `webBuyer`, `signalingServer`, `protocol`, `docs`, `ci`, `github`.
+- Tipos: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`.
+- Exemplos OK: `feat(composeApp): pill component`, `fix(ci): cache gradle`, `chore: bump kotlin`.
+- Detalhes do branch model em `CONTRIBUTING.md`.

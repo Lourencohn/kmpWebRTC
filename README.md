@@ -4,20 +4,17 @@ Aplicativo móvel de venda B2B com **co-presença em tempo real** — vendedor e
 
 > **Stack**: Kotlin Multiplatform (Compose Multiplatform) + WebRTC P2P + Ktor.
 > **Categoria-alvo do MVP**: moda atacado.
-> **Status**: design completo. Construção em andamento.
+> **Status**: Milestone 0 — esqueleto montado; 4 superfícies abrem com a wordmark.
 
 ---
 
-## ⚡ Início rápido
+## ⚡ Primeira vez? Comece aqui
 
 ```bash
-# Abra o protótipo HTML (referência visual viva do produto)
-cd prototype
-python3 -m http.server 8000
-# Abra http://localhost:8000 no navegador
+./bootstrap.sh        # (opcional) instala wrappers e dependências de cada superfície
 ```
 
-Cada cena no protótipo mostra um par **iPhone do vendedor** + **navegador Android do cliente** lado a lado. Clique no nome de um artboard para ver em tela cheia.
+Para entender o produto antes do código, leia o `CLAUDE.md` e abra `prototype/index.html`.
 
 ---
 
@@ -25,29 +22,99 @@ Cada cena no protótipo mostra um par **iPhone do vendedor** + **navegador Andro
 
 ```
 trovatacast/
-├── CLAUDE.md              ← Ponto de entrada para Claude Code
-├── docs/                  ← Toda a documentação do produto
-│   ├── 00-concept.md
-│   ├── 01-product-flows.md
-│   ├── 02-design-system.md
-│   ├── 03-stack-kmp-webrtc.md
-│   ├── 04-architecture.md
-│   ├── 05-screens-reference.md
-│   └── 06-roadmap.md
-└── prototype/             ← Protótipo HTML (referência viva)
-    └── index.html
+├── CLAUDE.md                ← Ponto de entrada para Claude Code
+├── docs/                    ← Documentação do produto (0 a 6)
+├── prototype/               ← Protótipo HTML (referência visual viva)
+│
+├── protocol/                ← Módulo KMP compartilhado: SessionEvent + Codec
+├── composeApp/              ← App KMP do vendedor (Android + iOS)
+│   ├── src/commonMain/      ← Compose UI + theme + components
+│   ├── src/androidMain/     ← MainActivity, manifest, recursos Android
+│   └── src/iosMain/         ← MainViewController exposto pra Swift
+│
+├── iosApp/                  ← Bootstrap Xcode (XcodeGen)
+├── webBuyer/                ← Cliente web (Vite + TypeScript)
+├── signalingServer/         ← Ktor + WebSocket (sinalização e pedidos)
+│
+├── gradle/libs.versions.toml← Catálogo central de versões
+└── .github/workflows/ci.yml ← Build Android + iOS + web + server
 ```
-
-A estrutura de código KMP a ser criada está em `docs/04-architecture.md`.
 
 ---
 
-## 🧭 Para continuar com Claude Code
+## 🚀 Rodar cada superfície
 
-1. Abra `CLAUDE.md` — instruções de entrada.
-2. Leia os 7 docs na ordem indicada.
-3. Abra `prototype/index.html` — referência visual.
-4. Siga `docs/06-roadmap.md` — milestone por milestone.
+### Pré-requisitos (uma vez)
+
+```bash
+# JDK 17 (instale via brew/sdkman/asdf)
+java -version
+
+# Gradle 8.11+ (só pra gerar o wrapper na primeira vez)
+brew install gradle
+gradle wrapper --gradle-version=8.11.1
+
+# Para iOS
+brew install xcodegen
+xcode-select --install
+
+# Para webBuyer
+brew install node
+```
+
+### Android (vendedor)
+
+```bash
+./gradlew :composeApp:installDebug
+# ou abra no Android Studio: arquivo > abrir > seleciona a pasta raiz
+```
+
+### iOS (vendedor)
+
+```bash
+cd iosApp
+xcodegen generate
+open iosApp.xcodeproj
+# selecione um simulador iOS e cmd+R
+```
+
+Passos detalhados em `iosApp/README.md`.
+
+### webBuyer (cliente)
+
+```bash
+cd webBuyer
+npm install
+npm run dev
+# http://localhost:5173
+```
+
+### signalingServer (Ktor)
+
+```bash
+./gradlew :signalingServer:run
+# http://localhost:8080/health → "ok"
+```
+
+---
+
+## ✅ Critério de aceitação do Milestone 0
+
+- [x] Estrutura KMP per `docs/04-architecture.md`
+- [x] `gradle/libs.versions.toml` com todas as libs do `docs/03`
+- [x] Theme com tokens do `docs/02` (cores, raios, tipografia)
+- [x] Fontes Geist + Geist Mono — slot pronto, instruções em `composeApp/.../fonts/README.md`
+- [x] Android: wordmark TrovataCast renderiza
+- [x] iOS: mesma wordmark (via `iosApp/`)
+- [x] Ktor: `GET /health → "ok"`
+- [x] Web buyer: `index.html` com wordmark
+- [x] CI: Android + iOS framework + web + server em PR
+
+---
+
+## 🧭 Próximos passos
+
+Roadmap em `docs/06-roadmap.md`. Próximo: **Milestone 1 — Componentes do design system** (Pill, Btn, ProductCard, VideoTile, RemotePointer reproduzindo o protótipo).
 
 ---
 

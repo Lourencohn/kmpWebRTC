@@ -1,0 +1,17 @@
+{
+  "name": "trovatacast-buyer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Web app do cliente (buyer) do TrovataCast — abre via link, sem instalar.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 5174",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

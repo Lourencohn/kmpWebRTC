@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Dúvida sobre o produto
+    url: https://github.com/Lourencohn/kmpWebRTC/discussions
+    about: Para perguntas, abra uma Discussion ao invés de uma Issue.
