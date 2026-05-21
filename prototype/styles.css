@@ -1,0 +1,94 @@
+/* ────────────────────────────────────────────────────────────────
+   TrovataCast — design tokens
+   Modern B2B SaaS — calm blue/green, warm neutrals
+   ────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Neutrals (warm off-white) */
+  --bg:           #FAFAF6;
+  --surface:      #FFFFFF;
+  --surface-2:    #F4F4EE;
+  --surface-3:    #ECECE4;
+  --line:         #E5E4DC;
+  --line-strong:  #D6D5CB;
+
+  /* Ink */
+  --ink:          #0E1116;
+  --ink-2:        #2B313A;
+  --ink-3:        #5A6470;
+  --ink-4:        #8A93A0;
+  --ink-5:        #B6BCC4;
+
+  /* Brand — calm blue (primary) + jade green (co-presence / confirm) */
+  --brand:        #2456E0;
+  --brand-2:      #1A41AE;
+  --brand-tint:   #EAEFFE;
+  --brand-ring:   rgba(36,86,224,.22);
+
+  --jade:         #0E8F6E;
+  --jade-2:       #0A6E55;
+  --jade-tint:    #DFF3EC;
+
+  /* Status */
+  --live:         #E5484D;
+  --warn:         #C7711D;
+
+  /* Radii */
+  --r-1: 6px;
+  --r-2: 10px;
+  --r-3: 14px;
+  --r-4: 20px;
+  --r-5: 28px;
+
+  /* Shadows */
+  --sh-1: 0 1px 2px rgba(14,17,22,.06);
+  --sh-2: 0 4px 16px rgba(14,17,22,.07), 0 1px 3px rgba(14,17,22,.04);
+  --sh-3: 0 16px 40px rgba(14,17,22,.10), 0 4px 12px rgba(14,17,22,.05);
+
+  /* Type */
+  --f-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html, body { margin: 0; padding: 0; background: #F0EEE9; color: var(--ink); font-family: var(--f-sans); -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+
+/* ─── Phone-screen scoped resets (inside device frames) ─── */
+.tc { font-family: var(--f-sans); color: var(--ink); font-size: 14px; line-height: 1.4; letter-spacing: -0.005em; }
+.tc * { box-sizing: border-box; }
+.tc button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+
+/* Animations */
+@keyframes tc-pulse {
+  0%, 100% { transform: scale(1); opacity: .85; }
+  50%      { transform: scale(1.18); opacity: 1; }
+}
+@keyframes tc-ring {
+  0%   { transform: scale(.6); opacity: .9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes tc-blink {
+  0%, 60%, 100% { opacity: 1; }
+  70%, 95%      { opacity: .35; }
+}
+@keyframes tc-scroll-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+@keyframes tc-toast-in {
+  from { transform: translate(-50%, 8px); opacity: 0; }
+  to   { transform: translate(-50%, 0); opacity: 1; }
+}
+@keyframes tc-cursor-glide {
+  0%   { transform: translate(120px, 90px); }
+  35%  { transform: translate(120px, 90px); }
+  60%  { transform: translate(58px, 220px); }
+  100% { transform: translate(58px, 220px); }
+}
+
+.tc-live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--live);
+  animation: tc-blink 1.8s ease-in-out infinite;
+  display: inline-block;
+}

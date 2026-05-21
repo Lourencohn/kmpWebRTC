@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TrovataCast · pacote para Claude Code</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #FAFAF6; --surface: #FFFFFF; --surface-2: #F4F4EE;
+      --line: #E5E4DC; --ink: #0E1116; --ink-2: #2B313A; --ink-3: #5A6470; --ink-4: #8A93A0;
+      --brand: #2456E0; --brand-2: #1A41AE; --brand-tint: #EAEFFE;
+      --jade: #0E8F6E; --jade-tint: #DFF3EC;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; background: #F0EEE9; color: var(--ink);
+      font-family: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased; letter-spacing: -0.005em;
+    }
+    .page { max-width: 1080px; margin: 0 auto; padding: 60px 32px 80px; }
+    .mark {
+      display: inline-flex; align-items: center; gap: 12px;
+      padding: 8px 14px 8px 8px; border-radius: 999px;
+      background: var(--surface); border: 1px solid var(--line);
+      box-shadow: 0 1px 2px rgba(14,17,22,.06);
+    }
+    .mark-square {
+      width: 28px; height: 28px; border-radius: 8px; background: var(--ink); color: #fff;
+      display: flex; align-items: center; justify-content: center; position: relative;
+    }
+    .mark-square .ring {
+      width: 14px; height: 14px; border-radius: 50%; border: 2.8px solid #fff; position: relative;
+    }
+    .mark-square .dot {
+      position: absolute; right: -4px; bottom: -2px;
+      width: 6px; height: 6px; border-radius: 50%; background: var(--jade);
+      border: 1.5px solid var(--ink);
+    }
+    .mark-text {
+      font-weight: 600; font-size: 14px; letter-spacing: -0.01em;
+    }
+    .mark-tag {
+      font-size: 10.5px; color: var(--ink-4);
+      text-transform: uppercase; letter-spacing: 0.10em; font-weight: 600;
+      margin-left: 4px;
+    }
+    h1 {
+      margin: 32px 0 14px; font-size: 56px; font-weight: 600;
+      letter-spacing: -0.035em; line-height: 1.02;
+    }
+    .lede {
+      font-size: 18px; line-height: 1.5; color: var(--ink-3); max-width: 680px;
+    }
+    .lede b { color: var(--ink); font-weight: 500; }
+
+    .grid {
+      margin-top: 48px; display: grid;
+      grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: stretch;
+    }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 18px; padding: 24px;
+    }
+    .card.hero {
+      background: linear-gradient(180deg, #FFFFFF, #FBFAF4);
+      box-shadow: 0 4px 16px rgba(14,17,22,.05), 0 1px 3px rgba(14,17,22,.04);
+    }
+    .card-tag {
+      display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; border-radius: 999px;
+      background: var(--brand-tint); color: var(--brand-2); margin-bottom: 14px;
+    }
+    .card-tag.jade { background: var(--jade-tint); color: #0A6E55; }
+    .card h2 {
+      font-size: 22px; font-weight: 600; letter-spacing: -0.02em;
+      margin: 0 0 8px; color: var(--ink);
+    }
+    .card p { font-size: 14px; color: var(--ink-3); line-height: 1.5; margin: 0; }
+
+    .actions { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 0 16px; height: 44px; border-radius: 12px;
+      font-size: 14.5px; font-weight: 500; letter-spacing: -0.005em;
+      text-decoration: none; border: 1px solid transparent; white-space: nowrap;
+    }
+    .btn-primary { background: var(--brand); color: #fff; border-color: var(--brand-2); }
+    .btn-surface { background: var(--surface); color: var(--ink); border-color: var(--line);
+                   box-shadow: 0 1px 2px rgba(14,17,22,.06); }
+    .btn-ghost   { background: transparent; color: var(--ink); border-color: var(--line); }
+
+    .files {
+      margin-top: 48px;
+    }
+    .files-grid {
+      margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+      background: var(--line); border: 1px solid var(--line);
+      border-radius: 14px; overflow: hidden;
+    }
+    @media (max-width: 640px) { .files-grid { grid-template-columns: 1fr; } }
+    .file {
+      background: var(--surface); padding: 16px 18px;
+      display: flex; gap: 12px; align-items: flex-start;
+    }
+    .file-num {
+      flex: 0 0 28px; height: 28px; border-radius: 8px;
+      background: var(--surface-2); color: var(--ink-3);
+      font-family: "Geist Mono", monospace; font-size: 12px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .file-name {
+      font-family: "Geist Mono", monospace; font-size: 12.5px;
+      color: var(--ink-2); font-weight: 500;
+    }
+    .file-desc { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.4; }
+
+    .section-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--ink-4); margin-bottom: 8px;
+    }
+    .repo-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border-radius: 10px; background: var(--ink); color: #fff;
+      font-family: "Geist Mono", monospace; font-size: 12.5px; font-weight: 500;
+      margin-top: 20px;
+    }
+    .stack-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+    .stack-pill {
+      padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 500;
+      background: var(--surface-2); color: var(--ink-2);
+      border: 1px solid var(--line);
+    }
+    .stack-pill.brand { background: var(--brand-tint); color: var(--brand-2); border-color: transparent; }
+    .stack-pill.jade  { background: var(--jade-tint); color: #0A6E55; border-color: transparent; }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="mark">
+      <div class="mark-square">
+        <div class="ring"><div class="dot"></div></div>
+      </div>
+      <span class="mark-text">TrovataCast</span>
+      <span class="mark-tag">Pacote para Claude Code</span>
+    </div>
+
+    <h1>Tudo que o Claude<br/>Code precisa para<br/>continuar daqui.</h1>
+    <p class="lede">
+      Conceito, fluxos, sistema visual, decisões de stack <b>KMP + WebRTC</b>, arquitetura de módulos, roadmap milestone-a-milestone e um <b>protótipo HTML</b> como referência viva. Pronto para empurrar pro repositório.
+    </p>
+
+    <div class="stack-row">
+      <span class="stack-pill brand">Kotlin Multiplatform</span>
+      <span class="stack-pill brand">Compose Multiplatform</span>
+      <span class="stack-pill jade">WebRTC P2P</span>
+      <span class="stack-pill">Ktor</span>
+      <span class="stack-pill">SQLDelight</span>
+      <span class="stack-pill">Koin</span>
+    </div>
+
+    <div class="grid">
+
+      <div class="card hero">
+        <div class="card-tag">Comece por aqui</div>
+        <h2>Protótipo visual — 7 cenas</h2>
+        <p>
+          iPhone do vendedor e navegador Android do cliente lado a lado: preparar sessão, entrar pelo link, co-presença ao vivo, detalhe de produto, encerramento com pedido pronto, catálogo assíncrono e pipeline.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="prototype/index.html">Abrir protótipo →</a>
+          <a class="btn btn-ghost" href="CLAUDE.md">Ler CLAUDE.md</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-tag jade">Repositório alvo</div>
+        <h2>kmpWebRTC</h2>
+        <p>
+          Conteúdo deste pacote é o que vai pro topo do repo. Coloque os arquivos na raiz e siga o roadmap em <code>docs/06-roadmap.md</code>.
+        </p>
+        <div class="repo-pill">github.com/Lourencohn/kmpWebRTC</div>
+      </div>
+
+    </div>
+
+    <div class="files">
+      <div class="section-label">O que tem dentro</div>
+
+      <div class="files-grid">
+        <div class="file">
+          <div class="file-num">★</div>
+          <div>
+            <div class="file-name">CLAUDE.md</div>
+            <div class="file-desc">Ponto de entrada para o Claude Code. Diz o que ler e em que ordem.</div>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-num">★</div>
+          <div>
+            <div class="file-name">README.md</div>
+            <div class="file-desc">README público do repositório, com início rápido.</div>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-num">00</div>
+          <div>
+            <div class="file-name">docs/00-concept.md</div>
+            <div class="file-desc">Documento conceitual original. Fonte da verdade.</div>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-num">01</div>
+          <div>
+            <div class="file-name">docs/01-product-flows.md</div>
+            <div class="file-desc">29 fluxos divididos em 4 ondas. Inclui protocolo de eventos do DC.</div>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-num">02</div>
+          <div>
+            <div class="file-name">docs/02-design-system.md</div>
+            <div class="file-desc">Tokens, tipografia Geist, componentes, copywriting.</div>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-num">03</div>
+          <div>
+            <div class="file-name">docs/03-stack-kmp-webrtc.md</div>
+            <div class="file-desc">Stack completa, libs com versão e racional, riscos conhecidos.</div>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-num">04</div>
+          <div>
+            <div class="file-name">docs/04-architecture.md</div>
+            <div class="file-desc">Estrutura de módulos KMP + spec do protocolo Data Channel.</div>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-num">05</div>
+          <div>
+            <div class="file-name">docs/05-screens-reference.md</div>
+            <div class="file-desc">Cada tela do protótipo mapeada para Compose.</div>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-num">06</div>
+          <div>
+            <div class="file-name">docs/06-roadmap.md</div>
+            <div class="file-desc">12 milestones para o MVP + ondas 2, 3 e 4.</div>
+          </div>
+        </div>
+        <div class="file">
+          <div class="file-num">UI</div>
+          <div>
+            <div class="file-name">prototype/</div>
+            <div class="file-desc">Protótipo HTML completo, referência viva do produto.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 32px;">
+      <div class="card-tag">Próximos passos</div>
+      <h2>Como continuar com Claude Code</h2>
+      <p style="margin-bottom: 14px;">
+        <b style="color: var(--ink)">1.</b> Baixe o zip neste chat.<br/>
+        <b style="color: var(--ink)">2.</b> Descompacte na raiz do repo <code>kmpWebRTC</code> e faça commit inicial.<br/>
+        <b style="color: var(--ink)">3.</b> Abra o repositório com Claude Code; ele encontra <code>CLAUDE.md</code> automaticamente.<br/>
+        <b style="color: var(--ink)">4.</b> Diga: <i>"comece pelo Milestone 0 do roadmap"</i> e vá milestone por milestone.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
