@@ -9,8 +9,8 @@
 | Milestone | Status | PR / commit | Notas |
 |---|---|---|---|
 | M0 — Esqueleto e tooling | ✅ concluído | init scaffold | 5 superfícies sobem, 5 jobs CI verdes |
-| M1 — Componentes do design system | 🚧 próximo | — | Pill, Btn, ProductCard, VideoTile, RemotePointer |
-| M2 — Sessões (Home do vendedor) | ⏳ pendente | — | depende de M1 |
+| M1 — Componentes do design system | ✅ concluído | m1 design system | Pill, Btn, ProductCard, VideoTile, RemotePointer, TabBar, Garments, DesignSystemPreview |
+| M2 — Sessões (Home do vendedor) | 🚧 próximo | — | depende de M1 |
 | M3 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
 ---
@@ -57,36 +57,59 @@ trovatacast/
 
 ---
 
-## Próximo milestone — M1: Componentes do design system
+## O que foi entregue no M1
 
-Critério de aceitação do roadmap: *side-by-side com o protótipo, nenhuma divergência visual perceptível em telas chave.*
+### Componentes (commonMain)
+- `Pill` — tones neutral/brand/jade/live (pulsa)/ghost/dark, ícone 12dp opcional.
+- `Btn` — kinds primary/jade/soft/ghost/surface/dark/danger × sm/md/lg, ícone opcional.
+- `IconBtn` — toolbar circular, kinds soft/dark/danger/jade/brand/line + estado active.
+- `Avatar` — iniciais sobre fundo OKLCH por hue (consistência por usuário).
+- `TrovataCard` — superfície + borda + sh1.
+- `SectionLabel` — small caps Ink4 + ação opcional à direita.
+- `ScreenHeader` — title + subtitle + eyebrow + trailing.
+- `Garment` — 9 silhuetas (shirt, polo, tee, dress, jacket, pants, shoe, sweater, skirt) renderizadas como `ImageVector` parametrizado por tint, mantendo acentos com alpha.
+- `ProductCard` — sm/md/lg com `highlight`, `pointed`, `inCart`, tag (Novo / Top venda / Pré-venda), bullets de cor + `+N`.
+- `ProductRow` — variante linha (sm/md/lg) para carrinho/histórico.
+- `VideoTile` — gradiente radial OKLCH simulando rosto + ombros + chip de nome com dot (verde/cinza); aspecto 1:1.34 e modo `mini` 1:1.
+- `RemotePointer` — seta filled em OKLCH + label colorido, posicionável via `offset`.
+- `TabBar` — Sessões / Catálogo / Clientes / Insights, light e dark.
 
-### Componentes a construir (ordem sugerida)
-1. **Pill** — `commonMain/ui/components/Pill.kt`. Variantes: `neutral`, `brand`, `jade`, `live` (pulsa), `ghost`, `dark`. Ícone opcional 12dp.
-2. **Btn** — `Btn.kt`. Variantes: `primary`, `jade`, `soft`, `ghost`, `surface`, `dark`, `danger`. Tamanhos sm/md/lg.
-3. **Icon** + Icons object — adaptar do `prototype/ui.jsx` (Lucide-style, stroke 1.6-1.8).
-4. **Avatar** — iniciais sobre fundo `oklch(86% 0.07 hue)`. Hue por cliente.
-5. **Card** — base com `r3` + `sh1`.
-6. **SectionLabel** — small caps Ink4 + ação opcional.
-7. **ProductCard** — todas as variantes (sm/md/lg, highlight, pointed, inCart). Cor de fundo da peça (sand/sage/terracota/...).
-8. **ProductRow** — versão linha.
-9. **VideoTile** — gradiente radial simulando rosto. Aspecto 1:1.34.
-10. **RemotePointer** — seta + label. Cor por usuário (hue 30 vendedor / 210 cliente).
-11. **TabBar** iOS-style — 4 abas (Sessões, Catálogo, Clientes, Insights).
-12. **Garments** — silhuetas SVG (`shirt`, `polo`, `tee`, `dress`, `jacket`, `pants`, `shoe`, `sweater`, `skirt`).
-13. **`DesignSystemPreview`** — tela storybook-like renderizando todos.
+### Ícones
+- `app.trovata.cast.ui.icons.TrovataIcons` — 47 ícones (mesmo set do `prototype/ui.jsx`) como `ImageVector` stroke-only (1.6dp default, round caps/joins).
 
-### Onde mora cada coisa
-- Componentes Compose: `composeApp/src/commonMain/kotlin/app/trovata/cast/ui/components/`.
-- Ícones: `composeApp/src/commonMain/kotlin/app/trovata/cast/ui/icons/Icons.kt`.
-- Catálogo hardcoded (pra preview): `composeApp/src/commonMain/kotlin/app/trovata/cast/data/sample/SampleCatalog.kt`.
-- Preview screen: `composeApp/src/commonMain/kotlin/app/trovata/cast/ui/screens/preview/DesignSystemScreen.kt`.
+### Catálogo de amostra
+- `app.trovata.cast.data.sample.SampleCatalog` — Coleção Outono · Atelier Norte com 9 SKUs (espelha `prototype/catalog.jsx`).
+- `FashionPalette` — 8 tintas (sand, sage, walnut, slate-blue, terracota, graphite, mustard, moss).
+- `ProductSwatchPalette` — 4 cores de bullet padrão.
 
-### Como atacar
-- Branch: `feat/m1-design-system`.
-- PR único cobrindo todos os componentes (M1 é uma unidade conceitual).
-- Para cada componente: abrir o protótipo HTML correspondente, ler `prototype/ui.jsx` / `prototype/catalog.jsx`, escrever o equivalente em Compose, comparar lado a lado.
-- Testes: screenshot tests opcionais; comparação visual manual é o critério principal.
+### Cor
+- `app.trovata.cast.ui.color.oklch(l%, c, h)` — conversor OKLCH → linear sRGB → sRGB cross-platform, alimenta Avatar, VideoTile, RemotePointer e borda de "apontando".
+- `HueRoles` — vendedor=30, cliente=210, neutro=220.
+
+### Preview
+- `app.trovata.cast.ui.screens.preview.DesignSystemScreen` — storybook lazy column com todas as variantes; `App.kt` agora renderiza essa tela em iOS + Android.
+
+### Aceitação validada
+- `./gradlew :composeApp:compileDebugKotlinAndroid` ✅
+- `./gradlew :composeApp:compileKotlinIosSimulatorArm64` ✅
+- `./gradlew :composeApp:assembleDebug` ✅
+- Comparação visual com `prototype/index.html` — match em proporções, tipografia, hierarquia de cor.
+
+---
+
+## Próximo milestone — M2: Sessões (Home do vendedor)
+
+Critério de aceitação do roadmap: a Home do vendedor (`SellerHome`) renderiza com dados de sessão simulados, navega entre as 4 abas, e abre placeholders para chamadas recebidas e em preparação.
+
+### Telas (commonMain/ui/screens/sessions/)
+1. **`SellerHomeScreen`** — header com saudação + métrica do dia, lista de "Próximas" + "Esta semana" + "Histórico", FAB "Convidar cliente".
+2. **`IncomingCallScreen`** — preview ao receber chamada com `Atender` (Jade) / `Recusar` (Danger) + `Reagendar`.
+3. **`SessionPrepScreen`** — checklist pré-chamada (catálogo, áudio, conexão) antes de entrar ao vivo.
+
+### Dependências
+- Sample data: `data/sample/SampleSessions.kt` (espelha o protótipo).
+- ViewModels com `StateFlow`: `feature/sessions/SessionsViewModel.kt`.
+- Navegação: ainda placeholder em `ui/nav/` (Voyager ou compose-navigation-multiplatform virão em M3).
 
 ---
 
@@ -95,3 +118,4 @@ Critério de aceitação do roadmap: *side-by-side com o protótipo, nenhuma div
 | Data | Marco |
 |---|---|
 | 2026-05-20 | M0 fechado: estrutura KMP + 4 superfícies + CI |
+| 2026-05-20 | M1 fechado: design system completo (13 componentes + 47 ícones + 9 silhuetas + preview) |
