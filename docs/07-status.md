@@ -384,11 +384,40 @@ trovatacast/
 - ~US$ 2/mês com 1 máquina shared-cpu-1x (rodar `fly scale count 1` se o Fly subiu 2 por padrão de HA).
 - Fly.io não tem feature de "spend limit"; recomendado cartão virtual com teto se preocupação for crítica.
 
+### Validação em produção (2026-05-22)
+- iPhone vendedor em **3G** + buyer no Chrome desktop → `POST /session` 201, `wss://` 101 em ambos os lados, P2P estabelecido. Mac do vendedor não precisou estar rodando o signaling.
+- Reconnect rudimentar funcionou: WS dropou (`NSURLErrorNetworkConnectionLost`) sob 3G ruim, app criou nova sessão automaticamente.
+
 ### Dívidas conhecidas
-- **`PUBLIC_BUYER_URL`** não setado no Fly.io — `POST /session` ainda devolve URLs com `http://localhost:5173`. Setar quando webBuyer for hospedado (Cloudflare Pages / Netlify).
-- **Webbuyer ainda local** — depende de `npm run dev` no Mac do vendedor. Próximo passo natural pra eliminar o Mac.
+- **`PUBLIC_BUYER_URL`** não setado no Fly.io — `POST /session` ainda devolve URLs com `http://localhost:5173`. Setar quando webBuyer for hospedado.
+- **Webbuyer ainda local** — depende de `npm run dev` no Mac do vendedor. Próximo passo natural pra eliminar o Mac (ver seção abaixo).
 - **TURN não wired** — Cloudflare Realtime TURN tem 1TB/mês grátis; entrar antes de qualquer beta em rede móvel real.
 - **Restart com perda de sessões in-memory** — `SessionStore` + `RoomManager` vivem só na RAM. Persistência Postgres entra em M9 (Order).
+- **iOS `AURemoteIO StartIO failed (561145187)`** observado quando o WS reconecta após queda de rede — pipeline de áudio não retoma. Sintoma: a primeira chamada conecta; depois de um drop+retry, o áudio não inicia. Suspeitas: `AVAudioSession` não liberado entre tentativas ou categoria incorreta no `webrtc-kmp` iOS. Investigar antes do M10 (reconexão + qualidade) — combina com ICE restart.
+- **Reconnect resiliente** — o app só refaz `POST /session` quando o WS quebra; precisaria reaproveitar token + sessão existente. Entra em M10.
+
+---
+
+## Próximo passo de infra — webBuyer no Cloudflare Pages
+
+Sem isso, o link gerado pelo signaling continua apontando pra `http://localhost:5173` e o vendedor precisa do Mac rodando `npm run dev` pro cliente abrir. Cloudflare Pages serve estático grátis com HTTPS + CDN + zero cold start.
+
+### Fluxo planejado
+1. Conta Cloudflare (grátis, sem cartão) + projeto Pages conectado ao repo GitHub.
+2. `.github/workflows/web-buyer-deploy.yml` que, em cada push na `main`, faz `npm ci && npm run build` no `webBuyer/` e publica o `dist/` em produção via `cloudflare/wrangler-action` ou integração nativa do Pages.
+3. URL final esperada: `https://trovatacast-buyer.pages.dev` (ou domínio custom depois).
+4. `VITE_SIGNALING_BASE` setado no Pages como variável de build apontando pra `https://trovatacast-signaling.fly.dev`.
+5. No Fly.io: `fly secrets set PUBLIC_BUYER_URL=https://<url-final> --app trovatacast-signaling` pra que o `POST /session` retorne URLs corretas.
+
+### Validação esperada
+- Gerar sessão no app vendedor → link copiado vem com `https://<url-final>/?t=<token>`.
+- Cliente abre o link em qualquer celular/rede → conecta direto, sem Mac.
+- Mac desligado durante todo o fluxo.
+
+### Limpezas que entram junto
+- Remover `cleartextTrafficPermitted` para `10.0.2.2`/`localhost` em [network_security_config.xml](../composeApp/src/androidMain/res/xml/network_security_config.xml) (não é mais necessário).
+- Remover `NSAllowsArbitraryLoads` em [Info.plist](../iosApp/iosApp/Info.plist) (Apple rejeita em App Review).
+- Remover proxy `http://127.0.0.1:8080` em [vite.config.ts](../webBuyer/vite.config.ts) — produção não usa Vite dev server.
 
 ---
 
@@ -419,3 +448,4 @@ Critério de aceitação: pedido se constrói em tempo real visto pelos dois lad
 | 2026-05-21 | M6 fechado: mute na UI dos dois lados + áudio remoto anexado + banner refinado |
 | 2026-05-21 | M7 fechado: DC Scroll/PointAt + grade de catálogo na LiveCall + halo de produto apontado |
 | 2026-05-22 | Infra: signaling deployado no Fly.io `gru`, clientes apontados para `https://trovatacast-signaling.fly.dev`, Mac não mais necessário para o servidor |
+| 2026-05-22 | Validação E2E: iPhone em 3G + buyer desktop através do Fly.io estabeleceram WSS + WebRTC; ficou registrada dívida de `AURemoteIO` no iOS após reconnect (M10) e webBuyer ainda local (próximo passo de infra) |
