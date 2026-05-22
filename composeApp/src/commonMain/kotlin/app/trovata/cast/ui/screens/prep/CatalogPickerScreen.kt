@@ -72,8 +72,8 @@ data class CatalogPickerScreen(
         }
         val screenModel = rememberScreenModel {
             CatalogPickerScreenModel(
-                sessionsApi = container.sessionsApi,
-                repository = container.sessionsRepository,
+                createSession = container.sessionsApi::createSession,
+                persistSession = container.sessionsRepository::persistCreated,
                 initialClient = initial,
             )
         }

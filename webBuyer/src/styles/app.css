@@ -149,6 +149,17 @@ main#app {
   cursor: default;
 }
 
+.arrival-cta--ghost {
+  background: transparent;
+  color: var(--brand);
+  border: 1px solid var(--line);
+}
+
+.arrival-cta--ghost:hover:not([disabled]) {
+  background: var(--brand-tint);
+  color: var(--brand-2);
+}
+
 .arrival-hint {
   margin: 0;
   font-size: 12px;

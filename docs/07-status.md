@@ -12,8 +12,9 @@
 | M1 — Componentes do design system | ✅ concluído | m1 design system | Pill, Btn, ProductCard, VideoTile, RemotePointer, TabBar, Garments, DesignSystemPreview |
 | M2 — Sessões (Home do vendedor) | ✅ concluído | m2 sessions | SellerHome + IncomingCall + SessionPrep + SessionsViewModel + SampleSessions |
 | M3 — Catálogo + convite (link da sessão) | ✅ concluído | m3 catalog & invite | CatalogPicker + Invite + Voyager nav + REST + SQLDelight + webBuyer arrival |
-| M4 — Web buyer mínimo | 🚧 próximo | — | parcialmente entregue em M3 (BuyerArrival); falta CTA de áudio integrado |
-| M5 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
+| M4 — Web buyer mínimo | ✅ concluído | m4 web buyer + share + qr | Share intent nativo + QR + erros finos + persistência + 33 testes |
+| M5 — Sinalização + handshake WebRTC | 🚧 próximo | — | depende de M4 |
+| M6 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
 ---
 
@@ -190,20 +191,69 @@ trovatacast/
 
 ---
 
-## Próximo milestone — M4: Web buyer mínimo
+## O que foi entregue no M4
 
-Critério de aceitação: cliente abre o link gerado num celular real e vê tela de chegada com nome real do vendedor; CTA "Entrar com áudio" pede permissão de mic.
+### Share intent nativo (`composeApp/`)
+- `ShareController` (expect class) + actuals Android (`Intent.ACTION_SEND` via `Intent.createChooser`) e iOS (`UIActivityViewController` apresentado no top view controller).
+- `ActivityProvider` (Android-only) — `WeakReference<Activity>` populado em `onCreate`/`onResume`/`onDestroy` do `MainActivity`.
+- `AppContainer.shareController` injeta em qualquer `Screen` que precise.
+- iOS resolve `keyWindow → rootViewController → presentedViewController` recursivo para encontrar o topo.
 
-### O que já está adiantado
-- Tela de chegada renderizada (parcialmente entregue no M3).
-- `GET /session/{token}` no servidor.
-- Pedido de mic via `getUserMedia`.
+### QR code (`composeApp/`)
+- Lib `io.github.alexzhirkevich:qrose:1.0.1` (Compose Multiplatform).
+- `QrCard(data, size)` em `ui/components` — `rememberQrCodePainter` com bolas circulares + pixels round-corner 0.5.
 
-### Falta
-- Share intent real Android + iOS (sair de placeholder).
-- QR code do link na `InviteScreen` (cliente lê com a câmera).
-- Estados de erro mais finos no webBuyer (rede offline, token expirado vs inválido).
-- Persistência de "ultima sessão aberta" no webBuyer para retomar após reload.
+### InviteScreen rev2
+- Seção nova "QR para o cliente" com `QrCard(record.url)` ao lado da explicação.
+- Botões `WhatsApp` / `Outro app` agora chamam `share.share(text, "Catálogo TrovataCast")`.
+- Botão `Enviar link` (substituiu "Abrir teste") compartilha só o URL.
+- Botão `Copiar link` usa `LocalClipboardManager` real (multiplataforma).
+
+### CatalogPickerScreenModel testável
+- Refatorado: agora aceita `createSession: CreateSessionFn` e `persistSession: PersistSessionFn` (typealiases de função suspend), em vez de receber `SessionsApi` + `SessionsRepository` concretos. Permite fakes sem extrair interfaces nem usar mocks.
+- Construído com `container.sessionsApi::createSession` e `container.sessionsRepository::persistCreated` na produção.
+
+### Web buyer rev2
+- `api/sessions.ts` — `fetchSession(baseUrl, token, deps)` com `SessionFetchError` discriminada por `kind` (`network`/`not_found`/`expired`/`server`/`malformed`); injeção de `fetchImpl` e `now` para testes.
+- `storage/lastSession.ts` — `saveLastSession`/`loadLastSession`/`clearLastSession` com `localStorage` + fallback seguro quando indisponível.
+- `views/arrival.ts` — assinaturas com `ArrivalActions` injetáveis; `renderError` mostra título por `kind` e label de retry contextual; `renderLanding` exibe botão "Voltar para a última sessão" se `lastToken`.
+- `main.ts` — leitura do token, retomada do último, rerun após erro, atualização de URL via `history.replaceState`, request de mic apenas para validar permissão (stoppa o stream).
+- Novos estilos: `arrival-cta--ghost` para o botão de retomar.
+
+### Testes
+- **Kotlin commonTest** (`:composeApp:testDebugUnitTest`): `CatalogPickerScreenModelTest` — 8 testes cobrindo `toggle`, `setFilter`, `skuCount`, `clearError`, `generateLink` (vazio, happy path, falha do servidor) e `consumeCreatedSession`. Usa `StandardTestDispatcher` + `Dispatchers.setMain`.
+- **TypeScript vitest** (`npm test`): 25 testes em 3 arquivos.
+  - `api/sessions`: 8 testes (happy path, trailing slash, 404, 500, network fail, JSON quebrado, schema errado, expirado).
+  - `views/arrival`: 11 testes (todos os 4 estados, ação de retry, callback de reopen-last, ação de mic happy/fail, escape de HTML).
+  - `storage/lastSession`: 6 testes (roundtrip, vazio, JSON corrompido, schema inválido, clear, storage null).
+- **CI**: workflows atualizados — `web-buyer` roda `npm test` antes de `npm run build`; `android` roda `:composeApp:testDebugUnitTest` antes de `assembleDebug`.
+
+### Aceitação validada
+- `./gradlew :protocol:jvmTest` ✅ (4 testes)
+- `./gradlew :signalingServer:test` ✅ (5 testes)
+- `./gradlew :composeApp:testDebugUnitTest` ✅ (8 testes)
+- `./gradlew :composeApp:assembleDebug` ✅
+- `./gradlew :composeApp:compileKotlinIosSimulatorArm64` ✅
+- `(cd webBuyer && npm run typecheck && npm test && npm run build)` ✅ (25 testes)
+
+### Dívidas conhecidas
+- **iPad popoverPresentationController** para `UIActivityViewController`: não setado — abre como sheet só no iPhone. iPad faria crash sem source view. Fix antes de qualquer release iPad.
+- **Compartilhamento durante navegação**: `Intent.createChooser` no Android exige Activity viva (capturada via `ActivityProvider`); se a Activity for destruída e o singleton segurar uma stale ref, o share vira no-op. Aceitável para M4.
+- **Persistência de mídia**: o webBuyer hoje só faz `getUserMedia` para checar permissão e libera os tracks. O stream real entra em M5.
+- **Reabrir sessão expirada**: se o backend já removeu a sessão (TTL 24h), o usuário cai em `not_found` e o lastSession é limpo. Não há mensagem específica para "passou da validade no servidor" vs "validade local". Aceitável.
+
+---
+
+## Próximo milestone — M5: Sinalização + handshake WebRTC
+
+Critério de aceitação: dois aparelhos se conectam P2P, sem mídia ainda. Data channel aberto, ping/pong via DC funciona, ICE restart manual reconecta.
+
+### A construir
+- WebSocket no servidor: `/ws/session/<token>` orquestra `offer/answer/ice`.
+- `PeerConnection` no Android (actual) com `webrtc-kmp` ou Google `webrtc-android`.
+- `PeerConnection` no iOS (actual) — Podfile + `WebRTC.framework`.
+- `PeerConnection` no web buyer (nativo).
+- DC envia `Presence` ping a cada 5s.
 
 ---
 
@@ -215,3 +265,4 @@ Critério de aceitação: cliente abre o link gerado num celular real e vê tela
 | 2026-05-20 | M1 fechado: design system completo (13 componentes + 47 ícones + 9 silhuetas + preview) |
 | 2026-05-21 | M2 fechado: SellerHome + IncomingCall + SessionPrep + ViewModel com StateFlow |
 | 2026-05-21 | M3 fechado: CatalogPicker + Invite + Voyager + REST `/session` + SQLDelight + webBuyer arrival |
+| 2026-05-21 | M4 fechado: share intent nativo + QR + erros finos no webBuyer + persistência + 33 testes (8 Kotlin + 25 TS) |

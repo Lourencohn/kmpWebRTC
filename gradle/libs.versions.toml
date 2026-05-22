@@ -34,6 +34,9 @@ coil = "3.0.4"
 # Navigation (MP)
 voyager = "1.1.0-beta03"
 
+# QR code (Compose Multiplatform)
+qrose = "1.0.1"
+
 # Logging
 kermit = "2.0.5"
 
@@ -111,6 +114,9 @@ coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor3", version.re
 voyager-navigator = { module = "cafe.adriel.voyager:voyager-navigator", version.ref = "voyager" }
 voyager-screenmodel = { module = "cafe.adriel.voyager:voyager-screenmodel", version.ref = "voyager" }
 voyager-transitions = { module = "cafe.adriel.voyager:voyager-transitions", version.ref = "voyager" }
+
+# QR
+qrose = { module = "io.github.alexzhirkevich:qrose", version.ref = "qrose" }
 
 # Logging
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }

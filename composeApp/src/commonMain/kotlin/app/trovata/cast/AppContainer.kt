@@ -7,6 +7,7 @@ import app.trovata.cast.data.remote.SessionsApi
 import app.trovata.cast.db.TrovataDatabase
 import app.trovata.cast.feature.sessions.SessionsViewModel
 import app.trovata.cast.platform.DatabaseDriverFactory
+import app.trovata.cast.platform.ShareController
 
 class AppContainer(driverFactory: DatabaseDriverFactory) {
     private val driver: SqlDriver = driverFactory.create()
@@ -16,6 +17,7 @@ class AppContainer(driverFactory: DatabaseDriverFactory) {
     val sessionsRepository: SessionsRepository = SessionsRepository(database)
     val sessionsApi: SessionsApi = SessionsApi(httpClient)
     val sessionsViewModel: SessionsViewModel = SessionsViewModel()
+    val shareController: ShareController = ShareController()
 }
 
 object AppContainerHolder {

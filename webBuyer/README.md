@@ -24,6 +24,15 @@ npm run build
 npm run typecheck
 ```
 
+## Testes
+
+```bash
+npm test            # roda vitest uma vez
+npm run test:watch  # modo watch (jsdom)
+```
+
+Cobertura atual: `api/sessions`, `views/arrival`, `storage/lastSession`.
+
 ## Configuração
 
 Defina o servidor de sinalização via `.env` (veja `.env.example`):
@@ -38,21 +47,28 @@ Sem essa variável o webBuyer assume `http://localhost:8080`.
 
 ```
 webBuyer/
-├── index.html               ← entry
+├── index.html                       ← entry
 ├── src/
-│   ├── main.ts              ← boot: lê ?t=<token>, chama /session/{token}
+│   ├── main.ts                      ← boot: lê ?t=<token>, retoma última sessão, pede mic
+│   ├── api/
+│   │   ├── sessions.ts              ← fetchSession + SessionFetchError discriminada
+│   │   └── __tests__/sessions.test.ts
+│   ├── storage/
+│   │   ├── lastSession.ts           ← save/load/clear via localStorage (com fallback null)
+│   │   └── __tests__/lastSession.test.ts
 │   ├── views/
-│   │   └── arrival.ts       ← landing, loading, arrival, error
+│   │   ├── arrival.ts               ← landing | loading | arrival | error
+│   │   └── __tests__/arrival.test.ts
 │   └── styles/
-│       ├── tokens.css       ← cores/raios/sombras (espelho do design system)
-│       └── app.css          ← layout base + cards
+│       ├── tokens.css               ← cores/raios/sombras (espelho do design system)
+│       └── app.css                  ← layout base + cards + spinner
 ├── package.json
 ├── tsconfig.json
-└── vite.config.ts
+├── vite.config.ts
+└── vitest.config.ts
 ```
 
 ## Roadmap
 
-- **M0–M3** (entregue): wordmark, build verde, tela de chegada com `GET /session/{token}`, CTA de microfone.
-- **M4**: share intent / QR code, retomar última sessão, estados de erro mais finos.
+- **M0–M4** (entregue): boot, tela de chegada com `GET /session/{token}`, estados de erro finos, persistência da última sessão, CTA de mic.
 - **M5+**: WebRTC nativo do browser, peer + data channel, sincronização com o vendedor.

@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import app.trovata.cast.platform.ActivityProvider
 import app.trovata.cast.platform.DatabaseDriverFactory
 
 class MainActivity : ComponentActivity() {
@@ -11,8 +12,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         AppContainerHolder.init(AppContainer(DatabaseDriverFactory(applicationContext)))
+        ActivityProvider.attach(this)
         setContent {
             App()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ActivityProvider.attach(this)
+    }
+
+    override fun onDestroy() {
+        ActivityProvider.detach(this)
+        super.onDestroy()
     }
 }

@@ -2,7 +2,6 @@ package app.trovata.cast.ui.screens.invite
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,11 +26,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import app.trovata.cast.AppContainerHolder
 import app.trovata.cast.data.local.StoredSessionRecord
+import app.trovata.cast.platform.ShareController
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind
@@ -40,6 +43,7 @@ import app.trovata.cast.ui.components.IconBtn
 import app.trovata.cast.ui.components.IconBtnKind
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
+import app.trovata.cast.ui.components.QrCard
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.components.TrovataCard
 import app.trovata.cast.ui.icons.TrovataIcons
@@ -52,8 +56,10 @@ data class InviteScreen(val record: StoredSessionRecord) : Screen {
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
+        val container = AppContainerHolder.current
         InviteBody(
             record = record,
+            share = container.shareController,
             onBack = { navigator.pop() },
             onClose = { navigator.popUntilRoot() },
         )
@@ -63,11 +69,27 @@ data class InviteScreen(val record: StoredSessionRecord) : Screen {
 @Composable
 private fun InviteBody(
     record: StoredSessionRecord,
+    share: ShareController,
     onBack: () -> Unit,
     onClose: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
+    val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
+
+    val shareSubject = "Catálogo TrovataCast"
+    val sellerLine = record.sellerName
+    val clientFirstName = record.clientName?.split(' ')?.firstOrNull()
+    val greeting = if (clientFirstName != null) "Oi, $clientFirstName!" else "Olá!"
+    val shareText = buildString {
+        append(greeting)
+        append(' ')
+        append("Acabei de preparar uma sessão pra você: ")
+        append(record.collectionLabel)
+        append(". Abre o link no celular, sem precisar instalar nada: ")
+        append(record.url)
+    }
+    val whatsappText = shareText
 
     Box(modifier = Modifier.fillMaxSize().background(colors.bg)) {
         LazyColumn(
@@ -92,7 +114,7 @@ private fun InviteBody(
                             fontWeight = FontWeight.Medium,
                         )
                         Text(
-                            text = record.clientName?.let { "Para ${it.split(' ').first()}" } ?: "Pronto para enviar",
+                            text = clientFirstName?.let { "Para $it" } ?: "Pronto para enviar",
                             color = colors.ink,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -103,12 +125,46 @@ private fun InviteBody(
             }
 
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                ) {
-                    SuccessHero(record = record)
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    SuccessHero(record = record, sellerLine = sellerLine)
+                }
+            }
+
+            item {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    SectionLabel(
+                        text = "QR para o cliente",
+                        action = {
+                            Pill(
+                                text = "Aponta a câmera",
+                                tone = PillTone.Brand,
+                                icon = TrovataIcons.eye,
+                            )
+                        },
+                    )
+                    TrovataCard(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            QrCard(data = record.url, size = 132.dp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Mostre na tela",
+                                    color = colors.ink,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = "Funciona quando estão lado a lado. O cliente abre a câmera do celular e cai direto na sessão.",
+                                    color = colors.ink3,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -124,7 +180,15 @@ private fun InviteBody(
                             )
                         },
                     )
-                    LinkCard(url = record.url, copied = copied, onCopy = { copied = true })
+                    LinkCard(
+                        url = record.url,
+                        copied = copied,
+                        onCopy = {
+                            clipboard.setText(AnnotatedString(record.url))
+                            copied = true
+                        },
+                        onShareLinkOnly = { share.share(record.url, shareSubject) },
+                    )
                 }
             }
 
@@ -134,7 +198,7 @@ private fun InviteBody(
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Btn(
                             text = "WhatsApp",
-                            onClick = {},
+                            onClick = { share.share(whatsappText, shareSubject) },
                             kind = BtnKind.Jade,
                             size = BtnSize.Md,
                             icon = TrovataIcons.send,
@@ -142,7 +206,7 @@ private fun InviteBody(
                         )
                         Btn(
                             text = "Outro app",
-                            onClick = {},
+                            onClick = { share.share(shareText, shareSubject) },
                             kind = BtnKind.Soft,
                             size = BtnSize.Md,
                             icon = TrovataIcons.share,
@@ -189,7 +253,7 @@ private fun InviteBody(
 }
 
 @Composable
-private fun SuccessHero(record: StoredSessionRecord) {
+private fun SuccessHero(record: StoredSessionRecord, sellerLine: String) {
     val colors = TrovataTokens.colors
     TrovataCard(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -218,7 +282,7 @@ private fun SuccessHero(record: StoredSessionRecord) {
                     letterSpacing = (-0.01).em,
                 )
                 Text(
-                    text = record.collectionLabel,
+                    text = "$sellerLine · ${record.collectionLabel}",
                     color = colors.ink3,
                     fontSize = 12.5.sp,
                 )
@@ -235,7 +299,12 @@ private fun SuccessHero(record: StoredSessionRecord) {
 }
 
 @Composable
-private fun LinkCard(url: String, copied: Boolean, onCopy: () -> Unit) {
+private fun LinkCard(
+    url: String,
+    copied: Boolean,
+    onCopy: () -> Unit,
+    onShareLinkOnly: () -> Unit,
+) {
     val colors = TrovataTokens.colors
     TrovataCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -276,11 +345,11 @@ private fun LinkCard(url: String, copied: Boolean, onCopy: () -> Unit) {
                     modifier = Modifier.weight(1f),
                 )
                 Btn(
-                    text = "Abrir teste",
-                    onClick = {},
+                    text = "Enviar link",
+                    onClick = onShareLinkOnly,
                     kind = BtnKind.Ghost,
                     size = BtnSize.Sm,
-                    icon = TrovataIcons.globe,
+                    icon = TrovataIcons.share,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -364,3 +433,4 @@ private fun StickyClose(onClose: () -> Unit) {
         }
     }
 }
+

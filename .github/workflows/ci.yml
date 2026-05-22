@@ -33,7 +33,7 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :composeApp:assembleDebug --no-daemon
+      - run: ./gradlew :composeApp:testDebugUnitTest :composeApp:assembleDebug --no-daemon
 
   ios-framework:
     name: composeApp (iOS framework link)
@@ -74,4 +74,5 @@ jobs:
           cache-dependency-path: webBuyer/package-lock.json
       - run: npm ci || npm install
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
