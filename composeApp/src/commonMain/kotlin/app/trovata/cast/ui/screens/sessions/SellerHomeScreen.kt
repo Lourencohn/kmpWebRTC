@@ -47,7 +47,6 @@ import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
 import app.trovata.cast.ui.components.ScreenHeader
 import app.trovata.cast.ui.components.SectionLabel
-import app.trovata.cast.ui.components.TabBar
 import app.trovata.cast.ui.components.TrovataCard
 import app.trovata.cast.ui.icons.TrovataIcons
 
@@ -87,18 +86,12 @@ fun SellerHomeScreen(
             }
         }
 
-        Box(
+        InviteFab(
+            onClick = onInviteClient,
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-        ) {
-            Column {
-                InviteFab(onClick = onInviteClient, modifier = Modifier
-                    .align(Alignment.End)
-                    .padding(end = 16.dp, bottom = 14.dp))
-                TabBar(active = state.activeTab, onSelect = viewModel::selectTab)
-            }
-        }
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 14.dp),
+        )
     }
 }
 

@@ -26,6 +26,7 @@ export class PeerSession {
   private pc: RTCPeerConnection | null = null
   private dc: RTCDataChannel | null = null
   private peerId: string | null = null
+  private offerSent = false
   private presenceTimer: ReturnType<typeof setInterval> | null = null
   private offMessage: (() => void) | null = null
   private offStatus: (() => void) | null = null
@@ -57,9 +58,14 @@ export class PeerSession {
     this.offStatus = this.signaling.onStatus((s) => {
       if (s === 'failed' || s === 'closed') this.setStatus('failed', `signaling ${s}`)
     })
-    if (this.options.selfRole === 'Buyer') {
-      this.createOffer()
-    }
+  }
+
+  private maybeCreateOfferAsBuyer(): void {
+    if (this.options.selfRole !== 'Buyer') return
+    if (!this.peerId) return
+    if (this.offerSent) return
+    this.offerSent = true
+    void this.createOffer()
   }
 
   async restartIce(): Promise<void> {
@@ -91,6 +97,7 @@ export class PeerSession {
     this.dc = null
     this.pc?.close()
     this.pc = null
+    this.offerSent = false
     this.setStatus('closed', reason)
   }
 
@@ -142,10 +149,12 @@ export class PeerSession {
     if (m.type === 'roomState') {
       const other = m.peers.find((p) => p.peerId !== this.options.peerId)
       this.peerId = other?.peerId ?? null
+      this.maybeCreateOfferAsBuyer()
       return
     }
     if (m.type === 'peerJoined') {
       this.peerId = m.peer.peerId
+      this.maybeCreateOfferAsBuyer()
       return
     }
     if (m.type === 'peerLeft') {

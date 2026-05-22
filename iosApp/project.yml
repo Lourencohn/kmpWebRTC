@@ -7,9 +7,11 @@ options:
 
 settings:
   base:
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: U85FWGJMNC
+    CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.10"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
+    JAVA_HOME: /Applications/Android Studio.app/Contents/jbr/Contents/Home
 
 targets:
   iosApp:
@@ -32,18 +34,18 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         NSMicrophoneUsageDescription: "TrovataCast usa o microfone para chamadas com clientes."
         NSCameraUsageDescription: "TrovataCast usa a câmera para o seu vídeo durante a chamada."
+        NSLocalNetworkUsageDescription: "TrovataCast conecta ao servidor local durante o desenvolvimento."
         ITSAppUsesNonExemptEncryption: false
+        CADisableMinimumFrameDurationOnPhone: true
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.trovata.cast
         TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_DEBUG_DYLIB: NO
+        ENABLE_PREVIEWS: NO
         FRAMEWORK_SEARCH_PATHS:
           - "$(inherited)"
-          - "$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
-        OTHER_LDFLAGS: "$(inherited) -framework ComposeApp"
-    preBuildScripts:
-      - name: Build Kotlin Framework
-        basedOnDependencyAnalysis: false
-        script: |
-          cd "$SRCROOT/.."
-          ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode
+        OTHER_LDFLAGS: "$(inherited) -framework ComposeApp -lsqlite3"

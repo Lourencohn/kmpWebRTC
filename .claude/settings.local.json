@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf /Users/ltcloud/Library/Developer/Xcode/DerivedData/iosApp-*)",
+      "Bash(xcodebuild -workspace iosApp.xcworkspace -scheme iosApp -configuration Debug -destination 'generic/platform=iOS' -allowProvisioningUpdates build)"
+    ]
+  }
+}

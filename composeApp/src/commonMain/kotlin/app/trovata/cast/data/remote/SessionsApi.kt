@@ -14,6 +14,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.CancellationException
 
 sealed class SessionsApiResult<out T> {
     data class Ok<T>(val value: T) : SessionsApiResult<T>()
@@ -24,26 +25,41 @@ class SessionsApi(
     private val client: HttpClient,
     private val baseUrl: String = ServerConfig.baseUrl,
 ) {
-    suspend fun createSession(request: SessionCreateRequest): SessionsApiResult<SessionCreateResponse> {
-        val response = client.post("$baseUrl/session") {
-            contentType(ContentType.Application.Json)
-            setBody(request)
+    suspend fun createSession(request: SessionCreateRequest): SessionsApiResult<SessionCreateResponse> =
+        safeCall {
+            val response = client.post("$baseUrl/session") {
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+            if (response.status.isSuccess()) {
+                SessionsApiResult.Ok(response.body())
+            } else {
+                failureFromBody(response.status, response.body<ErrorResponse?>())
+            }
         }
-        return if (response.status.isSuccess()) {
-            SessionsApiResult.Ok(response.body())
-        } else {
-            failureFromBody(response.status, response.body<ErrorResponse?>())
-        }
-    }
 
-    suspend fun fetchSession(token: String): SessionsApiResult<SessionInfo> {
-        val response = client.get("$baseUrl/session/$token")
-        return if (response.status.isSuccess()) {
-            SessionsApiResult.Ok(response.body())
-        } else {
-            failureFromBody(response.status, response.body<ErrorResponse?>())
+    suspend fun fetchSession(token: String): SessionsApiResult<SessionInfo> =
+        safeCall {
+            val response = client.get("$baseUrl/session/$token")
+            if (response.status.isSuccess()) {
+                SessionsApiResult.Ok(response.body())
+            } else {
+                failureFromBody(response.status, response.body<ErrorResponse?>())
+            }
         }
-    }
+
+    private inline fun <T> safeCall(block: () -> SessionsApiResult<T>): SessionsApiResult<T> =
+        try {
+            block()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (t: Throwable) {
+            SessionsApiResult.Fail(
+                code = "network_error",
+                message = t.message ?: "Sem conexão com o servidor",
+                status = 0,
+            )
+        }
 
     private fun failureFromBody(status: HttpStatusCode, body: ErrorResponse?): SessionsApiResult.Fail =
         SessionsApiResult.Fail(

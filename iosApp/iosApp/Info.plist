@@ -20,10 +20,21 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>TrovataCast usa a câmera para o seu vídeo durante a chamada.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>TrovataCast conecta ao servidor local durante o desenvolvimento.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>TrovataCast usa o microfone para chamadas com clientes.</string>
 	<key>UILaunchScreen</key>
