@@ -19,6 +19,8 @@ data class LiveCallUiState(
     val peer: PeerSessionState = PeerSessionState.Idle,
     val token: String,
     val role: PeerRole,
+    val localMuted: Boolean = false,
+    val remoteMuted: Boolean = false,
 ) {
     val isLive: Boolean get() = peer is PeerSessionState.Connected
     val isNegotiating: Boolean get() =
@@ -68,6 +70,12 @@ class LiveCallScreenModel(
         screenModelScope.launch {
             peer.state.collect { p -> _state.value = _state.value.copy(peer = p) }
         }
+        screenModelScope.launch {
+            peer.localMuted.collect { m -> _state.value = _state.value.copy(localMuted = m) }
+        }
+        screenModelScope.launch {
+            peer.remoteMuted.collect { m -> _state.value = _state.value.copy(remoteMuted = m) }
+        }
     }
 
     fun start() {
@@ -75,6 +83,10 @@ class LiveCallScreenModel(
             signaling.start()
             peer.start()
         }
+    }
+
+    fun toggleMute() {
+        peer.setLocalMuted(!_state.value.localMuted)
     }
 
     fun hangup() {

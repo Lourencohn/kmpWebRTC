@@ -245,13 +245,15 @@ describe('PeerSession (buyer)', () => {
 
   it('manda presence pings via DC ao abrir', async () => {
     vi.useFakeTimers()
-    const { client } = makeSignaling()
+    const { client, socket } = makeSignaling()
     const session = new PeerSession(client, {
       peerId: 'p-buyer',
       selfRole: 'Buyer',
       presenceIntervalMs: 1_000,
     })
     session.start()
+    socket.message({ type: 'peerJoined', peer: { peerId: 'p-seller', role: 'Seller' } })
+    await Promise.resolve()
     const dc = fakePc.dataChannels[0]!
     dc.open()
     vi.advanceTimersByTime(2_500)

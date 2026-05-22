@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -32,6 +34,8 @@ import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind
 import app.trovata.cast.ui.components.BtnSize
+import app.trovata.cast.ui.components.IconBtn
+import app.trovata.cast.ui.components.IconBtnKind
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
 import app.trovata.cast.ui.icons.TrovataIcons
@@ -62,12 +66,17 @@ data class LiveCallScreen(val token: String, val sellerName: String) : Screen {
                 screenModel.hangup()
                 navigator.pop()
             },
+            onToggleMute = { screenModel.toggleMute() },
         )
     }
 }
 
 @Composable
-private fun LiveCallBody(state: LiveCallUiState, onHangup: () -> Unit) {
+private fun LiveCallBody(
+    state: LiveCallUiState,
+    onHangup: () -> Unit,
+    onToggleMute: () -> Unit,
+) {
     val colors = TrovataTokens.colors
     val ink = colors.ink
     Box(
@@ -98,6 +107,15 @@ private fun LiveCallBody(state: LiveCallUiState, onHangup: () -> Unit) {
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 13.sp,
             )
+
+            if (state.isLive && state.remoteMuted) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Pill(
+                    text = "Cliente mutou o microfone",
+                    tone = PillTone.Dark,
+                    icon = TrovataIcons.micOff,
+                )
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -139,14 +157,28 @@ private fun LiveCallBody(state: LiveCallUiState, onHangup: () -> Unit) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Btn(
-                text = "Encerrar",
-                onClick = onHangup,
-                kind = BtnKind.Danger,
-                size = BtnSize.Lg,
-                icon = TrovataIcons.hangup,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconBtn(
+                    icon = if (state.localMuted) TrovataIcons.micOff else TrovataIcons.mic,
+                    onClick = onToggleMute,
+                    kind = IconBtnKind.Dark,
+                    active = state.localMuted,
+                    size = 56.dp,
+                    contentDescription = if (state.localMuted) "Reativar microfone" else "Silenciar microfone",
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Btn(
+                    text = "Encerrar",
+                    onClick = onHangup,
+                    kind = BtnKind.Danger,
+                    size = BtnSize.Lg,
+                    icon = TrovataIcons.hangup,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }

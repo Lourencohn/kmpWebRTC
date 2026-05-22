@@ -199,13 +199,18 @@ export class PeerSession {
 
   private bindDataChannel(channel: RTCDataChannel): void {
     this.dc = channel
+    channel.binaryType = 'arraybuffer'
     channel.addEventListener('open', () => {
       this.events.onDataChannelOpen?.()
       this.startPresenceLoop()
     })
     channel.addEventListener('message', (event) => {
       const data = (event as MessageEvent).data
-      if (typeof data === 'string') this.events.onDataChannelMessage?.(data)
+      if (typeof data === 'string') {
+        this.events.onDataChannelMessage?.(data)
+      } else if (data instanceof ArrayBuffer) {
+        this.events.onDataChannelMessage?.(new TextDecoder().decode(data))
+      }
     })
     channel.addEventListener('close', () => {
       if (this.presenceTimer != null) {

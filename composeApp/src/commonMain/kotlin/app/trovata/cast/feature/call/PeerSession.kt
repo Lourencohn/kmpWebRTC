@@ -1,14 +1,19 @@
 package app.trovata.cast.feature.call
 
 import app.trovata.cast.data.signaling.SignalingClient
+import app.trovata.cast.protocol.DataChannelMessage
 import app.trovata.cast.protocol.PeerRole
 import app.trovata.cast.protocol.SignalingMessage
+import app.trovata.cast.protocol.decodeDataChannel
+import app.trovata.cast.protocol.encode
 import com.shepeliev.webrtckmp.DataChannel
+import com.shepeliev.webrtckmp.DataChannelState
 import com.shepeliev.webrtckmp.IceCandidate
 import com.shepeliev.webrtckmp.IceConnectionState
 import com.shepeliev.webrtckmp.IceServer
 import com.shepeliev.webrtckmp.MediaDevices
 import com.shepeliev.webrtckmp.MediaStream
+import com.shepeliev.webrtckmp.MediaStreamTrackKind
 import com.shepeliev.webrtckmp.OfferAnswerOptions
 import com.shepeliev.webrtckmp.PeerConnection
 import com.shepeliev.webrtckmp.RtcConfiguration
@@ -56,6 +61,12 @@ class PeerSession(
 
     private val _remoteAudio = MutableStateFlow<MediaStream?>(null)
     val remoteAudio: StateFlow<MediaStream?> = _remoteAudio.asStateFlow()
+
+    private val _localMuted = MutableStateFlow(false)
+    val localMuted: StateFlow<Boolean> = _localMuted.asStateFlow()
+
+    private val _remoteMuted = MutableStateFlow(false)
+    val remoteMuted: StateFlow<Boolean> = _remoteMuted.asStateFlow()
 
     private var pc: PeerConnection? = null
     private var dc: DataChannel? = null
@@ -179,7 +190,10 @@ class PeerSession(
     private fun bindDataChannel(channel: DataChannel) {
         dc = channel
         collectorJobs += scope.launch {
-            channel.onOpen.collect { startPresenceLoop() }
+            channel.onOpen.collect {
+                startPresenceLoop()
+                if (_localMuted.value) sendMuteState(_localMuted.value)
+            }
         }
         collectorJobs += scope.launch {
             channel.onClose.collect {
@@ -187,6 +201,31 @@ class PeerSession(
                 presenceJob = null
             }
         }
+        collectorJobs += scope.launch {
+            channel.onMessage.collect { bytes ->
+                val payload = bytes.decodeToString()
+                when (val parsed = decodeDataChannel(payload)) {
+                    is DataChannelMessage.Mute -> _remoteMuted.value = parsed.muted
+                    null -> Unit
+                }
+            }
+        }
+    }
+
+    fun setLocalMuted(muted: Boolean) {
+        if (_localMuted.value == muted) return
+        localStream?.tracks
+            ?.filter { it.kind == MediaStreamTrackKind.Audio }
+            ?.forEach { it.enabled = !muted }
+        _localMuted.value = muted
+        sendMuteState(muted)
+    }
+
+    private fun sendMuteState(muted: Boolean) {
+        val channel = dc ?: return
+        if (channel.readyState != DataChannelState.Open) return
+        val payload = DataChannelMessage.Mute(muted = muted, from = selfPeerId).encode()
+        channel.send(payload.encodeToByteArray())
     }
 
     private fun startPresenceLoop() {
@@ -213,6 +252,8 @@ class PeerSession(
         localStream = null
         pc?.close()
         pc = null
+        _localMuted.value = false
+        _remoteMuted.value = false
         _state.value = PeerSessionState.Closed
     }
 

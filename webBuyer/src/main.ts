@@ -84,6 +84,30 @@ function peerIdFor(token: string): string {
   return `buyer-${token}-${Math.random().toString(36).slice(2, 7)}`
 }
 
+function handleDataChannelMessage(raw: string): void {
+  let parsed: { type?: string; muted?: boolean } | null = null
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return
+  }
+  if (parsed?.type === 'mute' && typeof parsed.muted === 'boolean') {
+    setRemoteMuteIndicator(parsed.muted)
+  }
+}
+
+function setRemoteMuteIndicator(muted: boolean): void {
+  let chip = document.getElementById('remote-mute-chip')
+  if (!chip) {
+    chip = document.createElement('div')
+    chip.id = 'remote-mute-chip'
+    chip.className = 'remote-mute-chip'
+    document.body.appendChild(chip)
+  }
+  chip.textContent = muted ? 'Vendedor sem áudio' : ''
+  chip.dataset.muted = muted ? 'true' : 'false'
+}
+
 function startPeer(info: SessionInfo, audio: MediaStream): void {
   const peerId = peerIdFor(info.token)
   const signaling = new SignalingClient(signalingUrlFor(info.token), {
@@ -102,6 +126,7 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
       onStatus: (status, detail) => updateConnectionBanner(status, detail),
       onRemoteAudio: (stream) => attachRemoteAudio(stream),
       onDataChannelOpen: () => updateConnectionBanner('connected', 'dc_open'),
+      onDataChannelMessage: (raw) => handleDataChannelMessage(raw),
     },
   )
 
