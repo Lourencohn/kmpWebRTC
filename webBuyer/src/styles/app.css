@@ -204,3 +204,182 @@ main#app {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+main#app:has(.live-call) {
+  padding: 0;
+  place-items: stretch;
+}
+
+.live-call {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  background: var(--ink);
+  color: white;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 56px 24px 36px;
+  gap: 24px;
+}
+
+.live-call-top {
+  display: flex;
+  justify-content: center;
+}
+
+.live-call-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+.live-call-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-4);
+  box-shadow: 0 0 0 0 rgba(255,255,255,0);
+  transition: background 200ms ease;
+}
+
+.live-call[data-status="connected"] .live-call-pill { background: var(--jade); border-color: rgba(255,255,255,0.18); }
+.live-call[data-status="connected"] .live-call-pill-dot {
+  background: white;
+  animation: pulse-dot 1.6s ease-out infinite;
+}
+.live-call[data-status="failed"] .live-call-pill { background: var(--live); border-color: rgba(255,255,255,0.18); }
+.live-call[data-status="failed"] .live-call-pill-dot { background: white; }
+.live-call[data-status="closed"] .live-call-pill { background: rgba(255,255,255,0.05); }
+
+@keyframes pulse-dot {
+  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); }
+  70%  { box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+}
+
+.live-call-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  text-align: center;
+  padding-top: 12px;
+}
+
+.live-call-avatar {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 3px solid rgba(255,255,255,0.22);
+  display: grid;
+  place-items: center;
+  transition: border-color 200ms ease;
+}
+
+.live-call[data-status="connected"] .live-call-avatar { border-color: var(--jade); }
+.live-call[data-status="failed"]    .live-call-avatar { border-color: var(--live); }
+
+.live-call-avatar-letter {
+  font-size: 48px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: white;
+}
+
+.live-call-title {
+  margin: 8px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.live-call-sub {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255,255,255,0.72);
+}
+
+.live-call-detail {
+  margin: 0;
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.5);
+  font-family: var(--f-mono);
+}
+
+.live-call-remote-mute {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.14);
+  font-size: 13px;
+  color: white;
+}
+
+.live-call-remote-mute[hidden] { display: none; }
+
+.live-call-remote-mute-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.live-call-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.live-call-mic {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.live-call-mic:hover { background: rgba(255,255,255,0.14); }
+.live-call-mic:active { transform: scale(0.96); }
+
+.live-call[data-local-muted="true"] .live-call-mic {
+  background: white;
+  border-color: white;
+  color: var(--ink);
+}
+
+.live-call-hangup {
+  appearance: none;
+  flex: 1;
+  border: none;
+  background: var(--live);
+  color: white;
+  padding: 16px 18px;
+  border-radius: var(--r-3);
+  font: inherit;
+  font-weight: 600;
+  font-size: 15.5px;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+.live-call-hangup:hover { filter: brightness(1.05); }
+.live-call-hangup:active { transform: scale(0.985); }

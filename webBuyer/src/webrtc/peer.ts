@@ -11,6 +11,8 @@ export type PeerSessionOptions = {
   presenceIntervalMs?: number
 }
 
+type MuteEnvelope = { type: 'mute'; muted: boolean; from: string }
+
 export type PeerEvents = {
   onStatus?: (status: PeerStatus, detail?: string) => void
   onDataChannelOpen?: () => void
@@ -31,6 +33,7 @@ export class PeerSession {
   private offMessage: (() => void) | null = null
   private offStatus: (() => void) | null = null
   private _status: PeerStatus = 'idle'
+  private _localMuted = false
 
   constructor(
     private readonly signaling: SignalingClient,
@@ -84,6 +87,24 @@ export class PeerSession {
     return true
   }
 
+  get localMuted(): boolean {
+    return this._localMuted
+  }
+
+  setLocalMuted(muted: boolean): void {
+    if (this._localMuted === muted) return
+    this._localMuted = muted
+    this.options.localAudio?.getAudioTracks().forEach((t) => {
+      t.enabled = !muted
+    })
+    this.sendMuteState(muted)
+  }
+
+  private sendMuteState(muted: boolean): void {
+    const envelope: MuteEnvelope = { type: 'mute', muted, from: this.options.peerId }
+    this.send(JSON.stringify(envelope))
+  }
+
   close(reason?: string): void {
     if (this.presenceTimer != null) {
       clearInterval(this.presenceTimer)
@@ -98,6 +119,7 @@ export class PeerSession {
     this.pc?.close()
     this.pc = null
     this.offerSent = false
+    this._localMuted = false
     this.setStatus('closed', reason)
   }
 
@@ -203,6 +225,7 @@ export class PeerSession {
     channel.addEventListener('open', () => {
       this.events.onDataChannelOpen?.()
       this.startPresenceLoop()
+      if (this._localMuted) this.sendMuteState(true)
     })
     channel.addEventListener('message', (event) => {
       const data = (event as MessageEvent).data

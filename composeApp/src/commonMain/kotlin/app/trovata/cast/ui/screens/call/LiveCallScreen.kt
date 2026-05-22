@@ -2,7 +2,6 @@ package app.trovata.cast.ui.screens.call
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -95,15 +93,15 @@ private fun LiveCallBody(
             CallAvatar(state = state)
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = if (state.isLive) "Conectado" else if (state.isNegotiating) "Conectando…" else "Aguardando cliente",
+                text = headlineFor(state),
                 color = Color.White,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.02).em,
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = state.errorMessage ?: "Token ${state.token}",
+                text = state.errorMessage ?: subheadlineFor(state),
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 13.sp,
             )
@@ -118,44 +116,6 @@ private fun LiveCallBody(
             }
 
             Spacer(modifier = Modifier.weight(1f))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "Sinalização",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        text = state.signaling::class.simpleName ?: "?",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Peer",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        text = state.peer::class.simpleName ?: "?",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -181,6 +141,20 @@ private fun LiveCallBody(
             }
         }
     }
+}
+
+private fun headlineFor(state: LiveCallUiState): String = when {
+    state.errorMessage != null -> "Falha na chamada"
+    state.isLive -> "Em chamada com o cliente"
+    state.isNegotiating -> "Cliente entrando…"
+    else -> "Aguardando cliente entrar"
+}
+
+private fun subheadlineFor(state: LiveCallUiState): String = when {
+    state.isLive && state.remoteMuted -> "Cliente está te ouvindo, mas sem áudio."
+    state.isLive -> "Áudio P2P ativo · token ${state.token}"
+    state.isNegotiating -> "Conectando o áudio · token ${state.token}"
+    else -> "Compartilhe o link · token ${state.token}"
 }
 
 @Composable
@@ -215,7 +189,7 @@ private fun CallAvatar(state: LiveCallUiState) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = state.role.name.first().toString(),
+            text = "C",
             color = Color.White,
             fontSize = 48.sp,
             fontWeight = FontWeight.SemiBold,

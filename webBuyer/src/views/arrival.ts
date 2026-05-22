@@ -125,6 +125,115 @@ export function renderArrival(
   })
 }
 
+export type LiveCallStatus = 'connecting' | 'connected' | 'failed' | 'closed'
+
+export type LiveCallActions = {
+  onToggleMute?: (nextMuted: boolean) => void
+  onHangup?: () => void
+}
+
+export type LiveCallView = {
+  setStatus(status: LiveCallStatus, detail?: string): void
+  setRemoteMuted(muted: boolean): void
+}
+
+export function renderLiveCall(
+  root: HTMLElement,
+  info: SessionInfo,
+  actions: LiveCallActions = {},
+): LiveCallView {
+  const sellerInitial = (info.sellerName?.trim()?.[0] ?? 'V').toUpperCase()
+  root.innerHTML = `
+    <section class="live-call" data-view="live-call" data-status="connecting" data-local-muted="false" data-remote-muted="false">
+      <div class="live-call-top">
+        <span class="live-call-pill" data-role="status-pill">
+          <span class="live-call-pill-dot"></span>
+          <span data-role="status-pill-label">Conectando…</span>
+        </span>
+      </div>
+
+      <div class="live-call-hero">
+        <div class="live-call-avatar" aria-hidden="true">
+          <span class="live-call-avatar-letter">${escapeHtml(sellerInitial)}</span>
+        </div>
+        <h1 class="live-call-title" data-role="status-title">Conectando ao vendedor…</h1>
+        <p class="live-call-sub">${escapeHtml(info.sellerName)}${
+          info.clientShop ? ` · ${escapeHtml(info.clientShop)}` : ''
+        }</p>
+        <p class="live-call-detail" data-role="status-detail">Token ${escapeHtml(info.token)}</p>
+
+        <div class="live-call-remote-mute" data-role="remote-mute" hidden>
+          <span class="live-call-remote-mute-icon" aria-hidden="true">🔇</span>
+          <span>Vendedor sem áudio</span>
+        </div>
+      </div>
+
+      <div class="live-call-actions">
+        <button
+          type="button"
+          class="live-call-mic"
+          data-action="toggle-mute"
+          aria-pressed="false"
+          aria-label="Silenciar microfone">
+          <span class="live-call-mic-icon" data-role="mic-icon">🎙️</span>
+        </button>
+        <button type="button" class="live-call-hangup" data-action="hangup">
+          Encerrar
+        </button>
+      </div>
+    </section>
+  `
+
+  const section = root.querySelector<HTMLElement>('.live-call')!
+  const statusPillLabel = section.querySelector<HTMLElement>('[data-role="status-pill-label"]')!
+  const statusTitle = section.querySelector<HTMLElement>('[data-role="status-title"]')!
+  const statusDetail = section.querySelector<HTMLElement>('[data-role="status-detail"]')!
+  const remoteMute = section.querySelector<HTMLElement>('[data-role="remote-mute"]')!
+  const micBtn = section.querySelector<HTMLButtonElement>('[data-action="toggle-mute"]')!
+  const micIcon = section.querySelector<HTMLElement>('[data-role="mic-icon"]')!
+  const hangupBtn = section.querySelector<HTMLButtonElement>('[data-action="hangup"]')!
+
+  let localMuted = false
+
+  micBtn.addEventListener('click', () => {
+    localMuted = !localMuted
+    section.dataset.localMuted = localMuted ? 'true' : 'false'
+    micBtn.setAttribute('aria-pressed', localMuted ? 'true' : 'false')
+    micBtn.setAttribute('aria-label', localMuted ? 'Reativar microfone' : 'Silenciar microfone')
+    micIcon.textContent = localMuted ? '🚫' : '🎙️'
+    actions.onToggleMute?.(localMuted)
+  })
+
+  hangupBtn.addEventListener('click', () => {
+    actions.onHangup?.()
+  })
+
+  return {
+    setStatus(status, detail) {
+      section.dataset.status = status
+      const labelByStatus: Record<LiveCallStatus, string> = {
+        connecting: 'Conectando…',
+        connected: 'Em chamada',
+        failed: 'Conexão caiu',
+        closed: 'Sessão encerrada',
+      }
+      const titleByStatus: Record<LiveCallStatus, string> = {
+        connecting: 'Conectando ao vendedor…',
+        connected: `Em chamada com ${info.sellerName}`,
+        failed: 'Conexão caiu',
+        closed: 'Sessão encerrada',
+      }
+      statusPillLabel.textContent = labelByStatus[status]
+      statusTitle.textContent = titleByStatus[status]
+      statusDetail.textContent = detail ?? `Token ${info.token}`
+    },
+    setRemoteMuted(muted) {
+      section.dataset.remoteMuted = muted ? 'true' : 'false'
+      remoteMute.hidden = !muted
+    },
+  }
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')

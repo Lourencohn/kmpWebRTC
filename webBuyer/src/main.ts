@@ -6,7 +6,10 @@ import {
   renderArrival,
   renderError,
   renderLanding,
+  renderLiveCall,
   renderLoading,
+  type LiveCallStatus,
+  type LiveCallView,
 } from './views/arrival'
 
 const root = document.getElementById('app')
@@ -84,28 +87,31 @@ function peerIdFor(token: string): string {
   return `buyer-${token}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-function handleDataChannelMessage(raw: string): void {
-  let parsed: { type?: string; muted?: boolean } | null = null
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return
-  }
-  if (parsed?.type === 'mute' && typeof parsed.muted === 'boolean') {
-    setRemoteMuteIndicator(parsed.muted)
+function mapPeerStatus(status: PeerStatus): LiveCallStatus {
+  switch (status) {
+    case 'connected':
+      return 'connected'
+    case 'failed':
+      return 'failed'
+    case 'closed':
+      return 'closed'
+    default:
+      return 'connecting'
   }
 }
 
-function setRemoteMuteIndicator(muted: boolean): void {
-  let chip = document.getElementById('remote-mute-chip')
-  if (!chip) {
-    chip = document.createElement('div')
-    chip.id = 'remote-mute-chip'
-    chip.className = 'remote-mute-chip'
-    document.body.appendChild(chip)
+function buildMuteHandler(view: LiveCallView): (raw: string) => void {
+  return (raw) => {
+    let parsed: { type?: string; muted?: boolean } | null = null
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      return
+    }
+    if (parsed?.type === 'mute' && typeof parsed.muted === 'boolean') {
+      view.setRemoteMuted(parsed.muted)
+    }
   }
-  chip.textContent = muted ? 'Vendedor sem áudio' : ''
-  chip.dataset.muted = muted ? 'true' : 'false'
 }
 
 function startPeer(info: SessionInfo, audio: MediaStream): void {
@@ -115,7 +121,26 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
     role: 'Buyer',
     displayName: info.clientName ?? undefined,
   })
-  const session = new PeerSession(
+
+  let session: PeerSession | null = null
+  let cleanedUp = false
+  const cleanup = (reason: string) => {
+    if (cleanedUp) return
+    cleanedUp = true
+    session?.close(reason)
+    signaling.close(reason)
+    audio.getTracks().forEach((t) => t.stop())
+  }
+
+  const view = renderLiveCall(root!, info, {
+    onToggleMute: (muted) => session?.setLocalMuted(muted),
+    onHangup: () => {
+      cleanup('hangup')
+      showLanding()
+    },
+  })
+
+  session = new PeerSession(
     signaling,
     {
       peerId,
@@ -123,58 +148,17 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
       localAudio: audio,
     },
     {
-      onStatus: (status, detail) => updateConnectionBanner(status, detail),
+      onStatus: (status, detail) => view.setStatus(mapPeerStatus(status), detail),
       onRemoteAudio: (stream) => attachRemoteAudio(stream),
-      onDataChannelOpen: () => updateConnectionBanner('connected', 'dc_open'),
-      onDataChannelMessage: (raw) => handleDataChannelMessage(raw),
+      onDataChannelMessage: buildMuteHandler(view),
     },
   )
 
-  const banner = ensureBanner()
-  banner.dataset.state = 'connecting'
-  banner.textContent = 'Conectando ao vendedor…'
-
+  view.setStatus('connecting')
   signaling.start()
   session.start()
 
-  window.addEventListener('beforeunload', () => {
-    session.close('navigated_away')
-    signaling.close('navigated_away')
-    audio.getTracks().forEach((t) => t.stop())
-  })
-}
-
-function ensureBanner(): HTMLElement {
-  let banner = document.getElementById('connection-banner') as HTMLElement | null
-  if (!banner) {
-    banner = document.createElement('div')
-    banner.id = 'connection-banner'
-    banner.className = 'connection-banner'
-    document.body.appendChild(banner)
-  }
-  return banner
-}
-
-function updateConnectionBanner(status: PeerStatus, detail?: string): void {
-  const banner = ensureBanner()
-  banner.dataset.state = status
-  switch (status) {
-    case 'idle':
-      banner.textContent = 'Aguardando…'
-      break
-    case 'negotiating':
-      banner.textContent = 'Conectando ao vendedor…'
-      break
-    case 'connected':
-      banner.textContent = detail === 'dc_open' ? 'Conectado · pronto pra trocar áudio' : 'Conectado'
-      break
-    case 'failed':
-      banner.textContent = `Conexão caiu (${detail ?? 'erro'})`
-      break
-    case 'closed':
-      banner.textContent = 'Sessão encerrada'
-      break
-  }
+  window.addEventListener('beforeunload', () => cleanup('navigated_away'))
 }
 
 function attachRemoteAudio(stream: MediaStream): void {
