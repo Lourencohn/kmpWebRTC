@@ -1,3 +1,5 @@
+import { SampleCatalog } from '../data/catalog'
+import { renderProductCard } from '../ui/productCard'
 import type { SessionFetchErrorKind, SessionInfo } from '../api/sessions'
 
 export type ArrivalActions = {
@@ -135,6 +137,8 @@ export type LiveCallActions = {
 export type LiveCallView = {
   setStatus(status: LiveCallStatus, detail?: string): void
   setRemoteMuted(muted: boolean): void
+  setPointedProduct(ref: string | null): void
+  scrollToProduct(ref: string, offset?: number): void
 }
 
 export function renderLiveCall(
@@ -142,33 +146,29 @@ export function renderLiveCall(
   info: SessionInfo,
   actions: LiveCallActions = {},
 ): LiveCallView {
-  const sellerInitial = (info.sellerName?.trim()?.[0] ?? 'V').toUpperCase()
   root.innerHTML = `
     <section class="live-call" data-view="live-call" data-status="connecting" data-local-muted="false" data-remote-muted="false">
-      <div class="live-call-top">
+      <header class="live-call-bar live-call-bar--top">
         <span class="live-call-pill" data-role="status-pill">
           <span class="live-call-pill-dot"></span>
           <span data-role="status-pill-label">Conectando…</span>
         </span>
-      </div>
-
-      <div class="live-call-hero">
-        <div class="live-call-avatar" aria-hidden="true">
-          <span class="live-call-avatar-letter">${escapeHtml(sellerInitial)}</span>
-        </div>
-        <h1 class="live-call-title" data-role="status-title">Conectando ao vendedor…</h1>
-        <p class="live-call-sub">${escapeHtml(info.sellerName)}${
-          info.clientShop ? ` · ${escapeHtml(info.clientShop)}` : ''
-        }</p>
-        <p class="live-call-detail" data-role="status-detail">Token ${escapeHtml(info.token)}</p>
-
-        <div class="live-call-remote-mute" data-role="remote-mute" hidden>
+        <span class="live-call-bar-meta" data-role="status-title">Aguardando vendedor</span>
+        <span class="live-call-remote-mute" data-role="remote-mute" hidden>
           <span class="live-call-remote-mute-icon" aria-hidden="true">🔇</span>
           <span>Vendedor sem áudio</span>
+        </span>
+      </header>
+
+      <div class="live-call-catalog" data-role="catalog">
+        <div class="live-call-catalog-header">
+          <span class="live-call-catalog-eyebrow">${escapeHtml(SampleCatalog.collection)}</span>
+          <p class="live-call-catalog-text">${escapeHtml(info.sellerName)} está te mostrando este catálogo.</p>
         </div>
+        <div class="product-grid" data-role="product-grid"></div>
       </div>
 
-      <div class="live-call-actions">
+      <footer class="live-call-bar live-call-bar--bottom">
         <button
           type="button"
           class="live-call-mic"
@@ -177,21 +177,34 @@ export function renderLiveCall(
           aria-label="Silenciar microfone">
           <span class="live-call-mic-icon" data-role="mic-icon">🎙️</span>
         </button>
+        <div class="live-call-bar-info">
+          <span class="live-call-bar-label" data-role="footer-label">Token ${escapeHtml(info.token)}</span>
+        </div>
         <button type="button" class="live-call-hangup" data-action="hangup">
-          Encerrar
+          <span class="live-call-hangup-icon" aria-hidden="true">⏹</span>
+          <span>Encerrar</span>
         </button>
-      </div>
+      </footer>
     </section>
   `
 
   const section = root.querySelector<HTMLElement>('.live-call')!
   const statusPillLabel = section.querySelector<HTMLElement>('[data-role="status-pill-label"]')!
   const statusTitle = section.querySelector<HTMLElement>('[data-role="status-title"]')!
-  const statusDetail = section.querySelector<HTMLElement>('[data-role="status-detail"]')!
+  const footerLabel = section.querySelector<HTMLElement>('[data-role="footer-label"]')!
   const remoteMute = section.querySelector<HTMLElement>('[data-role="remote-mute"]')!
   const micBtn = section.querySelector<HTMLButtonElement>('[data-action="toggle-mute"]')!
   const micIcon = section.querySelector<HTMLElement>('[data-role="mic-icon"]')!
   const hangupBtn = section.querySelector<HTMLButtonElement>('[data-action="hangup"]')!
+  const catalog = section.querySelector<HTMLElement>('[data-role="catalog"]')!
+  const grid = section.querySelector<HTMLElement>('[data-role="product-grid"]')!
+
+  const cardByRef = new Map<string, HTMLElement>()
+  SampleCatalog.products.forEach((product) => {
+    const card = renderProductCard(product)
+    cardByRef.set(product.ref, card)
+    grid.appendChild(card)
+  })
 
   let localMuted = false
 
@@ -208,28 +221,49 @@ export function renderLiveCall(
     actions.onHangup?.()
   })
 
+  let currentPointed: string | null = null
+
   return {
     setStatus(status, detail) {
       section.dataset.status = status
-      const labelByStatus: Record<LiveCallStatus, string> = {
+      const pillByStatus: Record<LiveCallStatus, string> = {
         connecting: 'Conectando…',
         connected: 'Em chamada',
         failed: 'Conexão caiu',
         closed: 'Sessão encerrada',
       }
       const titleByStatus: Record<LiveCallStatus, string> = {
-        connecting: 'Conectando ao vendedor…',
+        connecting: `Conectando com ${info.sellerName}…`,
         connected: `Em chamada com ${info.sellerName}`,
         failed: 'Conexão caiu',
         closed: 'Sessão encerrada',
       }
-      statusPillLabel.textContent = labelByStatus[status]
+      statusPillLabel.textContent = pillByStatus[status]
       statusTitle.textContent = titleByStatus[status]
-      statusDetail.textContent = detail ?? `Token ${info.token}`
+      footerLabel.textContent = detail ?? `Token ${info.token}`
     },
     setRemoteMuted(muted) {
       section.dataset.remoteMuted = muted ? 'true' : 'false'
       remoteMute.hidden = !muted
+    },
+    setPointedProduct(ref) {
+      if (currentPointed && currentPointed !== ref) {
+        cardByRef.get(currentPointed)?.setAttribute('data-pointed', 'false')
+      }
+      currentPointed = ref
+      if (ref) {
+        const card = cardByRef.get(ref)
+        card?.setAttribute('data-pointed', 'true')
+        card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    },
+    scrollToProduct(ref, offset = 0) {
+      const card = cardByRef.get(ref)
+      if (!card) return
+      const cardRect = card.getBoundingClientRect()
+      const catalogRect = catalog.getBoundingClientRect()
+      const targetY = catalog.scrollTop + (cardRect.top - catalogRect.top) + offset * cardRect.height
+      catalog.scrollTop = targetY
     },
   }
 }

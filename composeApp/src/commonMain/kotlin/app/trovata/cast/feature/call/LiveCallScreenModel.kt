@@ -89,6 +89,14 @@ class LiveCallScreenModel(
         peer.setLocalMuted(!_state.value.localMuted)
     }
 
+    fun publishScroll(productId: String, offset: Float) {
+        peer.publishScroll(productId, offset)
+    }
+
+    fun publishPointAt(productId: String) {
+        peer.publishPointAt(productId)
+    }
+
     fun hangup() {
         screenModelScope.launch {
             peer.close("hangup")

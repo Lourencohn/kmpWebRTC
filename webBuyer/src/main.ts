@@ -1,4 +1,5 @@
 import { fetchSession, SessionFetchError, type SessionInfo } from './api/sessions'
+import { decodeDataChannelMessage } from './protocol/dataChannel'
 import { SignalingClient } from './signaling/client'
 import { clearLastSession, loadLastSession, saveLastSession } from './storage/lastSession'
 import { PeerSession, type PeerStatus } from './webrtc/peer'
@@ -100,16 +101,24 @@ function mapPeerStatus(status: PeerStatus): LiveCallStatus {
   }
 }
 
-function buildMuteHandler(view: LiveCallView): (raw: string) => void {
+function buildDataChannelHandler(view: LiveCallView): (raw: string) => void {
+  let pointTimer: ReturnType<typeof setTimeout> | null = null
   return (raw) => {
-    let parsed: { type?: string; muted?: boolean } | null = null
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      return
-    }
-    if (parsed?.type === 'mute' && typeof parsed.muted === 'boolean') {
-      view.setRemoteMuted(parsed.muted)
+    const msg = decodeDataChannelMessage(raw)
+    if (!msg) return
+    switch (msg.type) {
+      case 'mute':
+        view.setRemoteMuted(msg.muted)
+        return
+      case 'scroll':
+        view.scrollToProduct(msg.productId, msg.offset)
+        return
+      case 'pointAt':
+        view.setPointedProduct(msg.productId)
+        if (pointTimer) clearTimeout(pointTimer)
+        const duration = msg.durationMs ?? 3_000
+        pointTimer = setTimeout(() => view.setPointedProduct(null), duration)
+        return
     }
   }
 }
@@ -150,7 +159,7 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
     {
       onStatus: (status, detail) => view.setStatus(mapPeerStatus(status), detail),
       onRemoteAudio: (stream) => attachRemoteAudio(stream),
-      onDataChannelMessage: buildMuteHandler(view),
+      onDataChannelMessage: buildDataChannelHandler(view),
     },
   )
 

@@ -29,9 +29,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
@@ -67,6 +72,14 @@ class PeerSession(
 
     private val _remoteMuted = MutableStateFlow(false)
     val remoteMuted: StateFlow<Boolean> = _remoteMuted.asStateFlow()
+
+    private val _remoteScroll = MutableSharedFlow<DataChannelMessage.Scroll>(extraBufferCapacity = 4)
+    val remoteScroll: SharedFlow<DataChannelMessage.Scroll> = _remoteScroll.asSharedFlow()
+
+    private val _remotePointAt = MutableSharedFlow<DataChannelMessage.PointAt>(extraBufferCapacity = 4)
+    val remotePointAt: SharedFlow<DataChannelMessage.PointAt> = _remotePointAt.asSharedFlow()
+
+    private val _outgoingScroll = MutableStateFlow<DataChannelMessage.Scroll?>(null)
 
     private var pc: PeerConnection? = null
     private var dc: DataChannel? = null
@@ -119,6 +132,13 @@ class PeerSession(
         }
         collectorJobs += scope.launch {
             signaling.incoming.collect { handleSignal(it) }
+        }
+        collectorJobs += scope.launch {
+            _outgoingScroll.filterNotNull().sample(33).collect { message ->
+                val channel = dc ?: return@collect
+                if (channel.readyState != DataChannelState.Open) return@collect
+                channel.send(message.encode().encodeToByteArray())
+            }
         }
 
         if (selfRole == PeerRole.Buyer) {
@@ -206,6 +226,8 @@ class PeerSession(
                 val payload = bytes.decodeToString()
                 when (val parsed = decodeDataChannel(payload)) {
                     is DataChannelMessage.Mute -> _remoteMuted.value = parsed.muted
+                    is DataChannelMessage.Scroll -> _remoteScroll.tryEmit(parsed)
+                    is DataChannelMessage.PointAt -> _remotePointAt.tryEmit(parsed)
                     null -> Unit
                 }
             }
@@ -225,6 +247,27 @@ class PeerSession(
         val channel = dc ?: return
         if (channel.readyState != DataChannelState.Open) return
         val payload = DataChannelMessage.Mute(muted = muted, from = selfPeerId).encode()
+        channel.send(payload.encodeToByteArray())
+    }
+
+    fun publishScroll(productId: String, offset: Float) {
+        _outgoingScroll.value = DataChannelMessage.Scroll(
+            productId = productId,
+            offset = offset,
+            ts = Clock.System.now().toEpochMilliseconds(),
+            from = selfPeerId,
+        )
+    }
+
+    fun publishPointAt(productId: String, durationMs: Long = 3_000) {
+        val channel = dc ?: return
+        if (channel.readyState != DataChannelState.Open) return
+        val payload = DataChannelMessage.PointAt(
+            productId = productId,
+            ts = Clock.System.now().toEpochMilliseconds(),
+            from = selfPeerId,
+            durationMs = durationMs,
+        ).encode()
         channel.send(payload.encodeToByteArray())
     }
 
@@ -254,6 +297,7 @@ class PeerSession(
         pc = null
         _localMuted.value = false
         _remoteMuted.value = false
+        _outgoingScroll.value = null
         _state.value = PeerSessionState.Closed
     }
 

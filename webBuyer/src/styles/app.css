@@ -208,42 +208,96 @@ main#app {
 main#app:has(.live-call) {
   padding: 0;
   place-items: stretch;
+  min-height: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .live-call {
   position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   width: 100%;
   background: var(--ink);
   color: white;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  padding: 56px 24px 36px;
-  gap: 24px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 
-.live-call-top {
+.live-call-bar {
   display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(0,0,0,0.32);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.live-call-bar--top {
+  padding-top: max(env(safe-area-inset-top), 14px);
+  position: sticky;
+  top: 0;
+  z-index: 4;
+}
+
+.live-call-bar--bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 14px);
+  border-bottom: none;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+}
+
+.live-call-bar-meta {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.78);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-call-bar-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
   justify-content: center;
+  min-width: 0;
+}
+
+.live-call-bar-label {
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .live-call-pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 7px;
+  padding: 5px 12px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.10);
   border: 1px solid rgba(255,255,255,0.12);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: -0.005em;
+  flex-shrink: 0;
 }
 
 .live-call-pill-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--ink-4);
   box-shadow: 0 0 0 0 rgba(255,255,255,0);
@@ -261,103 +315,80 @@ main#app:has(.live-call) {
 
 @keyframes pulse-dot {
   0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); }
-  70%  { box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+  70%  { box-shadow: 0 0 0 8px rgba(255,255,255,0); }
   100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
 }
 
-.live-call-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  text-align: center;
-  padding-top: 12px;
-}
-
-.live-call-avatar {
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.08);
-  border: 3px solid rgba(255,255,255,0.22);
-  display: grid;
-  place-items: center;
-  transition: border-color 200ms ease;
-}
-
-.live-call[data-status="connected"] .live-call-avatar { border-color: var(--jade); }
-.live-call[data-status="failed"]    .live-call-avatar { border-color: var(--live); }
-
-.live-call-avatar-letter {
-  font-size: 48px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: white;
-}
-
-.live-call-title {
-  margin: 8px 0 0;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.live-call-sub {
-  margin: 0;
-  font-size: 14px;
-  color: rgba(255,255,255,0.72);
-}
-
-.live-call-detail {
-  margin: 0;
-  font-size: 12.5px;
-  color: rgba(255,255,255,0.5);
-  font-family: var(--f-mono);
-}
-
 .live-call-remote-mute {
-  margin-top: 12px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  gap: 6px;
+  padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(0,0,0,0.45);
-  border: 1px solid rgba(255,255,255,0.14);
-  font-size: 13px;
+  background: var(--warn);
   color: white;
+  font-size: 11.5px;
+  font-weight: 500;
+  flex-shrink: 0;
 }
 
 .live-call-remote-mute[hidden] { display: none; }
 
 .live-call-remote-mute-icon {
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
 }
 
-.live-call-actions {
-  display: flex;
-  align-items: center;
+.live-call-catalog {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 16px 24px;
+  scroll-snap-type: y proximity;
+}
+
+.live-call-catalog-header {
+  margin-bottom: 14px;
+}
+
+.live-call-catalog-eyebrow {
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.55);
+}
+
+.live-call-catalog-text {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: rgba(255,255,255,0.82);
+  line-height: 1.35;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
 .live-call-mic {
   appearance: none;
   border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.10);
   color: white;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 22px;
+  font-size: 18px;
   cursor: pointer;
+  flex-shrink: 0;
   transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 
-.live-call-mic:hover { background: rgba(255,255,255,0.14); }
+.live-call-mic:hover { background: rgba(255,255,255,0.18); }
 .live-call-mic:active { transform: scale(0.96); }
 
 .live-call[data-local-muted="true"] .live-call-mic {
@@ -368,18 +399,184 @@ main#app:has(.live-call) {
 
 .live-call-hangup {
   appearance: none;
-  flex: 1;
   border: none;
   background: var(--live);
   color: white;
-  padding: 16px 18px;
-  border-radius: var(--r-3);
+  padding: 10px 14px;
+  border-radius: 999px;
   font: inherit;
   font-weight: 600;
-  font-size: 15.5px;
+  font-size: 13px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
   transition: filter 120ms ease, transform 120ms ease;
+}
+
+.live-call-hangup-icon {
+  font-size: 11px;
+  line-height: 1;
 }
 
 .live-call-hangup:hover { filter: brightness(1.05); }
 .live-call-hangup:active { transform: scale(0.985); }
+
+.product-card {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--r-3);
+  padding: 8px;
+  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+  scroll-snap-align: start;
+}
+
+.product-card[data-highlight="true"] {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+.product-card-frame {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border-radius: var(--r-2);
+  background: var(--card-tint-bg);
+  color: var(--card-tint-fg);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.product-card-silhouette {
+  width: 70%;
+  height: 70%;
+  display: block;
+}
+
+.product-card-ref {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: rgba(0,0,0,0.55);
+}
+
+.product-card-tag {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: rgba(0,0,0,0.65);
+  color: white;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.product-card-tag[data-tag="topVenda"] { background: var(--jade); }
+.product-card-tag[data-tag="preVenda"] { background: var(--warn); }
+.product-card-tag[data-tag="novo"]     { background: var(--brand); }
+
+.product-card-halo {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-2);
+  pointer-events: none;
+  opacity: 0;
+  border: 3px solid var(--warn);
+  box-shadow: 0 0 0 6px rgba(199,113,29,0.18);
+  transition: opacity 180ms ease;
+  display: grid;
+  place-items: start end;
+  padding: 6px;
+}
+
+.product-card-halo-label {
+  background: var(--warn);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.product-card[data-pointed="true"] .product-card-halo {
+  opacity: 1;
+  animation: halo-pulse 1.6s ease-out infinite;
+}
+
+@keyframes halo-pulse {
+  0%   { box-shadow: 0 0 0 4px rgba(199,113,29,0.30); }
+  60%  { box-shadow: 0 0 0 14px rgba(199,113,29,0); }
+  100% { box-shadow: 0 0 0 4px rgba(199,113,29,0); }
+}
+
+.product-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 4px 4px;
+}
+
+.product-card-name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-card-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.product-card-price {
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  color: white;
+  font-weight: 600;
+}
+
+.product-card-moq {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.04em;
+}
+
+.product-card-swatches {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.product-card-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.22);
+}
+
+.product-card-swatch-extra {
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 500;
+  margin-left: 2px;
+}

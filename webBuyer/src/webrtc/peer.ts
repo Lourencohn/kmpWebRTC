@@ -233,6 +233,8 @@ export class PeerSession {
         this.events.onDataChannelMessage?.(data)
       } else if (data instanceof ArrayBuffer) {
         this.events.onDataChannelMessage?.(new TextDecoder().decode(data))
+      } else if (ArrayBuffer.isView(data)) {
+        this.events.onDataChannelMessage?.(new TextDecoder().decode((data as ArrayBufferView).buffer))
       }
     })
     channel.addEventListener('close', () => {

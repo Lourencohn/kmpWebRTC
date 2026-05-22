@@ -13,6 +13,24 @@ sealed class DataChannelMessage {
         val muted: Boolean,
         val from: String,
     ) : DataChannelMessage()
+
+    @Serializable
+    @SerialName("scroll")
+    data class Scroll(
+        val productId: String,
+        val offset: Float,
+        val ts: Long,
+        val from: String,
+    ) : DataChannelMessage()
+
+    @Serializable
+    @SerialName("pointAt")
+    data class PointAt(
+        val productId: String,
+        val ts: Long,
+        val from: String,
+        val durationMs: Long = 3_000,
+    ) : DataChannelMessage()
 }
 
 val DataChannelJson: Json = Json {
