@@ -12,6 +12,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.ktor.server.websocket.WebSockets
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -37,10 +38,17 @@ fun Application.module() {
         allowMethod(io.ktor.http.HttpMethod.Get)
         allowMethod(io.ktor.http.HttpMethod.Options)
     }
+    install(WebSockets) {
+        pingPeriodMillis = 20_000
+        timeoutMillis = 30_000
+        maxFrameSize = Long.MAX_VALUE
+        masking = false
+    }
 
     val baseUrl = System.getenv("PUBLIC_BUYER_URL")?.takeIf { it.isNotBlank() }
         ?: "http://localhost:5173"
     val store = SessionStore()
+    val rooms = RoomManager()
 
     routing {
         get("/health") { call.respondText("ok") }
@@ -49,6 +57,7 @@ fun Application.module() {
         }
     }
     sessionRoutes(store, baseUrl)
+    signalingRoutes(rooms, store)
 }
 
 @Serializable

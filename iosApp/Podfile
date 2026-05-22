@@ -1,0 +1,8 @@
+platform :ios, '15.0'
+
+use_frameworks!
+
+target 'iosApp' do
+  pod 'composeApp', :path => '../composeApp'
+  pod 'WebRTC-SDK', '125.6422.07'
+end

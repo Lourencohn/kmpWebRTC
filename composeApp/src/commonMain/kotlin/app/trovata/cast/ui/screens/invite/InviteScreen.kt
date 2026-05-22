@@ -47,6 +47,7 @@ import app.trovata.cast.ui.components.QrCard
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.components.TrovataCard
 import app.trovata.cast.ui.icons.TrovataIcons
+import app.trovata.cast.ui.screens.call.LiveCallScreen
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -62,6 +63,9 @@ data class InviteScreen(val record: StoredSessionRecord) : Screen {
             share = container.shareController,
             onBack = { navigator.pop() },
             onClose = { navigator.popUntilRoot() },
+            onStartCall = {
+                navigator.push(LiveCallScreen(token = record.token, sellerName = record.sellerName))
+            },
         )
     }
 }
@@ -72,6 +76,7 @@ private fun InviteBody(
     share: ShareController,
     onBack: () -> Unit,
     onClose: () -> Unit,
+    onStartCall: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
     val clipboard = LocalClipboardManager.current
@@ -247,7 +252,7 @@ private fun InviteBody(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth(),
         ) {
-            StickyClose(onClose = onClose)
+            StickyClose(onClose = onClose, onStartCall = onStartCall)
         }
     }
 }
@@ -395,7 +400,7 @@ private fun NextStepRow(index: Int, title: String, detail: String) {
 }
 
 @Composable
-private fun StickyClose(onClose: () -> Unit) {
+private fun StickyClose(onClose: () -> Unit, onStartCall: () -> Unit) {
     val colors = TrovataTokens.colors
     Box(
         modifier = Modifier
@@ -407,28 +412,23 @@ private fun StickyClose(onClose: () -> Unit) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Convite pronto",
-                    color = colors.ink4,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    text = "Vai aparecer em Sessões",
-                    color = colors.ink,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
             Btn(
                 text = "Concluir",
                 onClick = onClose,
-                kind = BtnKind.Primary,
+                kind = BtnKind.Ghost,
                 size = BtnSize.Md,
                 icon = TrovataIcons.check,
+                modifier = Modifier.weight(1f),
+            )
+            Btn(
+                text = "Iniciar chamada",
+                onClick = onStartCall,
+                kind = BtnKind.Jade,
+                size = BtnSize.Md,
+                icon = TrovataIcons.video,
+                modifier = Modifier.weight(1f),
             )
         }
     }

@@ -12,7 +12,7 @@ import app.trovata.cast.platform.ShareController
 class AppContainer(driverFactory: DatabaseDriverFactory) {
     private val driver: SqlDriver = driverFactory.create()
     private val database: TrovataDatabase = TrovataDatabase(driver)
-    private val httpClient = HttpClientFactory.create()
+    val httpClient = HttpClientFactory.create()
 
     val sessionsRepository: SessionsRepository = SessionsRepository(database)
     val sessionsApi: SessionsApi = SessionsApi(httpClient)

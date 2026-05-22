@@ -1,5 +1,7 @@
-import { fetchSession, SessionFetchError } from './api/sessions'
+import { fetchSession, SessionFetchError, type SessionInfo } from './api/sessions'
+import { SignalingClient } from './signaling/client'
 import { clearLastSession, loadLastSession, saveLastSession } from './storage/lastSession'
+import { PeerSession, type PeerStatus } from './webrtc/peer'
 import {
   renderArrival,
   renderError,
@@ -26,6 +28,14 @@ function setTokenInUrl(token: string): void {
   window.history.replaceState(null, '', url.toString())
 }
 
+function signalingUrlFor(token: string): string {
+  const wsBase = SERVER_BASE
+    .replace(/^http:\/\//, 'ws://')
+    .replace(/^https:\/\//, 'wss://')
+    .replace(/\/$/, '')
+  return `${wsBase}/ws/session/${encodeURIComponent(token)}`
+}
+
 async function load(token: string): Promise<void> {
   renderLoading(root!, token)
   try {
@@ -33,8 +43,9 @@ async function load(token: string): Promise<void> {
     saveLastSession({ token: info.token, openedAtMs: Date.now(), joined: false })
     renderArrival(root!, info, {
       onJoinAudio: async () => {
-        await requestMic()
+        const audio = await requestMic()
         saveLastSession({ token: info.token, openedAtMs: Date.now(), joined: true })
+        startPeer(info, audio)
       },
     })
   } catch (err) {
@@ -42,16 +53,11 @@ async function load(token: string): Promise<void> {
       err instanceof SessionFetchError
         ? err
         : new SessionFetchError('server', 'Falha inesperada ao abrir a sessão.')
-    if (fail.kind === 'not_found' || fail.kind === 'expired') {
-      clearLastSession()
-    }
+    if (fail.kind === 'not_found' || fail.kind === 'expired') clearLastSession()
     renderError(root!, fail.kind, fail.message, token, {
       onRetry: () => {
-        if (fail.kind === 'not_found' || fail.kind === 'expired') {
-          showLanding()
-        } else {
-          void load(token)
-        }
+        if (fail.kind === 'not_found' || fail.kind === 'expired') showLanding()
+        else void load(token)
       },
     })
   }
@@ -67,12 +73,95 @@ function showLanding(): void {
   })
 }
 
-async function requestMic(): Promise<void> {
+async function requestMic(): Promise<MediaStream> {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('Mídia não suportada')
   }
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-  stream.getTracks().forEach((track) => track.stop())
+  return navigator.mediaDevices.getUserMedia({ audio: true })
+}
+
+function peerIdFor(token: string): string {
+  return `buyer-${token}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function startPeer(info: SessionInfo, audio: MediaStream): void {
+  const peerId = peerIdFor(info.token)
+  const signaling = new SignalingClient(signalingUrlFor(info.token), {
+    peerId,
+    role: 'Buyer',
+    displayName: info.clientName ?? undefined,
+  })
+  const session = new PeerSession(
+    signaling,
+    {
+      peerId,
+      selfRole: 'Buyer',
+      localAudio: audio,
+    },
+    {
+      onStatus: (status, detail) => updateConnectionBanner(status, detail),
+      onRemoteAudio: (stream) => attachRemoteAudio(stream),
+      onDataChannelOpen: () => updateConnectionBanner('connected', 'dc_open'),
+    },
+  )
+
+  const banner = ensureBanner()
+  banner.dataset.state = 'connecting'
+  banner.textContent = 'Conectando ao vendedor…'
+
+  signaling.start()
+  session.start()
+
+  window.addEventListener('beforeunload', () => {
+    session.close('navigated_away')
+    signaling.close('navigated_away')
+    audio.getTracks().forEach((t) => t.stop())
+  })
+}
+
+function ensureBanner(): HTMLElement {
+  let banner = document.getElementById('connection-banner') as HTMLElement | null
+  if (!banner) {
+    banner = document.createElement('div')
+    banner.id = 'connection-banner'
+    banner.className = 'connection-banner'
+    document.body.appendChild(banner)
+  }
+  return banner
+}
+
+function updateConnectionBanner(status: PeerStatus, detail?: string): void {
+  const banner = ensureBanner()
+  banner.dataset.state = status
+  switch (status) {
+    case 'idle':
+      banner.textContent = 'Aguardando…'
+      break
+    case 'negotiating':
+      banner.textContent = 'Conectando ao vendedor…'
+      break
+    case 'connected':
+      banner.textContent = detail === 'dc_open' ? 'Conectado · pronto pra trocar áudio' : 'Conectado'
+      break
+    case 'failed':
+      banner.textContent = `Conexão caiu (${detail ?? 'erro'})`
+      break
+    case 'closed':
+      banner.textContent = 'Sessão encerrada'
+      break
+  }
+}
+
+function attachRemoteAudio(stream: MediaStream): void {
+  let audio = document.getElementById('remote-audio') as HTMLAudioElement | null
+  if (!audio) {
+    audio = document.createElement('audio')
+    audio.id = 'remote-audio'
+    audio.autoplay = true
+    audio.setAttribute('playsinline', '')
+    document.body.appendChild(audio)
+  }
+  audio.srcObject = stream
 }
 
 function boot(): void {

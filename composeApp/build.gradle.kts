@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.kotlin.cocoapods)
 }
 
 kotlin {
@@ -30,6 +31,25 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = true
         }
+    }
+
+    cocoapods {
+        version = "0.1.0"
+        summary = "TrovataCast shared composeApp module"
+        homepage = "https://trovata.cast"
+        ios.deploymentTarget = "15.0"
+
+        framework {
+            baseName = "ComposeApp"
+            isStatic = true
+        }
+
+        pod("WebRTC-SDK") {
+            version = "125.6422.07"
+            linkOnly = true
+        }
+
+        podfile = project.file("../iosApp/Podfile")
     }
 
     sourceSets {
@@ -59,9 +79,12 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.client.logging)
+            implementation(libs.ktor.client.websockets)
             implementation(libs.ktor.serialization.kotlinx.json)
 
             implementation(libs.qrose)
+
+            implementation(libs.webrtc.kmp)
         }
         androidMain.dependencies {
             implementation(compose.preview)

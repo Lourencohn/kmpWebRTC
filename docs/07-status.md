@@ -13,8 +13,9 @@
 | M2 — Sessões (Home do vendedor) | ✅ concluído | m2 sessions | SellerHome + IncomingCall + SessionPrep + SessionsViewModel + SampleSessions |
 | M3 — Catálogo + convite (link da sessão) | ✅ concluído | m3 catalog & invite | CatalogPicker + Invite + Voyager nav + REST + SQLDelight + webBuyer arrival |
 | M4 — Web buyer mínimo | ✅ concluído | m4 web buyer + share + qr | Share intent nativo + QR + erros finos + persistência + 33 testes |
-| M5 — Sinalização + handshake WebRTC | 🚧 próximo | — | depende de M4 |
-| M6 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
+| M5 — Sinalização + handshake WebRTC | ✅ concluído | m5 webrtc | WS room + SignalingClient (Kotlin/TS) + WebRTC nativo (webrtc-kmp + browser) + LiveCall + CocoaPods |
+| M6 — Áudio P2P | 🚧 próximo | — | tracks de áudio já trafegando (preview); falta UI de mute + estado visível |
+| M7 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
 ---
 
@@ -244,16 +245,78 @@ trovatacast/
 
 ---
 
-## Próximo milestone — M5: Sinalização + handshake WebRTC
+## O que foi entregue no M5
 
-Critério de aceitação: dois aparelhos se conectam P2P, sem mídia ainda. Data channel aberto, ping/pong via DC funciona, ICE restart manual reconecta.
+### Protocolo
+- `protocol/Signaling.kt` — sealed class `SignalingMessage` com 10 variantes (`Hello`, `RoomState`, `PeerJoined`, `PeerLeft`, `Offer`, `Answer`, `IceCandidate`, `Bye`, `PresencePing`, `ProtocolError`).
+- `SignalingJson` polimórfico via `classDiscriminator = "type"`.
+- 6 testes round-trip (`SignalingDtoTest`).
+
+### Servidor
+- `signalingServer/Room.kt` — `RoomPeer`, `Room` (max 2 peers, sem roles duplicadas, mutex-guarded) + `RoomManager` global.
+- `signalingServer/SignalingWebSocket.kt` — `/ws/session/{token}` valida token via `SessionStore`, requer `Hello` como primeira mensagem, broadcasta `RoomState`/`PeerJoined`/`PeerLeft`, relaya `Offer`/`Answer`/`IceCandidate`/`PresencePing`/`Bye` (com roteamento opcional `to`).
+- WebSockets plugin instalado com ping/timeout (20s/30s).
+- 7 testes (`SignalingWebSocketTest`): token desconhecido, hello+roomState, dois peers + relay + bye, sala cheia, role duplicada, peerLeft, payload completo.
+
+### App (composeApp/)
+- **CocoaPods** ligado: `kotlin-cocoapods` plugin + `cocoapods { pod("WebRTC-SDK", "125.6422.07") { linkOnly = true } }`. `iosApp/Podfile` consome o `composeApp` Podspec gerado + WebRTC.
+- **webrtc-kmp** (`com.shepeliev:webrtc-kmp:0.125.10`) adicionado em commonMain — funciona em Android (AAR `io.github.webrtc-sdk`) e iOS (WebRTC.framework via Pods).
+- **HttpClient** atualizado: `install(WebSockets)` no Ktor client.
+- `data/signaling/SignalingClient.kt` — wrapper KMP da WebSocket com `StateFlow<SignalingState>`, `SharedFlow<SignalingMessage>`, listener UNDISPATCHED para deterministic startup. 7 testes (`SignalingClientTest`) com `FakeTransport`, `UnconfinedTestDispatcher` + `runCurrent`.
+- `data/signaling/KtorSignalingTransport.kt` — implementação real via `webSocketSession`.
+- `feature/call/PeerSession.kt` — orquestra `webrtc-kmp` PeerConnection: cria offer (buyer-side), responde answer (seller-side), troca ICE, abre DC `presence`, dispara `PresencePing` via signaling a cada 5s, transiciona `PeerSessionState` (Idle/Negotiating/Connected/Failed/Closed) via `onIceConnectionStateChange`.
+- `feature/call/LiveCallScreenModel.kt` + `ui/screens/call/LiveCallScreen.kt` — tela dark com status pill, avatar com borda colorida, debug card (sinalização + peer), botão `Encerrar`. Navegável de `InviteScreen` via novo botão "Iniciar chamada" (Jade).
+
+### Web buyer
+- `signaling/messages.ts` — tipos discriminados espelhando o protocolo Kotlin.
+- `signaling/client.ts` — `SignalingClient` com fila pré-open, status discriminado (`idle`/`connecting`/`connected`/`failed`/`closed`), 8 testes (`client.test.ts`) com `FakeSocket`.
+- `webrtc/peer.ts` — `PeerSession` com `RTCPeerConnection`, STUN, presence loop via DC, ICE restart, perfect-negotiation lite. 10 testes (`peer.test.ts`) com `FakePeerConnection` + `FakeDataChannel`.
+- `main.ts` — após pedir mic, instancia SignalingClient + PeerSession, mostra banner colorido fixo no topo (`Conectando…` / `Conectado` / `Conexão caiu`), prende áudio remoto em `<audio autoplay playsinline>`, encerra tudo no `beforeunload`.
+- CSS: `.connection-banner` com estados (`ink` default, `jade` connected, `live` failed, `warn` negotiating, `ink-3` closed).
+
+### CI
+- Job `web-buyer`: já incluído `npm test`.
+- Job `android`: já roda `:composeApp:testDebugUnitTest` antes de `assembleDebug`.
+- Job `ios-framework`: adiciona setup-ruby@v1 (3.3) + `gem install cocoapods` antes do `linkDebugFrameworkIosSimulatorArm64`. Cocoapods plugin executa `pod install` automaticamente para o synthetic project.
+
+### Aceitação validada
+- `./gradlew :protocol:jvmTest` ✅ (6 testes)
+- `./gradlew :signalingServer:test` ✅ (12 testes)
+- `./gradlew :composeApp:testDebugUnitTest` ✅ (15 testes)
+- `./gradlew :composeApp:assembleDebug` ✅ (libjingle_peerconnection_so.so empacotado)
+- `./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64` ✅ (WebRTC.framework via Pods)
+- `(cd webBuyer && npm run typecheck && npm test && npm run build)` ✅ (43 testes)
+
+### Como testar manualmente
+1. Subir o server: `./gradlew :signalingServer:run` (porta 8080).
+2. Subir o webBuyer: `cd webBuyer && npm run dev` (porta 5173).
+3. Abrir o app Android no emulador e gerar um link (Home → Iniciar nova sessão → Catalog → Gerar link).
+4. Tocar **Iniciar chamada** na InviteScreen. App entra em LiveCall como Seller (`SignalingState.Connecting → Connected`).
+5. Abrir o link gerado no Chrome do celular ou desktop. Clicar **Entrar com áudio** → banner azul → cria offer.
+6. Banner verde em ambos os lados quando ICE conecta. App muda `PeerSessionState` para `Connected`. DC `presence` aberto (presence ping de 5s via signaling).
+
+### Dívidas conhecidas
+- **STUN-only**: sem TURN server, NAT simétrico vai falhar. Entra no M10 (qualidade/reconnect).
+- **`MediaDevices.getUserMedia` no Android**: webrtc-kmp pede `RECORD_AUDIO` em runtime — o `MainActivity` ainda não solicita explicitamente; usuário aceita no prompt do sistema. Adicionar `ActivityResultContracts.RequestPermission` no fluxo do LiveCall antes de produção.
+- **iPad WebRTC**: não testado.
+- **Estado `Negotiating` ↔ `Connected` flapping** durante `ICE Disconnected`: tratado pra mostrar "Conectando…" no banner, mas precisaria ICE restart automático (M10).
+- **`getStats()` periódico**: declarado no PeerConnection mas não está sendo coletado — adicionar para modo economia (M10).
+- **Mute/câmera**: vendedor não tem controle de microfone na UI ainda — entra no M6.
+- **Áudio remoto no iOS**: `MediaStream` da `webrtc-kmp` é exposto via `PeerSession.remoteAudio` mas a UI não conecta a um `UIView` ainda; entra no M6.
+- **`PeerSession` em tests**: testes unitários cobrem `SignalingClient` e os webBuyer's peer flows; o app-side `PeerSession` depende de `webrtc-kmp` que tem inicialização nativa, então não é facilmente unit-testable. Validação é manual + via testes do webBuyer (mesmo protocolo).
+
+---
+
+## Próximo milestone — M6: Áudio P2P
+
+Critério de aceitação: chamada de voz real entre dois celulares de testers.
 
 ### A construir
-- WebSocket no servidor: `/ws/session/<token>` orquestra `offer/answer/ice`.
-- `PeerConnection` no Android (actual) com `webrtc-kmp` ou Google `webrtc-android`.
-- `PeerConnection` no iOS (actual) — Podfile + `WebRTC.framework`.
-- `PeerConnection` no web buyer (nativo).
-- DC envia `Presence` ping a cada 5s.
+- Captura local de mic já está fluindo via `MediaDevices.getUserMedia` (M5).
+- Mutar microfone na UI (`MediaStreamTrack.enabled = false`).
+- Mostrar estado do mic do outro lado (via DC ou `signaling.PresencePing` carregando `muted`).
+- Conectar `MediaStream` remoto a uma view de áudio no iOS/Android (`RemoteAudioTrack`).
+- Permissão Android pedida explicitamente no fluxo do LiveCall.
 
 ---
 
@@ -266,3 +329,4 @@ Critério de aceitação: dois aparelhos se conectam P2P, sem mídia ainda. Data
 | 2026-05-21 | M2 fechado: SellerHome + IncomingCall + SessionPrep + ViewModel com StateFlow |
 | 2026-05-21 | M3 fechado: CatalogPicker + Invite + Voyager + REST `/session` + SQLDelight + webBuyer arrival |
 | 2026-05-21 | M4 fechado: share intent nativo + QR + erros finos no webBuyer + persistência + 33 testes (8 Kotlin + 25 TS) |
+| 2026-05-21 | M5 fechado: signaling WS + SignalingClient (Kotlin/TS) + WebRTC (webrtc-kmp + browser nativo) + LiveCall + CocoaPods · 76 testes totais |
