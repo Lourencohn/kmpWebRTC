@@ -12,7 +12,7 @@ actual class DatabaseDriverFactory {
 }
 
 actual object ServerConfig {
-    actual val baseUrl: String = "http://192.168.1.101:8080"
+    actual val baseUrl: String = "https://trovatacast-signaling.fly.dev"
 }
 
 actual fun httpClientEngine(): HttpClientEngine = Darwin.create()

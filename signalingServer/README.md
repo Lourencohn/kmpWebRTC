@@ -35,6 +35,34 @@ java -jar signalingServer/build/libs/trovatacast-signaling.jar
 ./gradlew :signalingServer:test
 ```
 
+## Deploy no Fly.io
+
+Pré-requisitos: cadastro no Fly.io feito + cartão (a conta inicia em trial).
+
+```bash
+brew install flyctl
+fly auth login
+
+fly apps create trovatacast-signaling
+fly secrets set PUBLIC_BUYER_URL=https://buyer.trovatacast.app --app trovatacast-signaling
+fly deploy
+```
+
+Configuração relevante (`fly.toml` na raiz do repo):
+- Região primária: `gru` (São Paulo).
+- Máquina: `shared-cpu-1x` 256MB (~US$ 2/mês).
+- `auto_stop_machines = "off"` mantém o WebSocket sempre disponível.
+- Health check em `/health`.
+
+Verificar:
+
+```bash
+curl https://trovatacast-signaling.fly.dev/health
+curl https://trovatacast-signaling.fly.dev/version
+```
+
+Limite de gasto: configure em `fly.io/dashboard/<org>/billing` (Spend Limit) para teto absoluto.
+
 ## Roadmap
 
 - **M0** (atual): health-check, base do projeto.

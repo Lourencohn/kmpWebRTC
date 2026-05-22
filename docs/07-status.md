@@ -14,8 +14,11 @@
 | M3 — Catálogo + convite (link da sessão) | ✅ concluído | m3 catalog & invite | CatalogPicker + Invite + Voyager nav + REST + SQLDelight + webBuyer arrival |
 | M4 — Web buyer mínimo | ✅ concluído | m4 web buyer + share + qr | Share intent nativo + QR + erros finos + persistência + 33 testes |
 | M5 — Sinalização + handshake WebRTC | ✅ concluído | m5 webrtc | WS room + SignalingClient (Kotlin/TS) + WebRTC nativo (webrtc-kmp + browser) + LiveCall + CocoaPods |
-| M6 — Áudio P2P | 🚧 próximo | — | tracks de áudio já trafegando (preview); falta UI de mute + estado visível |
-| M7 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
+| M6 — Áudio P2P | ✅ concluído | `45d455f` m6 | Mute na UI dos dois lados via DC `Mute` + áudio remoto anexado (`onTrack` no app, `<audio autoplay>` no web) + banner refinado |
+| M7 — Co-presença básica | ✅ concluído | `7f1f6bc` m7 | DC `Scroll` (lossy ~30Hz, `sample(33)`) + `PointAt` (ordered) + catálogo grid em LiveCallScreen + productCard.ts no web + halo no cliente |
+| Infra — Signaling em produção | ✅ concluído | (sem commit ainda) | Fly.io `gru` 256MB sempre-on, HTTPS automático, Dockerfile multi-stage, deploy a partir da raiz |
+| M8 — Carrinho ao vivo | 🚧 próximo | — | `Navigate`, `CartUpdate`, `BuyerProductDetail`, gaveta no vendedor |
+| M9 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
 ---
 
@@ -307,16 +310,99 @@ trovatacast/
 
 ---
 
-## Próximo milestone — M6: Áudio P2P
+## O que foi entregue no M6
 
-Critério de aceitação: chamada de voz real entre dois celulares de testers.
+### App (`composeApp/`)
+- `PeerSession.setLocalMuted(muted)` — desabilita os tracks de áudio locais (`MediaStreamTrack.enabled = false`) e propaga `DataChannelMessage.Mute` via DC `presence`.
+- `PeerSession.onTrack` agora preenche `remoteAudio: StateFlow<MediaStream?>` — UI conecta ao `MediaStream` real no Android e iOS.
+- `LiveCallScreen` ganhou botão de mic toggle + indicador visual quando o outro lado está mudo.
+
+### Web buyer (`webBuyer/`)
+- Botão de mute na LiveCall view + indicador remoto via DC.
+- `<audio id="remote-audio" autoplay playsinline>` anexado dinamicamente em `attachRemoteAudio(stream)` no `main.ts`.
+- Banner de status redesenhado: estados `connecting` / `connected` / `failed` / `closed` com cores próprias (`ink`, `jade`, `live`, `ink-3`).
+
+### Aceitação validada
+- Chamada de voz real funcionando entre app vendedor (Android e iOS) e cliente web no Chrome.
+- Mute em um lado aparece imediatamente no outro.
+
+---
+
+## O que foi entregue no M7
+
+### Protocolo (`protocol/`)
+- `protocol/DataChannelMessage.kt` — sealed class com 3 variantes:
+  - `Mute(muted, from)`
+  - `Scroll(productId, offset, ts, from)`
+  - `PointAt(productId, ts, from, durationMs)`
+- `encode()` + `decodeDataChannel()` via Kotlinx Serialization polimórfica.
+- `DataChannelMessageTest` — round-trip + tipos inválidos.
+
+### App (`composeApp/`)
+- `PeerSession.publishScroll(productId, offset)` — emite em `MutableStateFlow` throttled via `sample(33)` (≈30Hz) → manda DC binário.
+- `PeerSession.publishPointAt(productId, durationMs)` — DC ordered, sem throttle.
+- `remoteScroll: SharedFlow<Scroll>` e `remotePointAt: SharedFlow<PointAt>` emitidos para a UI.
+- `LiveCallScreenModel` expõe ações + `pointedProductId` (com auto-clear pelo `durationMs`).
+- `LiveCallScreen` agora renderiza grade do catálogo (`ProductCard` md) com:
+  - Detecção de produto em foco via `LazyListState.firstVisibleItemIndex` + `firstVisibleItemScrollOffset` → publica scroll.
+  - Botão "Apontar": ativa modo de seleção; tap em produto dispara `publishPointAt` + halo local de 3s.
+  - Halo (`pointed = true` no `ProductCard`) quando o lado remoto aponta um produto.
+
+### Web buyer (`webBuyer/`)
+- `protocol/dataChannel.ts` — encode/decode equivalente ao Kotlin (Mute/Scroll/PointAt) + tipo discriminado por `type`.
+- `data/catalog.ts` — catálogo cliente espelhando `SampleCatalog` Kotlin (9 SKUs, cores, tags).
+- `ui/productCard.ts` — `renderProductCard(product, { pointed, inCart })` em HTML puro com os mesmos tokens do design system.
+- `views/arrival.ts` (`renderLiveCall`) — grade scroll-snap dos produtos + `scrollToProduct(productId, offset)` (com `behavior: 'smooth'` quando offset pequeno) + halo `--pointed` aplicado.
+- `main.ts.buildDataChannelHandler(view)` — roteia `mute` / `scroll` / `pointAt` para a `LiveCallView`; `pointAt` agenda `setTimeout` para limpar o halo após `durationMs ?? 3000`.
+- `styles/app.css` — variáveis e classes para `.live-call`, `.live-call__grid`, `.product-card.is-pointed`, `.live-call__status` etc.
+
+### Aceitação validada
+- Vendedor rola o catálogo no app → cliente rola junto no Chrome (≈30Hz, sem jank visível).
+- Vendedor toca "Apontar" + produto → cliente vê halo laranja por 3s, vendedor vê mesmo halo localmente.
+- Mute, áudio e co-presença coexistem em uma única conexão WebRTC.
+
+### Dívidas conhecidas
+- **`getStats()` periódico** continua não coletado.
+- **`Navigate` + `CartUpdate`** (M8) ainda não existem — `BuyerProductDetail` é placeholder.
+- **TURN**: ainda STUN-only. Falhas silenciosas esperadas em NAT simétrico (operadoras móveis).
+- **ICE restart automático**: ainda não implementado (M10).
+
+---
+
+## O que foi entregue na Infra (signaling em produção)
+
+### Deploy
+- `Dockerfile` na raiz: multi-stage (`gradle:8.11.1-jdk17` build → `eclipse-temurin:17-jre-alpine` runtime), imagem final ~72MB. `sed` remove `composeApp` do `settings.gradle.kts` antes do `gradle :signalingServer:buildFatJar` para não puxar o Android SDK.
+- `fly.toml` na raiz: app `trovatacast-signaling`, região `gru`, `shared-cpu-1x` 256MB, `auto_stop_machines = "off"`, health check em `/health`.
+- `.dockerignore` enxuga o contexto (exclui `iosApp`, `webBuyer`, `prototype`, `docs`, builds locais).
+
+### URLs
+- **Signaling**: `https://trovatacast-signaling.fly.dev` (HTTPS automático). WebSocket: `wss://trovatacast-signaling.fly.dev/ws/session/{token}`.
+- `ServerConfig.baseUrl` (Android + iOS) e `VITE_SIGNALING_BASE` (web) apontam para a URL acima.
+
+### Custo
+- ~US$ 2/mês com 1 máquina shared-cpu-1x (rodar `fly scale count 1` se o Fly subiu 2 por padrão de HA).
+- Fly.io não tem feature de "spend limit"; recomendado cartão virtual com teto se preocupação for crítica.
+
+### Dívidas conhecidas
+- **`PUBLIC_BUYER_URL`** não setado no Fly.io — `POST /session` ainda devolve URLs com `http://localhost:5173`. Setar quando webBuyer for hospedado (Cloudflare Pages / Netlify).
+- **Webbuyer ainda local** — depende de `npm run dev` no Mac do vendedor. Próximo passo natural pra eliminar o Mac.
+- **TURN não wired** — Cloudflare Realtime TURN tem 1TB/mês grátis; entrar antes de qualquer beta em rede móvel real.
+- **Restart com perda de sessões in-memory** — `SessionStore` + `RoomManager` vivem só na RAM. Persistência Postgres entra em M9 (Order).
+
+---
+
+## Próximo milestone — M8: Carrinho ao vivo
+
+Critério de aceitação: pedido se constrói em tempo real visto pelos dois lados.
 
 ### A construir
-- Captura local de mic já está fluindo via `MediaDevices.getUserMedia` (M5).
-- Mutar microfone na UI (`MediaStreamTrack.enabled = false`).
-- Mostrar estado do mic do outro lado (via DC ou `signaling.PresencePing` carregando `muted`).
-- Conectar `MediaStream` remoto a uma view de áudio no iOS/Android (`RemoteAudioTrack`).
-- Permissão Android pedida explicitamente no fluxo do LiveCall.
+- **DC `Navigate`** — cliente toca um card → vendedor é navegado pra detalhe do mesmo produto.
+- **`BuyerProductDetail`** (web) — stepper de tamanhos/cores + botão "Adicionar".
+- **DC `CartUpdate`** — adição/remoção → vendedor recebe toast "Diego adicionou 12un da peça X".
+- **Carrinho dock** no cliente (sticky bottom) com subtotal e contagem.
+- **Gaveta de carrinho** no vendedor com `ProductRow` listando o pedido em construção + total.
+- Persistência local da seleção via SQLDelight (`SelectedProductEntity` já existe desde M3).
 
 ---
 
@@ -330,3 +416,6 @@ Critério de aceitação: chamada de voz real entre dois celulares de testers.
 | 2026-05-21 | M3 fechado: CatalogPicker + Invite + Voyager + REST `/session` + SQLDelight + webBuyer arrival |
 | 2026-05-21 | M4 fechado: share intent nativo + QR + erros finos no webBuyer + persistência + 33 testes (8 Kotlin + 25 TS) |
 | 2026-05-21 | M5 fechado: signaling WS + SignalingClient (Kotlin/TS) + WebRTC (webrtc-kmp + browser nativo) + LiveCall + CocoaPods · 76 testes totais |
+| 2026-05-21 | M6 fechado: mute na UI dos dois lados + áudio remoto anexado + banner refinado |
+| 2026-05-21 | M7 fechado: DC Scroll/PointAt + grade de catálogo na LiveCall + halo de produto apontado |
+| 2026-05-22 | Infra: signaling deployado no Fly.io `gru`, clientes apontados para `https://trovatacast-signaling.fly.dev`, Mac não mais necessário para o servidor |

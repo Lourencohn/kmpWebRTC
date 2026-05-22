@@ -13,7 +13,7 @@ actual class DatabaseDriverFactory(private val context: Context) {
 }
 
 actual object ServerConfig {
-    actual val baseUrl: String = "http://10.0.2.2:8080"
+    actual val baseUrl: String = "https://trovatacast-signaling.fly.dev"
 }
 
 actual fun httpClientEngine(): HttpClientEngine = OkHttp.create()
