@@ -198,6 +198,14 @@ function attachRemoteAudio(stream: MediaStream): void {
     document.body.appendChild(audio)
   }
   audio.srcObject = stream
+  audio.muted = false
+  audio.volume = 1
+  const playback = audio.play()
+  if (playback && typeof playback.catch === 'function') {
+    playback.catch((err) => {
+      console.warn('[trovatacast/web] remote audio autoplay blocked', err)
+    })
+  }
 }
 
 function boot(): void {
