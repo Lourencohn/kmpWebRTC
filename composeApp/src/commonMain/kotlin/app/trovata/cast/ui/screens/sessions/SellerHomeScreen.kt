@@ -1,7 +1,6 @@
 package app.trovata.cast.ui.screens.sessions
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +47,7 @@ import app.trovata.cast.ui.components.PillTone
 import app.trovata.cast.ui.components.ScreenHeader
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.components.TrovataCard
+import app.trovata.cast.ui.components.Wordmark
 import app.trovata.cast.ui.icons.TrovataIcons
 
 @Composable
@@ -103,10 +103,10 @@ private fun HomeHeader(eyebrow: String, title: String, subtitle: String) {
         subtitle = subtitle,
         eyebrow = {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                MarkBadge()
+                Wordmark(height = 22.dp)
                 Text(
                     text = eyebrow.uppercase(),
                     color = colors.ink4,
@@ -118,31 +118,6 @@ private fun HomeHeader(eyebrow: String, title: String, subtitle: String) {
         },
         trailing = { IconBtn(icon = TrovataIcons.bell, onClick = {}, kind = IconBtnKind.Line) },
     )
-}
-
-@Composable
-private fun MarkBadge() {
-    val colors = TrovataTokens.colors
-    Box(
-        modifier = Modifier
-            .size(22.dp)
-            .background(colors.ink, RoundedCornerShape(6.dp)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(11.dp)
-                .background(Color.Transparent, CircleShape)
-                .border(2.dp, Color.White, CircleShape),
-        ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(5.dp)
-                    .background(colors.jade, CircleShape),
-            )
-        }
-    }
 }
 
 @Composable
