@@ -21,34 +21,14 @@ main#app {
 .wordmark {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
 }
 
-.wordmark-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--brand);
-  display: inline-grid;
-  place-items: center;
+.wordmark-img {
+  height: 44px;
+  width: auto;
+  display: block;
+  user-select: none;
 }
-
-.wordmark-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--jade);
-}
-
-.wordmark-text {
-  font-size: 26px;
-  line-height: 1.05;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-}
-
-.wordmark-text-a { color: var(--ink); }
-.wordmark-text-b { color: var(--brand); }
 
 .arrival {
   width: 100%;

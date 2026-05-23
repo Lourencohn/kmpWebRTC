@@ -13,24 +13,24 @@
   --line-strong:  #D6D5CB;
 
   /* Ink */
-  --ink:          #0E1116;
-  --ink-2:        #2B313A;
+  --ink:          #222222;
+  --ink-2:        #333A42;
   --ink-3:        #5A6470;
   --ink-4:        #8A93A0;
   --ink-5:        #B6BCC4;
 
-  /* Brand — calm blue (primary) + jade green (co-presence / confirm) */
-  --brand:        #2456E0;
-  --brand-2:      #1A41AE;
-  --brand-tint:   #EAEFFE;
-  --brand-ring:   rgba(36,86,224,.22);
+  /* Brand — Trovata azul corporativo + verde institucional */
+  --brand:        #0057B8;
+  --brand-2:      #003F87;
+  --brand-tint:   #E6EFF9;
+  --brand-ring:   rgba(0,87,184,.22);
 
-  --jade:         #0E8F6E;
-  --jade-2:       #0A6E55;
-  --jade-tint:    #DFF3EC;
+  --jade:         #1B4332;
+  --jade-2:       #0F2D20;
+  --jade-tint:    #E2ECE6;
 
   /* Status */
-  --live:         #E5484D;
+  --live:         #D62828;
   --warn:         #C7711D;
 
   /* Radii */

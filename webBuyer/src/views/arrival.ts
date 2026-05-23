@@ -10,11 +10,8 @@ export type ArrivalActions = {
 
 function wordmark(): string {
   return `
-    <div class="wordmark" aria-label="TrovataCast">
-      <span class="wordmark-mark" aria-hidden="true"><span class="wordmark-dot"></span></span>
-      <span class="wordmark-text">
-        <span class="wordmark-text-a">Trovata</span><span class="wordmark-text-b">Cast</span>
-      </span>
+    <div class="wordmark" aria-label="Trovata">
+      <img class="wordmark-img" src="/trovata-logo.png" alt="Trovata" />
     </div>
   `
 }

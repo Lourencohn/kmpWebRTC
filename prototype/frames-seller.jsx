@@ -126,26 +126,19 @@ function SellerHome() {
   );
 }
 
-// Wordmark for the seller app
-function TrovataMark({ size = 22, color = 'var(--ink)' }) {
+function TrovataMark({ size = 22 }) {
   return (
-    <div style={{
-      width: size, height: size, borderRadius: size * 0.27,
-      background: 'var(--ink)', color: '#fff',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      position: 'relative', flexShrink: 0,
-    }}>
-      <div style={{
-        width: size * 0.5, height: size * 0.5, borderRadius: '50%',
-        border: `${size * 0.10}px solid #fff`, position: 'relative',
-      }}>
-        <div style={{
-          position: 'absolute', right: -size * 0.18, bottom: -size * 0.06,
-          width: size * 0.22, height: size * 0.22, borderRadius: '50%',
-          background: 'var(--jade)', border: `2px solid var(--ink)`,
-        }}/>
-      </div>
-    </div>
+    <img
+      src="trovata-logo.png"
+      alt="Trovata"
+      style={{
+        height: size * 1.6,
+        width: 'auto',
+        display: 'block',
+        flexShrink: 0,
+        objectFit: 'contain',
+      }}
+    />
   );
 }
 
