@@ -25,6 +25,14 @@ function info(overrides: Partial<SessionInfo> = {}): SessionInfo {
 
 beforeEach(() => {
   document.body.innerHTML = ''
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: vi.fn().mockResolvedValue({}) },
+  })
+  Object.defineProperty(navigator, 'userAgent', {
+    configurable: true,
+    value: 'Mozilla/5.0 (Macintosh) AppleWebKit/605 Safari/605',
+  })
 })
 
 describe('renderLanding', () => {

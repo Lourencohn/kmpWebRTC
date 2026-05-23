@@ -117,15 +117,25 @@ export function renderArrival(
     if (!errorBox) return
     errorBox.innerHTML = html
     errorBox.hidden = false
+    wireOpenExternalButton(errorBox)
   }
   const clearError = (): void => {
     if (!errorBox) return
     errorBox.innerHTML = ''
     errorBox.hidden = true
   }
-  void checkMicPermissionDenied().then((denied) => {
-    if (denied) showError(MIC_BLOCKED_HTML)
-  })
+  const inAppName = detectInAppBrowser()
+  if (inAppName) {
+    showError(inAppBrowserHtml(inAppName))
+    if (cta) cta.disabled = true
+  } else if (!hasMediaDevices()) {
+    showError(unsupportedBrowserHtml())
+    if (cta) cta.disabled = true
+  } else {
+    void checkMicPermissionDenied().then((denied) => {
+      if (denied) showError(MIC_BLOCKED_HTML)
+    })
+  }
   cta?.addEventListener('click', async () => {
     cta.disabled = true
     cta.textContent = 'Pedindo permissão…'
@@ -134,7 +144,11 @@ export function renderArrival(
       await actions.onJoinAudio?.()
       cta.textContent = 'Microfone pronto — aguardando vendedor'
     } catch (err) {
-      console.error('[trovatacast/web] onJoinAudio failed', err)
+      console.error('[trovatacast/web] onJoinAudio failed', err, {
+        ua: navigator.userAgent,
+        secure: window.isSecureContext,
+        hasMediaDevices: hasMediaDevices(),
+      })
       cta.disabled = false
       cta.textContent = 'Tentar de novo'
       showError(describeJoinError(err))
@@ -287,6 +301,56 @@ const MIC_BLOCKED_HTML = `
   <strong>Microfone bloqueado neste navegador.</strong>
   <br />Toque no <strong>cadeado</strong> ao lado do endereço → <em>Permissões</em> → libere o <em>Microfone</em>, depois <strong>recarregue</strong> a página.
 `
+
+function hasMediaDevices(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+}
+
+function detectInAppBrowser(): string | null {
+  const ua = navigator.userAgent || ''
+  if (/FBAN|FBAV|FB_IAB|FBIOS/i.test(ua)) return 'Facebook'
+  if (/Instagram/i.test(ua)) return 'Instagram'
+  if (/Messenger|MessengerLite/i.test(ua)) return 'Messenger'
+  if (/Line\//i.test(ua)) return 'Line'
+  if (/MicroMessenger/i.test(ua)) return 'WeChat'
+  if (/TikTok|Bytedance|musical_ly/i.test(ua)) return 'TikTok'
+  if (/wv\)/i.test(ua) && /Android/i.test(ua)) return 'app'
+  if (/WhatsApp/i.test(ua)) return 'WhatsApp'
+  return null
+}
+
+function inAppBrowserHtml(name: string): string {
+  const label = name === 'app' ? 'este app' : name
+  return `
+    <strong>Abra este link no navegador de verdade.</strong>
+    <br />Você está dentro do ${escapeHtml(label)}, que não libera microfone.
+    <br />Toque nos <strong>três pontos (⋮)</strong> no canto superior → <em>Abrir no Chrome</em> (ou Safari, no iPhone).
+    <br /><button type="button" class="arrival-cta arrival-cta--ghost" data-action="copy-link">Copiar link</button>
+  `
+}
+
+function unsupportedBrowserHtml(): string {
+  return `
+    <strong>Este navegador não permite microfone.</strong>
+    <br />Abra o link no <em>Chrome</em> (Android) ou <em>Safari</em> (iPhone) atualizado.
+    <br /><button type="button" class="arrival-cta arrival-cta--ghost" data-action="copy-link">Copiar link</button>
+  `
+}
+
+function wireOpenExternalButton(scope: HTMLElement): void {
+  const btn = scope.querySelector<HTMLButtonElement>('[data-action="copy-link"]')
+  if (!btn) return
+  btn.addEventListener('click', async () => {
+    const url = window.location.href
+    try {
+      await navigator.clipboard.writeText(url)
+      btn.textContent = 'Link copiado — cole no Chrome'
+    } catch {
+      btn.textContent = url
+    }
+    btn.disabled = true
+  })
+}
 
 async function checkMicPermissionDenied(): Promise<boolean> {
   const perms = (navigator as Navigator & { permissions?: Permissions }).permissions
