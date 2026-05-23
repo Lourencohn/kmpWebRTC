@@ -172,6 +172,18 @@ main#app {
   color: var(--ink-3);
 }
 
+.arrival-error {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--live, #b3261e);
+  background: var(--live-tint, rgba(179, 38, 30, 0.08));
+  border: 1px solid var(--live-line, rgba(179, 38, 30, 0.2));
+  border-radius: var(--r-2);
+  text-align: center;
+}
+
 .arrival-spinner {
   width: 28px;
   height: 28px;

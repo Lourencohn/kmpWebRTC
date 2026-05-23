@@ -47,9 +47,15 @@ async function load(token: string): Promise<void> {
     saveLastSession({ token: info.token, openedAtMs: Date.now(), joined: false })
     renderArrival(root!, info, {
       onJoinAudio: async () => {
+        ensureWebRtcSupported()
         const audio = await requestMic()
-        saveLastSession({ token: info.token, openedAtMs: Date.now(), joined: true })
-        startPeer(info, audio)
+        try {
+          saveLastSession({ token: info.token, openedAtMs: Date.now(), joined: true })
+          startPeer(info, audio)
+        } catch (err) {
+          audio.getTracks().forEach((t) => t.stop())
+          throw err
+        }
       },
     })
   } catch (err) {
@@ -78,10 +84,22 @@ function showLanding(): void {
 }
 
 async function requestMic(): Promise<MediaStream> {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error('Mídia não suportada')
+  if (!window.isSecureContext) {
+    throw new Error('Abra esta página por HTTPS para liberar o microfone.')
   }
-  return navigator.mediaDevices.getUserMedia({ audio: true })
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('Este navegador não expõe o microfone. Tente Chrome ou Safari atualizados.')
+  }
+  return navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+}
+
+function ensureWebRtcSupported(): void {
+  if (typeof window.RTCPeerConnection !== 'function') {
+    throw new Error('Este navegador não suporta WebRTC. Atualize o app ou use outro navegador.')
+  }
+  if (typeof window.WebSocket !== 'function') {
+    throw new Error('Este navegador não suporta WebSocket.')
+  }
 }
 
 function peerIdFor(token: string): string {

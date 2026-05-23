@@ -108,18 +108,36 @@ export function renderArrival(
       </ul>
       <button class="arrival-cta" type="button" data-action="join">Entrar com áudio</button>
       <p class="arrival-hint">Você vai precisar liberar o microfone. Nada é gravado.</p>
+      <p class="arrival-error" data-role="join-error" hidden></p>
     </section>
   `
   const cta = root.querySelector<HTMLButtonElement>('[data-action="join"]')
+  const errorBox = root.querySelector<HTMLElement>('[data-role="join-error"]')
+  const showError = (html: string): void => {
+    if (!errorBox) return
+    errorBox.innerHTML = html
+    errorBox.hidden = false
+  }
+  const clearError = (): void => {
+    if (!errorBox) return
+    errorBox.innerHTML = ''
+    errorBox.hidden = true
+  }
+  void checkMicPermissionDenied().then((denied) => {
+    if (denied) showError(MIC_BLOCKED_HTML)
+  })
   cta?.addEventListener('click', async () => {
     cta.disabled = true
     cta.textContent = 'Pedindo permissão…'
+    clearError()
     try {
       await actions.onJoinAudio?.()
       cta.textContent = 'Microfone pronto — aguardando vendedor'
-    } catch {
+    } catch (err) {
+      console.error('[trovatacast/web] onJoinAudio failed', err)
       cta.disabled = false
       cta.textContent = 'Tentar de novo'
+      showError(describeJoinError(err))
     }
   })
 }
@@ -263,6 +281,44 @@ export function renderLiveCall(
       catalog.scrollTop = targetY
     },
   }
+}
+
+const MIC_BLOCKED_HTML = `
+  <strong>Microfone bloqueado neste navegador.</strong>
+  <br />Toque no <strong>cadeado</strong> ao lado do endereço → <em>Permissões</em> → libere o <em>Microfone</em>, depois <strong>recarregue</strong> a página.
+`
+
+async function checkMicPermissionDenied(): Promise<boolean> {
+  const perms = (navigator as Navigator & { permissions?: Permissions }).permissions
+  if (!perms?.query) return false
+  try {
+    const status = await perms.query({ name: 'microphone' as PermissionName })
+    return status.state === 'denied'
+  } catch {
+    return false
+  }
+}
+
+function describeJoinError(err: unknown): string {
+  if (err && typeof err === 'object' && 'name' in err) {
+    const name = String((err as { name?: unknown }).name ?? '')
+    const message = String((err as { message?: unknown }).message ?? '')
+    switch (name) {
+      case 'NotAllowedError':
+      case 'SecurityError':
+        return MIC_BLOCKED_HTML
+      case 'NotFoundError':
+      case 'OverconstrainedError':
+        return 'Nenhum microfone disponível neste aparelho.'
+      case 'NotReadableError':
+        return 'O microfone está ocupado por outro app. Feche apps de chamada e tente de novo.'
+      case 'AbortError':
+        return 'O pedido de microfone foi cancelado. Tente de novo.'
+    }
+    if (message) return `Erro: ${escapeHtml(message)}`
+  }
+  if (err instanceof Error && err.message) return `Erro: ${escapeHtml(err.message)}`
+  return 'Não consegui iniciar a chamada. Tente de novo.'
 }
 
 function escapeHtml(value: string): string {
