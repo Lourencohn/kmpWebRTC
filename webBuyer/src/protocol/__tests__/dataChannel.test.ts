@@ -57,4 +57,45 @@ describe('dataChannel codec', () => {
       decodeDataChannelMessage('{"type":"scroll","productId":1,"offset":"x","ts":0,"from":"y"}'),
     ).toBeNull()
   })
+
+  it('roundtrips navigate', () => {
+    const original: DataChannelMessage = {
+      type: 'navigate',
+      productId: 'AN-088',
+      ts: 1_700_000_000_500,
+      from: 'buyer-xyz',
+    }
+    expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
+  })
+
+  it('roundtrips cartUpdate', () => {
+    const original: DataChannelMessage = {
+      type: 'cartUpdate',
+      productId: 'AN-104',
+      size: 'M',
+      units: 12,
+      ts: 1_700_000_000_750,
+      from: 'buyer-xyz',
+    }
+    expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
+  })
+
+  it('cartUpdate with zero units decodes', () => {
+    const raw =
+      '{"type":"cartUpdate","productId":"AN-104","size":"G","units":0,"ts":1,"from":"buyer"}'
+    const decoded = decodeDataChannelMessage(raw)
+    expect(decoded).toEqual({
+      type: 'cartUpdate',
+      productId: 'AN-104',
+      size: 'G',
+      units: 0,
+      ts: 1,
+      from: 'buyer',
+    })
+  })
+
+  it('rejects cartUpdate without size', () => {
+    const raw = '{"type":"cartUpdate","productId":"p","units":1,"ts":1,"from":"x"}'
+    expect(decodeDataChannelMessage(raw)).toBeNull()
+  })
 })

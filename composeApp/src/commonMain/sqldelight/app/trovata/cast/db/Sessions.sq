@@ -20,6 +20,18 @@ CREATE TABLE IF NOT EXISTS SelectedProductEntity (
 
 CREATE INDEX IF NOT EXISTS idx_selected_session ON SelectedProductEntity(sessionId);
 
+CREATE TABLE IF NOT EXISTS CartLineEntity (
+    sessionId TEXT NOT NULL,
+    sku TEXT NOT NULL,
+    size TEXT NOT NULL,
+    units INTEGER NOT NULL,
+    updatedAtMs INTEGER NOT NULL,
+    PRIMARY KEY (sessionId, sku, size),
+    FOREIGN KEY (sessionId) REFERENCES SessionEntity(sessionId) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_cart_session ON CartLineEntity(sessionId);
+
 insertSession:
 INSERT INTO SessionEntity(sessionId, token, url, sellerName, collectionLabel, clientName, clientShop, scheduledFor, createdAtMs, expiresAtMs)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
@@ -38,3 +50,16 @@ SELECT sku FROM SelectedProductEntity WHERE sessionId = ?;
 
 deleteSession:
 DELETE FROM SessionEntity WHERE sessionId = ?;
+
+upsertCartLine:
+INSERT OR REPLACE INTO CartLineEntity(sessionId, sku, size, units, updatedAtMs)
+VALUES (?, ?, ?, ?, ?);
+
+deleteCartLine:
+DELETE FROM CartLineEntity WHERE sessionId = ? AND sku = ? AND size = ?;
+
+selectCartLinesBySession:
+SELECT sku, size, units, updatedAtMs FROM CartLineEntity WHERE sessionId = ? ORDER BY updatedAtMs ASC;
+
+clearCart:
+DELETE FROM CartLineEntity WHERE sessionId = ?;

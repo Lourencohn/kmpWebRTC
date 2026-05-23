@@ -2,24 +2,28 @@ package app.trovata.cast.ui.screens.call
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.runtime.snapshotFlow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,7 +41,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.AppContainerHolder
+import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.sample.SampleCatalog
+import app.trovata.cast.feature.call.CartLineUi
+import app.trovata.cast.feature.call.CartToast
 import app.trovata.cast.feature.call.LiveCallScreenModel
 import app.trovata.cast.feature.call.LiveCallUiState
 import app.trovata.cast.theme.TrovataTokens
@@ -49,13 +57,20 @@ import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
 import app.trovata.cast.ui.components.ProductCard
 import app.trovata.cast.ui.components.ProductCardSize
+import app.trovata.cast.ui.components.ProductRow
+import app.trovata.cast.ui.components.ProductRowSize
 import app.trovata.cast.ui.icons.TrovataIcons
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 
-data class LiveCallScreen(val token: String, val sellerName: String) : Screen {
+data class LiveCallScreen(
+    val token: String,
+    val sessionId: String,
+    val sellerName: String,
+    val clientName: String?,
+) : Screen {
 
     @Composable
     override fun Content() {
@@ -64,13 +79,23 @@ data class LiveCallScreen(val token: String, val sellerName: String) : Screen {
         val screenModel = rememberScreenModel {
             LiveCallScreenModel(
                 token = token,
+                sessionId = sessionId,
+                clientName = clientName,
                 httpClient = container.httpClient,
+                cartRepository = container.cartRepository,
                 sellerName = sellerName,
             )
         }
         LaunchedEffect(token) { screenModel.start() }
 
         val state by screenModel.state.collectAsState()
+
+        LaunchedEffect(state.toast?.createdAtMs) {
+            if (state.toast == null) return@LaunchedEffect
+            kotlinx.coroutines.delay(3_500)
+            screenModel.dismissToast()
+        }
+
         LiveCallBody(
             state = state,
             onHangup = {
@@ -80,6 +105,9 @@ data class LiveCallScreen(val token: String, val sellerName: String) : Screen {
             onToggleMute = { screenModel.toggleMute() },
             onScroll = { ref, offset -> screenModel.publishScroll(ref, offset) },
             onPointAt = { ref -> screenModel.publishPointAt(ref) },
+            onOpenCart = { screenModel.openCartDrawer() },
+            onDismissCart = { screenModel.dismissCartDrawer() },
+            onDismissProductSheet = { screenModel.dismissProductSheet() },
         )
     }
 }
@@ -91,6 +119,9 @@ private fun LiveCallBody(
     onToggleMute: () -> Unit,
     onScroll: (productId: String, offset: Float) -> Unit,
     onPointAt: (productId: String) -> Unit,
+    onOpenCart: () -> Unit,
+    onDismissCart: () -> Unit,
+    onDismissProductSheet: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
     Box(
@@ -117,7 +148,35 @@ private fun LiveCallBody(
                 state = state,
                 onHangup = onHangup,
                 onToggleMute = onToggleMute,
+                onOpenCart = onOpenCart,
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        state.toast?.let { toast ->
+            CartToastView(
+                toast = toast,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 110.dp, start = 16.dp, end = 16.dp),
+            )
+        }
+
+        if (state.showProductSheet && state.focusedProductId != null) {
+            val product = SampleCatalog.products.firstOrNull { it.ref == state.focusedProductId }
+            if (product != null) {
+                ProductDetailSheet(
+                    product = product,
+                    state = state,
+                    onDismiss = onDismissProductSheet,
+                )
+            }
+        }
+
+        if (state.showCartDrawer) {
+            CartDrawer(
+                state = state,
+                onDismiss = onDismissCart,
             )
         }
     }
@@ -271,6 +330,7 @@ private fun CallActionBar(
     state: LiveCallUiState,
     onHangup: () -> Unit,
     onToggleMute: () -> Unit,
+    onOpenCart: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -288,6 +348,8 @@ private fun CallActionBar(
             contentDescription = if (state.localMuted) "Reativar microfone" else "Silenciar microfone",
         )
         Spacer(modifier = Modifier.width(10.dp))
+        CartButton(count = state.cartCount, onClick = onOpenCart)
+        Spacer(modifier = Modifier.width(10.dp))
         Btn(
             text = "Encerrar",
             onClick = onHangup,
@@ -295,6 +357,313 @@ private fun CallActionBar(
             size = BtnSize.Md,
             icon = TrovataIcons.hangup,
             modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun CartButton(count: Int, onClick: () -> Unit) {
+    val colors = TrovataTokens.colors
+    Box(modifier = Modifier.size(48.dp)) {
+        IconBtn(
+            icon = TrovataIcons.cart,
+            onClick = onClick,
+            kind = if (count > 0) IconBtnKind.Jade else IconBtnKind.Dark,
+            size = 48.dp,
+            contentDescription = "Abrir carrinho",
+        )
+        if (count > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(20.dp)
+                    .background(colors.brand, CircleShape)
+                    .border(2.dp, colors.ink, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (count > 99) "99+" else count.toString(),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CartToastView(toast: CartToast, modifier: Modifier = Modifier) {
+    val colors = TrovataTokens.colors
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(colors.jade, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(Color.White.copy(alpha = 0.18f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = TrovataIcons.cart,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            Text(
+                text = toast.text,
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductDetailSheet(
+    product: Product,
+    state: LiveCallUiState,
+    onDismiss: () -> Unit,
+) {
+    val colors = TrovataTokens.colors
+    val lines = state.cart.filter { it.productId == product.ref }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onDismiss),
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(colors.bg, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .clickable(enabled = false) { }
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(width = 36.dp, height = 4.dp)
+                    .background(colors.line, RoundedCornerShape(2.dp)),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Pill(text = "Cliente está vendo", tone = PillTone.Brand, icon = TrovataIcons.eye)
+                Spacer(modifier = Modifier.weight(1f))
+                IconBtn(
+                    icon = TrovataIcons.chev,
+                    onClick = onDismiss,
+                    kind = IconBtnKind.Line,
+                    size = 36.dp,
+                    contentDescription = "Fechar",
+                )
+            }
+            ProductRow(product = product, size = ProductRowSize.Lg)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                product.sizes.forEach { size ->
+                    val units = lines.firstOrNull { it.size == size }?.units ?: 0
+                    SizeChip(label = size, units = units)
+                }
+            }
+            Text(
+                text = if (lines.isEmpty()) "Aguardando o cliente escolher" else "${lines.sumOf { it.units }}un adicionadas",
+                color = colors.ink3,
+                fontSize = 12.5.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SizeChip(label: String, units: Int) {
+    val colors = TrovataTokens.colors
+    val active = units > 0
+    Column(
+        modifier = Modifier
+            .background(if (active) colors.jadeTint else colors.surface2, RoundedCornerShape(10.dp))
+            .border(1.dp, if (active) colors.jade else colors.line, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = label,
+            color = if (active) colors.jade2 else colors.ink2,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        if (active) {
+            Text(
+                text = "${units}un",
+                color = colors.jade2,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CartDrawer(state: LiveCallUiState, onDismiss: () -> Unit) {
+    val colors = TrovataTokens.colors
+    val total = state.cart.sumOf { line ->
+        val unit = priceCentsFor(line.productId) ?: return@sumOf 0
+        unit * line.units
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onDismiss),
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .heightIn(min = 280.dp, max = 560.dp)
+                .background(colors.bg, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .clickable(enabled = false) { }
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(width = 36.dp, height = 4.dp)
+                    .background(colors.line, RoundedCornerShape(2.dp)),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Pedido em construção",
+                    color = colors.ink,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                IconBtn(
+                    icon = TrovataIcons.chev,
+                    onClick = onDismiss,
+                    kind = IconBtnKind.Line,
+                    size = 36.dp,
+                    contentDescription = "Fechar carrinho",
+                )
+            }
+            if (state.cart.isEmpty()) {
+                EmptyCart(modifier = Modifier.fillMaxWidth().padding(vertical = 30.dp))
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
+                ) {
+                    items(state.cart, key = { it.productId + "/" + it.size }) { line ->
+                        CartRow(line = line)
+                    }
+                }
+                CartTotalBar(units = state.cart.sumOf { it.units }, totalCents = total)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CartRow(line: CartLineUi) {
+    val colors = TrovataTokens.colors
+    val product = SampleCatalog.products.firstOrNull { it.ref == line.productId }
+    if (product == null) {
+        Text(text = "${line.productId} · ${line.size} · ${line.units}un", color = colors.ink2)
+        return
+    }
+    ProductRow(
+        product = product,
+        size = ProductRowSize.Md,
+        quantity = line.units,
+        trailing = {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "Tam ${line.size}",
+                    color = colors.ink3,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = formatBrl(priceCentsFor(line.productId)?.let { it * line.units } ?: 0),
+                    color = colors.ink,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun CartTotalBar(units: Int, totalCents: Long) {
+    val colors = TrovataTokens.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.surface2, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Total",
+                color = colors.ink3,
+                fontSize = 11.sp,
+                letterSpacing = 0.06.em,
+            )
+            Text(
+                text = "${units}un · ${formatBrl(totalCents)}",
+                color = colors.ink,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Pill(text = "Ao vivo", tone = PillTone.Jade, icon = TrovataIcons.signal)
+    }
+}
+
+@Composable
+private fun EmptyCart(modifier: Modifier = Modifier) {
+    val colors = TrovataTokens.colors
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .background(colors.surface2, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = TrovataIcons.cart,
+                contentDescription = null,
+                tint = colors.ink3,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+        Text(
+            text = "Carrinho vazio",
+            color = colors.ink,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "Quando o cliente adicionar uma peça, ela aparece aqui em tempo real.",
+            color = colors.ink3,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 24.dp),
         )
     }
 }
@@ -351,4 +720,20 @@ private fun CallAvatar(state: LiveCallUiState) {
             fontWeight = FontWeight.SemiBold,
         )
     }
+}
+
+private fun priceCentsFor(productId: String): Long? {
+    val raw = SampleCatalog.products.firstOrNull { it.ref == productId }?.price ?: return null
+    val numeric = raw.filter { it.isDigit() || it == ',' || it == '.' }
+        .replace(".", "")
+        .replace(',', '.')
+    val decimal = numeric.toDoubleOrNull() ?: return null
+    return (decimal * 100).toLong()
+}
+
+private fun formatBrl(cents: Long): String {
+    val whole = cents / 100
+    val fractional = (cents % 100).toString().padStart(2, '0')
+    val wholeWithDots = whole.toString().reversed().chunked(3).joinToString(".").reversed()
+    return "R$ $wholeWithDots,$fractional"
 }

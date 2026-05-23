@@ -64,7 +64,14 @@ data class InviteScreen(val record: StoredSessionRecord) : Screen {
             onBack = { navigator.pop() },
             onClose = { navigator.popUntilRoot() },
             onStartCall = {
-                navigator.push(LiveCallScreen(token = record.token, sellerName = record.sellerName))
+                navigator.push(
+                    LiveCallScreen(
+                        token = record.token,
+                        sessionId = record.sessionId,
+                        sellerName = record.sellerName,
+                        clientName = record.clientName,
+                    ),
+                )
             },
         )
     }

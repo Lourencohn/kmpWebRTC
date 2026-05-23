@@ -18,7 +18,7 @@
 | M7 — Co-presença básica | ✅ concluído | `7f1f6bc` m7 | DC `Scroll` (lossy ~30Hz, `sample(33)`) + `PointAt` (ordered) + catálogo grid em LiveCallScreen + productCard.ts no web + halo no cliente |
 | Infra — Signaling em produção | ✅ concluído | (sem commit ainda) | Fly.io `gru` 256MB sempre-on, HTTPS automático, Dockerfile multi-stage, deploy a partir da raiz |
 | Infra — webBuyer no Cloudflare Pages | ✅ concluído | `578c97f` | `https://trovatacast-buyer.pages.dev` no ar via GH Actions + Wrangler; Fly `PUBLIC_BUYER_URL` setado; cleartext Android e ATS iOS limpos |
-| M8 — Carrinho ao vivo | 🚧 próximo | — | `Navigate`, `CartUpdate`, `BuyerProductDetail`, gaveta no vendedor |
+| M8 — Carrinho ao vivo | ✅ concluído | (sem commit ainda) | DC `Navigate` + `CartUpdate` + `BuyerProductDetail` (sheet) + carrinho dock no cliente + gaveta no vendedor + `CartRepository` (SQLDelight) + toast |
 | M9 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
 ---
@@ -434,17 +434,71 @@ trovatacast/
 
 ---
 
-## Próximo milestone — M8: Carrinho ao vivo
+## O que foi entregue no M8
 
-Critério de aceitação: pedido se constrói em tempo real visto pelos dois lados.
+### Protocolo (`protocol/`)
+- `DataChannelMessage` ganhou duas variantes:
+  - `Navigate(productId, ts, from)` — cliente abre detalhe → vendedor segue.
+  - `CartUpdate(productId, size, units, ts, from)` — modelo absoluto por linha (`units=0` remove).
+- Round-trips cobertos em `DataChannelMessageTest` (kotlin) e `dataChannel.test.ts` (vitest).
 
-### A construir
-- **DC `Navigate`** — cliente toca um card → vendedor é navegado pra detalhe do mesmo produto.
-- **`BuyerProductDetail`** (web) — stepper de tamanhos/cores + botão "Adicionar".
-- **DC `CartUpdate`** — adição/remoção → vendedor recebe toast "Diego adicionou 12un da peça X".
-- **Carrinho dock** no cliente (sticky bottom) com subtotal e contagem.
-- **Gaveta de carrinho** no vendedor com `ProductRow` listando o pedido em construção + total.
-- Persistência local da seleção via SQLDelight (`SelectedProductEntity` já existe desde M3).
+### App (`composeApp/`)
+- `PeerSession.publishNavigate(productId)` + `publishCartUpdate(productId, size, units)`; observáveis `remoteNavigate: SharedFlow<Navigate>` e `remoteCartUpdate: SharedFlow<CartUpdate>` ligados ao mesmo DC `presence`.
+- SQLDelight: nova tabela `CartLineEntity (sessionId, sku, size, units, updatedAtMs)` com FK em `SessionEntity`, índice em `sessionId`, e queries `upsertCartLine` (via `INSERT OR REPLACE` — dialect 3.18), `deleteCartLine`, `selectCartLinesBySession`, `clearCart`.
+- `CartRepository` em `data/local/` com `observe(sessionId): Flow<List<CartLine>>`, `apply(...)`, `snapshot(...)`, `clear(...)`. Injetado em `AppContainer.cartRepository`.
+- `LiveCallScreen` agora recebe também `sessionId` + `clientName`; `LiveCallScreenModel`:
+  - escuta `peer.remoteNavigate` → abre `ProductDetailSheet` no vendedor (read-only, com pill "Cliente está vendo");
+  - escuta `peer.remoteCartUpdate` → calcula delta usando snapshot anterior, persiste no `CartRepository`, emite `CartToast` (auto-dismiss 3.5s) com mensagem do tipo `"Diego adicionou 12un de AN-104 (M)"`;
+  - `state.cart` reflete `cartRepository.observe(sessionId)` direto da DB.
+- `LiveCallScreen` ganhou:
+  - **Botão de carrinho** na action bar com badge contando unidades (tom Jade quando > 0).
+  - **Gaveta de carrinho** (`CartDrawer`) — modal bottom sheet com `ProductRow` por linha, `Tam X` + subtotal por linha, barra "Total" formatado em R$ + contagem.
+  - **`ProductDetailSheet`** — modal bottom sheet renderiza `ProductRow` Lg + chips de tamanho mostrando unidades já no pedido.
+  - **`CartToastView`** — banner Jade flutuante no topo.
+
+### Web buyer (`webBuyer/`)
+- `cart/store.ts` — `CartStore` (Map keyed por `productId/size`, modelo absoluto), `subscribe(listener)`, `snapshot(): { lines, totalUnits, totalCents }`, helper `formatBrl()` e `unitPriceCentsFor()`.
+- `ui/productDetail.ts` — `mountProductDetail(host, product, lines, actions)` retorna `ProductDetailView` com `setCurrentUnits(size, units)` e `destroy()`. Chips de tamanho mostram unidades atuais; stepper de qty respeita MOQ; botão muda label entre "Adicionar Nun", "Atualizar para Nun", "Reduzir para Nun".
+- `ui/cartSheet.ts` — `mountCartSheet(host, snapshot, actions)` renderiza `<ul class="cart-lines">` com botão "Remover" por linha + `Subtotal` no rodapé. Estado vazio mostra hint amigável.
+- `views/arrival.ts.renderLiveCall`:
+  - `ProductCard` agora é clicável (chama `onOpenProduct(productId)`).
+  - **Cart dock** sticky entre o catálogo e o action bar — mostra `Nun · R$ X,XX · Ver pedido →`, escondido quando carrinho vazio.
+  - `LiveCallView` ganhou `setCart(snapshot)` + `host()` (retorna o container `.sheet-host` para montar overlays).
+- `main.ts`:
+  - Cria `CartStore` por sessão; `subscribe` atualiza dock + sheet de carrinho.
+  - Tap em produto → abre `ProductDetailSheet` localmente + envia `navigate`.
+  - "Adicionar" no detalhe → `cart.apply(...)` local + envia `cartUpdate` (absoluto).
+  - "Remover" no cart sheet → `cart.apply(... units=0)` + envia `cartUpdate(units=0)`.
+  - `buildDataChannelHandler` ganhou casos `navigate` (abre detalhe) e `cartUpdate` (aplica no store local + atualiza chip do detalhe se aberto).
+- CSS — `.cart-dock`, `.sheet-overlay`, `.sheet`, `.product-detail-{preview,sizes,size,stepper,step,qty,add}`, `.cart-{lines,line,total,empty}`. Sheets sobem com `transform: translateY` + scrim semi-opaco; tap fora dispensa.
+
+### Aceitação validada
+- `./gradlew :protocol:jvmTest` ✅ (9 testes; 3 novos de `Navigate`/`CartUpdate`)
+- `./gradlew :signalingServer:test` ✅ (12 testes; sem mudança)
+- `./gradlew :composeApp:testDebugUnitTest` ✅ (15 testes)
+- `./gradlew :composeApp:assembleDebug` ✅
+- `./gradlew :composeApp:compileKotlinIosSimulatorArm64` ✅
+- `(cd webBuyer && npm run typecheck && npm test && npm run build)` ✅ (54 testes; 11 em `dataChannel`)
+
+### Como testar manualmente
+1. Subir backend: `./gradlew :signalingServer:run` (porta 8080).
+2. Subir webBuyer: `cd webBuyer && npm run dev` (porta 5173).
+3. App Android/iOS → Home → Iniciar nova sessão → Catalog → Gerar link → **Iniciar chamada**.
+4. Abrir o link gerado em outra aba/celular → **Entrar com áudio**.
+5. ICE conecta → estado Jade nos dois lados.
+6. **Cliente**: tocar num `ProductCard` → sheet de detalhe abre; **vendedor**: sheet de detalhe abre também (Navigate).
+7. **Cliente**: escolhe tamanho, ajusta qty respeitando MOQ, toca "Adicionar" → cart dock aparece com `Nun · R$X,XX`.
+8. **Vendedor**: toast Jade flutua no topo (`"Diego adicionou 12un de Blusa Tricot Canelado (M)"`), badge do carrinho na action bar ganha contagem.
+9. **Vendedor**: toca botão de carrinho → `CartDrawer` lista o pedido com subtotal por linha + total geral.
+10. **Cliente**: toca dock → `mountCartSheet` lista o pedido, "Remover" emite `CartUpdate(units=0)` → vendedor recebe toast de remoção.
+
+### Dívidas conhecidas
+- **Cores não modeladas** — `BuyerProductDetail` só pede tamanho (espelhando o protótipo). Se `Product.colorCount > 1` precisar diferenciar SKUs por cor, adicionar `color` no DC `CartUpdate` + chave composta `(productId, size, color)` na DB.
+- **Vendedor não edita carrinho** — sheet do detalhe é read-only no vendedor; nenhuma chamada a `peer.publishCartUpdate` parte do lado dele. M9 (encerrar com pedido pronto) precisa decidir se o vendedor pode ajustar antes de confirmar.
+- **Cart não restaura no buyer** — se a aba do navegador reload, o `CartStore` reseta (memória). Persistir em `localStorage` por token entraria em M9 ou M11 (catálogo assíncrono).
+- **Snapshot do estado na reconexão** — quando WS dropa e reconecta, o vendedor relê DB, mas o buyer perde o cart. Sincronizar via DC após reconnect entra em M10.
+- **Toast empilhado** — alterações sucessivas escondem o toast anterior. Aceitável; uma fila pequena ficaria melhor em M9.
+- **`SelectedProductEntity` vs `CartLineEntity`** — agora coexistem (seleção inicial × pedido). Em M9 o `Order` deve ser materializado a partir do cart, e a seleção inicial pode virar histórico do "que foi mostrado".
 
 ---
 
@@ -463,3 +517,4 @@ Critério de aceitação: pedido se constrói em tempo real visto pelos dois lad
 | 2026-05-22 | Infra: signaling deployado no Fly.io `gru`, clientes apontados para `https://trovatacast-signaling.fly.dev`, Mac não mais necessário para o servidor |
 | 2026-05-22 | Validação E2E: iPhone em 3G + buyer desktop através do Fly.io estabeleceram WSS + WebRTC; ficou registrada dívida de `AURemoteIO` no iOS após reconnect (M10) e webBuyer ainda local (próximo passo de infra) |
 | 2026-05-22 | Infra: webBuyer no Cloudflare Pages (`trovatacast-buyer.pages.dev`) via GH Actions + Wrangler; Fly `PUBLIC_BUYER_URL` setado; Mac do vendedor não é mais necessário para nenhum componente |
+| 2026-05-23 | M8 fechado: DC `Navigate` + `CartUpdate`, `BuyerProductDetail` sheet, cart dock no cliente, gaveta + toast no vendedor, `CartRepository` (SQLDelight) · 78 testes totais (9 protocol + 15 composeApp + 12 signaling + 54 webBuyer) |

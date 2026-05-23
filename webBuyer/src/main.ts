@@ -1,7 +1,14 @@
 import { fetchSession, SessionFetchError, type SessionInfo } from './api/sessions'
-import { decodeDataChannelMessage } from './protocol/dataChannel'
+import { CartStore } from './cart/store'
+import {
+  decodeDataChannelMessage,
+  encodeDataChannelMessage,
+  type DataChannelMessage,
+} from './protocol/dataChannel'
 import { SignalingClient } from './signaling/client'
 import { clearLastSession, loadLastSession, saveLastSession } from './storage/lastSession'
+import { mountCartSheet, type CartSheetView } from './ui/cartSheet'
+import { findProduct, mountProductDetail, type ProductDetailView } from './ui/productDetail'
 import { PeerSession, type PeerStatus } from './webrtc/peer'
 import {
   renderArrival,
@@ -119,7 +126,18 @@ function mapPeerStatus(status: PeerStatus): LiveCallStatus {
   }
 }
 
-function buildDataChannelHandler(view: LiveCallView): (raw: string) => void {
+type SheetController = {
+  cart: CartSheetView | null
+  detail: ProductDetailView | null
+  detailProductId: string | null
+}
+
+function buildDataChannelHandler(
+  view: LiveCallView,
+  cart: CartStore,
+  sheets: SheetController,
+  openDetail: (productId: string) => void,
+): (raw: string) => void {
   let pointTimer: ReturnType<typeof setTimeout> | null = null
   return (raw) => {
     const msg = decodeDataChannelMessage(raw)
@@ -137,6 +155,15 @@ function buildDataChannelHandler(view: LiveCallView): (raw: string) => void {
         const duration = msg.durationMs ?? 3_000
         pointTimer = setTimeout(() => view.setPointedProduct(null), duration)
         return
+      case 'navigate':
+        openDetail(msg.productId)
+        return
+      case 'cartUpdate':
+        cart.apply(msg.productId, msg.size, msg.units, msg.ts)
+        if (sheets.detail && sheets.detailProductId === msg.productId) {
+          sheets.detail.setCurrentUnits(msg.size, msg.units)
+        }
+        return
     }
   }
 }
@@ -149,14 +176,79 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
     displayName: info.clientName ?? undefined,
   })
 
+  const cart = new CartStore()
+  const sheets: SheetController = { cart: null, detail: null, detailProductId: null }
   let session: PeerSession | null = null
   let cleanedUp = false
   const cleanup = (reason: string) => {
     if (cleanedUp) return
     cleanedUp = true
+    sheets.cart?.destroy()
+    sheets.detail?.destroy()
     session?.close(reason)
     signaling.close(reason)
     audio.getTracks().forEach((t) => t.stop())
+  }
+
+  const sendCartUpdate = (productId: string, size: string, units: number) => {
+    const msg: DataChannelMessage = {
+      type: 'cartUpdate',
+      productId,
+      size,
+      units,
+      ts: Date.now(),
+      from: peerId,
+    }
+    session?.send(encodeDataChannelMessage(msg))
+  }
+
+  const sendNavigate = (productId: string) => {
+    const msg: DataChannelMessage = {
+      type: 'navigate',
+      productId,
+      ts: Date.now(),
+      from: peerId,
+    }
+    session?.send(encodeDataChannelMessage(msg))
+  }
+
+  const openDetail = (productId: string) => {
+    const product = findProduct(productId)
+    if (!product) return
+    if (sheets.detail) {
+      sheets.detail.destroy()
+      sheets.detail = null
+    }
+    const lines = cart.linesFor(productId).map((l) => ({ size: l.size, units: l.units }))
+    sheets.detailProductId = productId
+    sheets.detail = mountProductDetail(view.host(), product, lines, {
+      onAdd: (size, units) => {
+        const ts = Date.now()
+        cart.apply(productId, size, units, ts)
+        sendCartUpdate(productId, size, units)
+        sheets.detail?.setCurrentUnits(size, units)
+      },
+      onDismiss: () => {
+        sheets.detail?.destroy()
+        sheets.detail = null
+        sheets.detailProductId = null
+      },
+    })
+  }
+
+  const openCart = () => {
+    if (sheets.cart) return
+    sheets.cart = mountCartSheet(view.host(), cart.snapshot(), {
+      onRemove: (productId, size) => {
+        const ts = Date.now()
+        cart.apply(productId, size, 0, ts)
+        sendCartUpdate(productId, size, 0)
+      },
+      onDismiss: () => {
+        sheets.cart?.destroy()
+        sheets.cart = null
+      },
+    })
   }
 
   const view = renderLiveCall(root!, info, {
@@ -165,6 +257,16 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
       cleanup('hangup')
       showLanding()
     },
+    onOpenProduct: (productId) => {
+      openDetail(productId)
+      sendNavigate(productId)
+    },
+    onOpenCart: () => openCart(),
+  })
+
+  cart.subscribe((snapshot) => {
+    view.setCart(snapshot)
+    sheets.cart?.update(snapshot)
   })
 
   session = new PeerSession(
@@ -177,7 +279,7 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
     {
       onStatus: (status, detail) => view.setStatus(mapPeerStatus(status), detail),
       onRemoteAudio: (stream) => attachRemoteAudio(stream),
-      onDataChannelMessage: buildDataChannelHandler(view),
+      onDataChannelMessage: buildDataChannelHandler(view, cart, sheets, openDetail),
     },
   )
 

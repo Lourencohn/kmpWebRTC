@@ -79,6 +79,12 @@ class PeerSession(
     private val _remotePointAt = MutableSharedFlow<DataChannelMessage.PointAt>(extraBufferCapacity = 4)
     val remotePointAt: SharedFlow<DataChannelMessage.PointAt> = _remotePointAt.asSharedFlow()
 
+    private val _remoteNavigate = MutableSharedFlow<DataChannelMessage.Navigate>(extraBufferCapacity = 4)
+    val remoteNavigate: SharedFlow<DataChannelMessage.Navigate> = _remoteNavigate.asSharedFlow()
+
+    private val _remoteCartUpdate = MutableSharedFlow<DataChannelMessage.CartUpdate>(extraBufferCapacity = 16)
+    val remoteCartUpdate: SharedFlow<DataChannelMessage.CartUpdate> = _remoteCartUpdate.asSharedFlow()
+
     private val _outgoingScroll = MutableStateFlow<DataChannelMessage.Scroll?>(null)
 
     private var pc: PeerConnection? = null
@@ -228,6 +234,8 @@ class PeerSession(
                     is DataChannelMessage.Mute -> _remoteMuted.value = parsed.muted
                     is DataChannelMessage.Scroll -> _remoteScroll.tryEmit(parsed)
                     is DataChannelMessage.PointAt -> _remotePointAt.tryEmit(parsed)
+                    is DataChannelMessage.Navigate -> _remoteNavigate.tryEmit(parsed)
+                    is DataChannelMessage.CartUpdate -> _remoteCartUpdate.tryEmit(parsed)
                     null -> Unit
                 }
             }
@@ -267,6 +275,30 @@ class PeerSession(
             ts = Clock.System.now().toEpochMilliseconds(),
             from = selfPeerId,
             durationMs = durationMs,
+        ).encode()
+        channel.send(payload.encodeToByteArray())
+    }
+
+    fun publishNavigate(productId: String) {
+        val channel = dc ?: return
+        if (channel.readyState != DataChannelState.Open) return
+        val payload = DataChannelMessage.Navigate(
+            productId = productId,
+            ts = Clock.System.now().toEpochMilliseconds(),
+            from = selfPeerId,
+        ).encode()
+        channel.send(payload.encodeToByteArray())
+    }
+
+    fun publishCartUpdate(productId: String, size: String, units: Int) {
+        val channel = dc ?: return
+        if (channel.readyState != DataChannelState.Open) return
+        val payload = DataChannelMessage.CartUpdate(
+            productId = productId,
+            size = size,
+            units = units,
+            ts = Clock.System.now().toEpochMilliseconds(),
+            from = selfPeerId,
         ).encode()
         channel.send(payload.encodeToByteArray())
     }

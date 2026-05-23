@@ -1,3 +1,4 @@
+import { formatBrl, type CartSnapshot } from '../cart/store'
 import { SampleCatalog } from '../data/catalog'
 import { renderProductCard } from '../ui/productCard'
 import type { SessionFetchErrorKind, SessionInfo } from '../api/sessions'
@@ -161,6 +162,8 @@ export type LiveCallStatus = 'connecting' | 'connected' | 'failed' | 'closed'
 export type LiveCallActions = {
   onToggleMute?: (nextMuted: boolean) => void
   onHangup?: () => void
+  onOpenProduct?: (productId: string) => void
+  onOpenCart?: () => void
 }
 
 export type LiveCallView = {
@@ -168,6 +171,8 @@ export type LiveCallView = {
   setRemoteMuted(muted: boolean): void
   setPointedProduct(ref: string | null): void
   scrollToProduct(ref: string, offset?: number): void
+  setCart(snapshot: CartSnapshot): void
+  host(): HTMLElement
 }
 
 export function renderLiveCall(
@@ -176,7 +181,7 @@ export function renderLiveCall(
   actions: LiveCallActions = {},
 ): LiveCallView {
   root.innerHTML = `
-    <section class="live-call" data-view="live-call" data-status="connecting" data-local-muted="false" data-remote-muted="false">
+    <section class="live-call" data-view="live-call" data-status="connecting" data-local-muted="false" data-remote-muted="false" data-cart-empty="true">
       <header class="live-call-bar live-call-bar--top">
         <span class="live-call-pill" data-role="status-pill">
           <span class="live-call-pill-dot"></span>
@@ -192,9 +197,20 @@ export function renderLiveCall(
       <div class="live-call-catalog" data-role="catalog">
         <div class="live-call-catalog-header">
           <span class="live-call-catalog-eyebrow">${escapeHtml(SampleCatalog.collection)}</span>
-          <p class="live-call-catalog-text">${escapeHtml(info.sellerName)} está te mostrando este catálogo.</p>
+          <p class="live-call-catalog-text">${escapeHtml(info.sellerName)} está te mostrando este catálogo. Toque numa peça para adicionar ao pedido.</p>
         </div>
         <div class="product-grid" data-role="product-grid"></div>
+      </div>
+
+      <div class="cart-dock" data-role="cart-dock" hidden>
+        <button type="button" class="cart-dock-btn" data-action="open-cart">
+          <span class="cart-dock-icon" aria-hidden="true">🧺</span>
+          <span class="cart-dock-text">
+            <span class="cart-dock-units" data-role="cart-units">0un</span>
+            <span class="cart-dock-subtotal" data-role="cart-subtotal">R$ 0,00</span>
+          </span>
+          <span class="cart-dock-cta">Ver pedido →</span>
+        </button>
       </div>
 
       <footer class="live-call-bar live-call-bar--bottom">
@@ -214,6 +230,8 @@ export function renderLiveCall(
           <span>Encerrar</span>
         </button>
       </footer>
+
+      <div class="sheet-host" data-role="sheet-host"></div>
     </section>
   `
 
@@ -228,9 +246,16 @@ export function renderLiveCall(
   const catalog = section.querySelector<HTMLElement>('[data-role="catalog"]')!
   const grid = section.querySelector<HTMLElement>('[data-role="product-grid"]')!
 
+  const cartDock = section.querySelector<HTMLElement>('[data-role="cart-dock"]')!
+  const cartUnitsEl = section.querySelector<HTMLElement>('[data-role="cart-units"]')!
+  const cartSubtotalEl = section.querySelector<HTMLElement>('[data-role="cart-subtotal"]')!
+  const cartDockBtn = section.querySelector<HTMLButtonElement>('[data-action="open-cart"]')!
+  const sheetHost = section.querySelector<HTMLElement>('[data-role="sheet-host"]')!
+
   const cardByRef = new Map<string, HTMLElement>()
   SampleCatalog.products.forEach((product) => {
     const card = renderProductCard(product)
+    card.addEventListener('click', () => actions.onOpenProduct?.(product.ref))
     cardByRef.set(product.ref, card)
     grid.appendChild(card)
   })
@@ -249,6 +274,8 @@ export function renderLiveCall(
   hangupBtn.addEventListener('click', () => {
     actions.onHangup?.()
   })
+
+  cartDockBtn.addEventListener('click', () => actions.onOpenCart?.())
 
   let currentPointed: string | null = null
 
@@ -293,6 +320,16 @@ export function renderLiveCall(
       const catalogRect = catalog.getBoundingClientRect()
       const targetY = catalog.scrollTop + (cardRect.top - catalogRect.top) + offset * cardRect.height
       catalog.scrollTop = targetY
+    },
+    setCart(snapshot) {
+      const empty = snapshot.totalUnits === 0
+      section.dataset.cartEmpty = empty ? 'true' : 'false'
+      cartDock.hidden = empty
+      cartUnitsEl.textContent = `${snapshot.totalUnits}un`
+      cartSubtotalEl.textContent = formatBrl(snapshot.totalCents)
+    },
+    host() {
+      return sheetHost
     },
   }
 }

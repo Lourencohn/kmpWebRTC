@@ -2,6 +2,8 @@ export type DataChannelMessage =
   | { type: 'mute'; muted: boolean; from: string }
   | { type: 'scroll'; productId: string; offset: number; ts: number; from: string }
   | { type: 'pointAt'; productId: string; ts: number; from: string; durationMs?: number }
+  | { type: 'navigate'; productId: string; ts: number; from: string }
+  | { type: 'cartUpdate'; productId: string; size: string; units: number; ts: number; from: string }
 
 export function encodeDataChannelMessage(message: DataChannelMessage): string {
   return JSON.stringify(message)
@@ -50,6 +52,33 @@ export function decodeDataChannelMessage(raw: string): DataChannelMessage | null
           ts: obj.ts,
           from: obj.from,
           durationMs: typeof obj.durationMs === 'number' ? obj.durationMs : undefined,
+        }
+      }
+      return null
+    case 'navigate':
+      if (
+        typeof obj.productId === 'string' &&
+        typeof obj.ts === 'number' &&
+        typeof obj.from === 'string'
+      ) {
+        return { type: 'navigate', productId: obj.productId, ts: obj.ts, from: obj.from }
+      }
+      return null
+    case 'cartUpdate':
+      if (
+        typeof obj.productId === 'string' &&
+        typeof obj.size === 'string' &&
+        typeof obj.units === 'number' &&
+        typeof obj.ts === 'number' &&
+        typeof obj.from === 'string'
+      ) {
+        return {
+          type: 'cartUpdate',
+          productId: obj.productId,
+          size: obj.size,
+          units: obj.units,
+          ts: obj.ts,
+          from: obj.from,
         }
       }
       return null

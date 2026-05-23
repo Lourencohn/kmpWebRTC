@@ -31,6 +31,24 @@ sealed class DataChannelMessage {
         val from: String,
         val durationMs: Long = 3_000,
     ) : DataChannelMessage()
+
+    @Serializable
+    @SerialName("navigate")
+    data class Navigate(
+        val productId: String,
+        val ts: Long,
+        val from: String,
+    ) : DataChannelMessage()
+
+    @Serializable
+    @SerialName("cartUpdate")
+    data class CartUpdate(
+        val productId: String,
+        val size: String,
+        val units: Int,
+        val ts: Long,
+        val from: String,
+    ) : DataChannelMessage()
 }
 
 val DataChannelJson: Json = Json {
