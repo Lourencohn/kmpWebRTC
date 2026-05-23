@@ -134,13 +134,24 @@
 
 ## Milestone 9 — Encerrar com pedido pronto
 
-- [ ] Tap em "encerrar chamada" → ambos os lados vão para tela de resumo.
-- [ ] `SummaryScreen` (vendedor) com todas as métricas calculadas a partir dos eventos da sessão (tempo em foco etc).
-- [ ] `BuyerConfirmation` (cliente) com pedido + PDF.
-- [ ] Servidor persiste o `Order`.
-- [ ] Vendedor recebe push do pedido.
+> Dividido em duas fases. Fase 1 (concluída) cobre o fluxo de confirmação P2P;
+> fase 2 (pendente) cobre persistência, PDF e métricas. Detalhes em `docs/07-status.md`.
 
-**Aceitação**: encerrar a chamada gera um Order no banco; PDF baixável.
+### Fase 1 — confirmação P2P (concluída)
+- [x] DC `OrderConfirm(orderId, lines, totalCents)` com `OrderLine` (round-trip Kotlin + TS).
+- [x] Botão **Confirmar pedido** na gaveta do vendedor.
+- [x] `OrderSummaryOverlay` no vendedor + `mountOrderSummary` no cliente.
+- [x] Tap "Fechar e encerrar" / "Fechar" → hangup + retorno pra `InviteScreen` / landing.
+
+### Fase 2 — persistência + recibo (pendente)
+- [ ] `OrderEntity` + `OrderLineEntity` em SQLDelight (vendedor); `OrderRepository.persist(summary)`.
+- [ ] Seção "Pedidos fechados hoje" na `SellerHomeScreen` listando os Orders locais.
+- [ ] `POST /order` no signaling server (em memória, seguindo padrão `SessionStore`); cliente envia opcionalmente via fetch após receber `OrderConfirm`.
+- [ ] `SummaryScreen` (vendedor) com métricas da sessão (tempo em foco por SKU, contagem de `PointAt`, duração total) — precisa de `SessionEventLog` no commonMain.
+- [ ] `BuyerConfirmation` (cliente) com botão "Salvar PDF" via `window.print()` + stylesheet `@media print`.
+- [ ] Vendedor recebe push do pedido (depende de persistência server-side).
+
+**Aceitação**: encerrar a chamada gera um Order persistido localmente (Fase 2 inicial) e no servidor (Fase 2 final); PDF baixável pelo cliente; tela de resumo do vendedor com métricas mínimas.
 
 ---
 

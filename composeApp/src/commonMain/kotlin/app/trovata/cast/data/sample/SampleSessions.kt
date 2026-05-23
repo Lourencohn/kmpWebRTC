@@ -143,9 +143,9 @@ object SampleSessions {
     )
 
     val home: SellerHomeData = SellerHomeData(
-        collectionEyebrow = "Atelier Norte · Outono 26",
-        greetingTitle = "Sessões",
-        greetingSubtitle = "3 agendadas para hoje · 2 clientes te chamando",
+        collectionEyebrow = "Sessões",
+        greetingTitle = "Sua agenda de hoje",
+        greetingSubtitle = "Atelier Norte · Outono 26 · 3 hoje, 2 te chamando",
         nowWaiting = LiveWaitingSession(
             id = "live-diego",
             client = diego,

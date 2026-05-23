@@ -1,7 +1,6 @@
 package app.trovata.cast.ui.screens.sessions
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,9 +22,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -40,14 +39,11 @@ import app.trovata.cast.ui.components.Avatar
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind
 import app.trovata.cast.ui.components.BtnSize
-import app.trovata.cast.ui.components.IconBtn
-import app.trovata.cast.ui.components.IconBtnKind
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
 import app.trovata.cast.ui.components.ScreenHeader
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.components.TrovataCard
-import app.trovata.cast.ui.components.Wordmark
 import app.trovata.cast.ui.icons.TrovataIcons
 
 @Composable
@@ -64,7 +60,7 @@ fun SellerHomeScreen(
     Box(modifier = modifier.fillMaxSize().background(colors.bg)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 56.dp, bottom = 180.dp),
+            contentPadding = PaddingValues(top = 56.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item { HomeHeader(state.data.collectionEyebrow, state.data.greetingTitle, state.data.greetingSubtitle) }
@@ -85,13 +81,6 @@ fun SellerHomeScreen(
                 item { HistorySection(state.data.history) }
             }
         }
-
-        InviteFab(
-            onClick = onInviteClient,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 14.dp),
-        )
     }
 }
 
@@ -102,21 +91,14 @@ private fun HomeHeader(eyebrow: String, title: String, subtitle: String) {
         title = title,
         subtitle = subtitle,
         eyebrow = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Wordmark(height = 22.dp)
-                Text(
-                    text = eyebrow.uppercase(),
-                    color = colors.ink4,
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.08.em,
-                )
-            }
+            Text(
+                text = eyebrow.uppercase(),
+                color = colors.ink4,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.08.em,
+            )
         },
-        trailing = { IconBtn(icon = TrovataIcons.bell, onClick = {}, kind = IconBtnKind.Line) },
     )
 }
 
@@ -206,54 +188,7 @@ private fun UpcomingSection(
         TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
             Column {
                 sessions.forEachIndexed { index, session ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Avatar(name = session.client.name, hue = session.client.hue, size = 36.dp)
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = session.client.name,
-                                color = colors.ink,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = "${session.client.shop} · ${session.itemsHint}",
-                                    color = colors.ink3,
-                                    fontSize = 11.5.sp,
-                                )
-                                session.tag?.let { tag ->
-                                    Pill(
-                                        text = tag.label,
-                                        tone = if (tag == SessionTag.PrimeiraSessao) PillTone.Brand else PillTone.Neutral,
-                                    )
-                                }
-                            }
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = session.time,
-                                style = TrovataTokens.type.mono.copy(
-                                    fontSize = 14.sp,
-                                    color = colors.ink,
-                                    fontWeight = FontWeight.SemiBold,
-                                ),
-                            )
-                            Text(
-                                text = session.day,
-                                color = colors.ink4,
-                                fontSize = 10.5.sp,
-                            )
-                        }
-                    }
+                    UpcomingRow(session = session)
                     if (index < sessions.lastIndex) {
                         Box(
                             modifier = Modifier
@@ -264,6 +199,67 @@ private fun UpcomingSection(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun UpcomingRow(session: UpcomingSession) {
+    val colors = TrovataTokens.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Avatar(name = session.client.name, hue = session.client.hue, size = 36.dp)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = session.client.name,
+                color = colors.ink,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "${session.client.shop} · ${session.itemsHint}",
+                color = colors.ink3,
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            session.tag?.let { tag ->
+                val (tone, icon) = tagStyle(tag)
+                Pill(
+                    text = tag.label,
+                    tone = tone,
+                    icon = icon,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+        Column(
+            horizontalAlignment = Alignment.End,
+            modifier = Modifier.padding(top = 2.dp),
+        ) {
+            Text(
+                text = session.time,
+                style = TrovataTokens.type.mono.copy(
+                    fontSize = 14.sp,
+                    color = colors.ink,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+            )
+            Text(
+                text = session.day,
+                color = colors.ink4,
+                fontSize = 10.5.sp,
+            )
         }
     }
 }
@@ -358,30 +354,8 @@ private fun HistoryRow(entry: HistorySession) {
     }
 }
 
-@Composable
-private fun InviteFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = TrovataTokens.colors
-    val shape = RoundedCornerShape(28.dp)
-    Row(
-        modifier = modifier
-            .shadow(elevation = 6.dp, shape = shape, clip = false)
-            .background(colors.ink, shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = TrovataIcons.plus,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(18.dp),
-        )
-        Text(
-            text = "Convidar cliente",
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
+private fun tagStyle(tag: SessionTag): Pair<PillTone, ImageVector> = when (tag) {
+    SessionTag.PrimeiraSessao -> PillTone.Brand to TrovataIcons.zap
+    SessionTag.Reposicao -> PillTone.Jade to TrovataIcons.trend
+    SessionTag.TopVenda -> PillTone.Warn to TrovataIcons.flame
 }

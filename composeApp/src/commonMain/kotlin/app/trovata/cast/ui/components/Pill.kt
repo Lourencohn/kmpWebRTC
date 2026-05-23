@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.theme.TrovataTokens
 
-enum class PillTone { Neutral, Brand, Jade, Live, Ghost, Dark }
+enum class PillTone { Neutral, Brand, Jade, Live, Warn, Ghost, Dark }
 
 @Composable
 fun Pill(
@@ -41,6 +41,7 @@ fun Pill(
         PillTone.Brand -> PillPalette(colors.brandTint, colors.brand2, Color.Transparent)
         PillTone.Jade -> PillPalette(colors.jadeTint, colors.jade2, Color.Transparent)
         PillTone.Live -> PillPalette(colors.live.copy(alpha = 0.10f), colors.live, Color.Transparent)
+        PillTone.Warn -> PillPalette(colors.warn.copy(alpha = 0.12f), colors.warn, Color.Transparent)
         PillTone.Ghost -> PillPalette(Color.Transparent, colors.ink3, colors.line)
         PillTone.Dark -> PillPalette(colors.ink.copy(alpha = 0.92f), Color.White, Color.Transparent)
     }
@@ -71,6 +72,8 @@ fun Pill(
             fontSize = 11.5.sp,
             fontWeight = FontWeight.Medium,
             letterSpacing = (-0.005).sp,
+            maxLines = 1,
+            softWrap = false,
         )
     }
 }
