@@ -98,4 +98,32 @@ describe('dataChannel codec', () => {
     const raw = '{"type":"cartUpdate","productId":"p","units":1,"ts":1,"from":"x"}'
     expect(decodeDataChannelMessage(raw)).toBeNull()
   })
+
+  it('roundtrips orderConfirm with multiple lines', () => {
+    const original: DataChannelMessage = {
+      type: 'orderConfirm',
+      orderId: 'ORD-abc-XYZ',
+      ts: 1_700_000_000_900,
+      from: 'seller-1',
+      lines: [
+        { productId: 'AN-104', size: 'M', units: 12, unitPriceCents: 8990 },
+        { productId: 'AN-088', size: 'G', units: 4, unitPriceCents: 15900 },
+      ],
+      totalCents: 12 * 8990 + 4 * 15900,
+    }
+    expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
+  })
+
+  it('orderConfirm with empty lines decodes', () => {
+    const raw =
+      '{"type":"orderConfirm","orderId":"ORD-empty","ts":1,"from":"seller","lines":[],"totalCents":0}'
+    const decoded = decodeDataChannelMessage(raw)
+    expect(decoded).toMatchObject({ type: 'orderConfirm', lines: [], totalCents: 0 })
+  })
+
+  it('rejects orderConfirm with malformed line', () => {
+    const raw =
+      '{"type":"orderConfirm","orderId":"X","ts":1,"from":"s","totalCents":0,"lines":[{"productId":"p","size":"M","units":"abc","unitPriceCents":1}]}'
+    expect(decodeDataChannelMessage(raw)).toBeNull()
+  })
 })

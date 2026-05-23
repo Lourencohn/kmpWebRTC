@@ -85,6 +85,9 @@ class PeerSession(
     private val _remoteCartUpdate = MutableSharedFlow<DataChannelMessage.CartUpdate>(extraBufferCapacity = 16)
     val remoteCartUpdate: SharedFlow<DataChannelMessage.CartUpdate> = _remoteCartUpdate.asSharedFlow()
 
+    private val _remoteOrderConfirm = MutableSharedFlow<DataChannelMessage.OrderConfirm>(extraBufferCapacity = 4)
+    val remoteOrderConfirm: SharedFlow<DataChannelMessage.OrderConfirm> = _remoteOrderConfirm.asSharedFlow()
+
     private val _outgoingScroll = MutableStateFlow<DataChannelMessage.Scroll?>(null)
 
     private var pc: PeerConnection? = null
@@ -236,6 +239,7 @@ class PeerSession(
                     is DataChannelMessage.PointAt -> _remotePointAt.tryEmit(parsed)
                     is DataChannelMessage.Navigate -> _remoteNavigate.tryEmit(parsed)
                     is DataChannelMessage.CartUpdate -> _remoteCartUpdate.tryEmit(parsed)
+                    is DataChannelMessage.OrderConfirm -> _remoteOrderConfirm.tryEmit(parsed)
                     null -> Unit
                 }
             }
@@ -301,6 +305,13 @@ class PeerSession(
             from = selfPeerId,
         ).encode()
         channel.send(payload.encodeToByteArray())
+    }
+
+    fun publishOrderConfirm(message: DataChannelMessage.OrderConfirm): Boolean {
+        val channel = dc ?: return false
+        if (channel.readyState != DataChannelState.Open) return false
+        channel.send(message.encode().encodeToByteArray())
+        return true
     }
 
     private fun startPresenceLoop() {

@@ -94,6 +94,36 @@ class DataChannelMessageTest {
     }
 
     @Test
+    fun orderConfirm_roundtrip() {
+        val original: DataChannelMessage = DataChannelMessage.OrderConfirm(
+            orderId = "ORD-abc-XYZ",
+            ts = 1_700_000_000_900,
+            from = "seller-1",
+            lines = listOf(
+                OrderLine("AN-104", "M", 12, 8_990),
+                OrderLine("AN-088", "G", 4, 15_900),
+            ),
+            totalCents = 12L * 8_990 + 4L * 15_900,
+        )
+        val raw = original.encode()
+        assertEquals(original, decodeDataChannel(raw))
+    }
+
+    @Test
+    fun orderConfirm_with_empty_lines() {
+        val raw = DataChannelMessage.OrderConfirm(
+            orderId = "ORD-empty",
+            ts = 1L,
+            from = "seller-1",
+            lines = emptyList(),
+            totalCents = 0,
+        ).encode()
+        val decoded = decodeDataChannel(raw) as DataChannelMessage.OrderConfirm
+        assertEquals(0, decoded.lines.size)
+        assertEquals(0, decoded.totalCents)
+    }
+
+    @Test
     fun unknown_payload_returns_null() {
         assertNull(decodeDataChannel("{\"type\":\"unknown-thing\",\"foo\":1}"))
         assertNull(decodeDataChannel("not json"))

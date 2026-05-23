@@ -1,9 +1,24 @@
+export type OrderLine = {
+  productId: string
+  size: string
+  units: number
+  unitPriceCents: number
+}
+
 export type DataChannelMessage =
   | { type: 'mute'; muted: boolean; from: string }
   | { type: 'scroll'; productId: string; offset: number; ts: number; from: string }
   | { type: 'pointAt'; productId: string; ts: number; from: string; durationMs?: number }
   | { type: 'navigate'; productId: string; ts: number; from: string }
   | { type: 'cartUpdate'; productId: string; size: string; units: number; ts: number; from: string }
+  | {
+      type: 'orderConfirm'
+      orderId: string
+      ts: number
+      from: string
+      lines: OrderLine[]
+      totalCents: number
+    }
 
 export function encodeDataChannelMessage(message: DataChannelMessage): string {
   return JSON.stringify(message)
@@ -79,6 +94,43 @@ export function decodeDataChannelMessage(raw: string): DataChannelMessage | null
           units: obj.units,
           ts: obj.ts,
           from: obj.from,
+        }
+      }
+      return null
+    case 'orderConfirm':
+      if (
+        typeof obj.orderId === 'string' &&
+        typeof obj.ts === 'number' &&
+        typeof obj.from === 'string' &&
+        typeof obj.totalCents === 'number' &&
+        Array.isArray(obj.lines)
+      ) {
+        const lines: OrderLine[] = []
+        for (const raw of obj.lines as unknown[]) {
+          if (!raw || typeof raw !== 'object') return null
+          const line = raw as Record<string, unknown>
+          if (
+            typeof line.productId !== 'string' ||
+            typeof line.size !== 'string' ||
+            typeof line.units !== 'number' ||
+            typeof line.unitPriceCents !== 'number'
+          ) {
+            return null
+          }
+          lines.push({
+            productId: line.productId,
+            size: line.size,
+            units: line.units,
+            unitPriceCents: line.unitPriceCents,
+          })
+        }
+        return {
+          type: 'orderConfirm',
+          orderId: obj.orderId,
+          ts: obj.ts,
+          from: obj.from,
+          lines,
+          totalCents: obj.totalCents,
         }
       }
       return null

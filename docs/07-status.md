@@ -19,7 +19,8 @@
 | Infra — Signaling em produção | ✅ concluído | (sem commit ainda) | Fly.io `gru` 256MB sempre-on, HTTPS automático, Dockerfile multi-stage, deploy a partir da raiz |
 | Infra — webBuyer no Cloudflare Pages | ✅ concluído | `578c97f` | `https://trovatacast-buyer.pages.dev` no ar via GH Actions + Wrangler; Fly `PUBLIC_BUYER_URL` setado; cleartext Android e ATS iOS limpos |
 | M8 — Carrinho ao vivo | ✅ concluído | (sem commit ainda) | DC `Navigate` + `CartUpdate` + `BuyerProductDetail` (sheet) + carrinho dock no cliente + gaveta no vendedor + `CartRepository` (SQLDelight) + toast |
-| M9 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
+| M9 — Encerrar com pedido pronto | 🟡 fase 1 | (sem commit ainda) | DC `OrderConfirm` + `OrderSummaryOverlay` (vendedor) + `mountOrderSummary` (cliente); PDF + persistência server-side + push ficam pra fase 2 |
+| M10 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
 ---
 
@@ -502,6 +503,64 @@ trovatacast/
 
 ---
 
+## O que foi entregue no M9 — fase 1 (finalização da venda)
+
+> Acordo com o PO: fase 1 confirma o pedido P2P + mostra resumo dos dois lados. Persistência server-side, PDF e push entram na fase 2.
+
+### Protocolo (`protocol/`)
+- `DataChannelMessage.OrderConfirm(orderId, ts, from, lines, totalCents)` — snapshot transacional do pedido enviado pelo vendedor.
+- `OrderLine(productId, size, units, unitPriceCents)` (top-level `@Serializable`) com `subtotalCents` derivado.
+- Round-trip Kotlin + TS, incluindo caso de lista vazia e payload com linha inválida.
+
+### App (`composeApp/`)
+- `PeerSession.publishOrderConfirm(message)` + `remoteOrderConfirm: SharedFlow<OrderConfirm>` ligado ao mesmo DC `presence`. Retorna `false` se DC não está open (vendedor evita estado inconsistente).
+- `LiveCallUiState.summary: OrderSummaryUi?` + reducer fecha gaveta de carrinho e sheet de detalhe quando summary aparece.
+- `LiveCallScreenModel.confirmOrder()`:
+  - Bloqueia se `summary != null` ou `cart.isEmpty()`.
+  - Constrói `OrderLine` lendo `priceCentsFor` do `SampleCatalog` (parser BRL local — `"R$ 89,90"` → `8990L`).
+  - Gera `orderId` no formato `ORD-{base36(tsLow6)}-{4ASCII}`.
+  - Publica DC + grava estado local (`confirmedByMe = true`).
+- `LiveCallScreenModel` também escuta `remoteOrderConfirm` (defensivo) — `confirmedByMe = false` no caso de simetria.
+- `LiveCallScreen`:
+  - `CartDrawer` ganhou CTA `Btn Jade Lg` **"Confirmar pedido · R$ X,XX"** abaixo do total quando há itens.
+  - `OrderSummaryOverlay` cobre a tela inteira em `colors.bg` quando `state.summary != null`: pill jade ("Você confirmou" / "Cliente confirmou"), título "Pedido pronto", lista de `ProductRow` com subtotal, barra inferior com total + botão "Fechar e encerrar" (chama `onHangup` que pop'a a tela).
+
+### Web buyer (`webBuyer/`)
+- `ui/orderSummary.ts` — `mountOrderSummary(host, payload, sellerName, { onClose })` cria overlay full-screen em z-index 60. Badge verde com check, título "Pedido pronto", `${sellerName} confirmou o seu pedido.`, `code` com `orderId`, lista de linhas com subtotal, footer com total grande + botão "Fechar" (chama `cleanup` + `showLanding`).
+- `main.ts`:
+  - `SheetController` ganhou campo `summary: OrderSummaryView | null`.
+  - `showSummary(payload)` destrói detail + cart sheets, monta summary fresh, e `onClose` faz `cleanup('order_closed')` + `showLanding()`.
+  - `buildDataChannelHandler` ganhou case `orderConfirm` → `showSummary(...)`.
+  - `cleanup` também destroi `sheets.summary`.
+- CSS — `.order-summary*` (rise animation, header com badge OKLCH-like, lista de linhas em cards, footer com total grande mono + botão Jade pill-shape). Respeita safe-area-inset top e bottom.
+
+### Aceitação validada
+- `./gradlew :protocol:jvmTest` ✅ (11 testes; 2 novos de `OrderConfirm`)
+- `./gradlew :composeApp:testDebugUnitTest` ✅ (15 testes)
+- `./gradlew :composeApp:assembleDebug` ✅
+- `./gradlew :composeApp:compileKotlinIosSimulatorArm64` ✅
+- `(cd webBuyer && npm run typecheck && npm test && npm run build)` ✅ (57 testes; 14 em `dataChannel`)
+
+### Como testar manualmente
+1. Subir backend + abrir webBuyer (ou usar produção em `trovatacast-buyer.pages.dev` após deploy).
+2. App vendedor: gerar link → iniciar chamada.
+3. Cliente: entrar → adicionar 1-3 produtos via `ProductDetail` + stepper.
+4. Vendedor: tocar no badge do carrinho → `CartDrawer` mostra linhas + total. Tocar **"Confirmar pedido · R$ X,XX"** (Jade).
+5. **Vendedor**: `OrderSummaryOverlay` cobre a tela com pill "Você confirmou" + lista + total + botão "Fechar e encerrar".
+6. **Cliente**: tela se transforma em `OrderSummaryOverlay` (badge verde + lista + total + botão "Fechar").
+7. Qualquer lado: tocar "Fechar" → desliga WebRTC, vendedor volta pra Invite, cliente volta pra landing.
+
+### Dívidas conhecidas (entram na fase 2)
+- **Persistência server-side** — `OrderConfirm` ainda não bate em `POST /order`. `SessionStore` no Ktor não conhece `Order`. Próximo passo: endpoint + tabela em memória (mantendo padrão do `SessionStore` + Postgres com Exposed/Flyway esperando).
+- **PDF no cliente** — `OrderSummary` web não baixa nada. Caminho mais leve: stylesheet `@media print` + botão "Imprimir / Salvar PDF" usando `window.print()`. Sem deps extras.
+- **Persistência local no vendedor** — `OrderSummaryUi` vive só na memória do `screenModel`. Se o app fechar antes do tap em "Fechar e encerrar", o pedido some. Tabela `OrderEntity` + `OrderLineEntity` em SQLDelight resolve.
+- **Push do pedido** — vendedor não recebe notificação posterior. Depende de persistência server-side primeiro.
+- **Métricas da sessão** — "tempo em foco por SKU", contagem de `PointAt`, etc., ainda não são coletadas. Precisa de `SessionEventLog` em commonMain (M12 colocará isso a serviço do Pipeline).
+- **Edição pós-confirmação** — uma vez `summary` setado, não dá pra voltar atrás na fase 1. Aceitável; M11 (catálogo assíncrono) pode reabrir.
+- **Sem replay no buyer reconectado** — se o cliente perder a conexão depois do `OrderConfirm`, ele cai em landing sem ver o resumo. Snapshot via DC após reconnect (M10) cobre isso.
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -518,3 +577,4 @@ trovatacast/
 | 2026-05-22 | Validação E2E: iPhone em 3G + buyer desktop através do Fly.io estabeleceram WSS + WebRTC; ficou registrada dívida de `AURemoteIO` no iOS após reconnect (M10) e webBuyer ainda local (próximo passo de infra) |
 | 2026-05-22 | Infra: webBuyer no Cloudflare Pages (`trovatacast-buyer.pages.dev`) via GH Actions + Wrangler; Fly `PUBLIC_BUYER_URL` setado; Mac do vendedor não é mais necessário para nenhum componente |
 | 2026-05-23 | M8 fechado: DC `Navigate` + `CartUpdate`, `BuyerProductDetail` sheet, cart dock no cliente, gaveta + toast no vendedor, `CartRepository` (SQLDelight) · 78 testes totais (9 protocol + 15 composeApp + 12 signaling + 54 webBuyer) |
+| 2026-05-23 | M9 fase 1 fechado: DC `OrderConfirm`, botão Confirmar pedido na gaveta, `OrderSummaryOverlay` (vendedor) + `mountOrderSummary` (cliente). PDF, persistência server-side e push ficam pra fase 2 · 83 testes totais (11 protocol + 15 composeApp + 12 signaling + 57 webBuyer) |

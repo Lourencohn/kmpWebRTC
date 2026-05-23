@@ -8,6 +8,7 @@ import {
 import { SignalingClient } from './signaling/client'
 import { clearLastSession, loadLastSession, saveLastSession } from './storage/lastSession'
 import { mountCartSheet, type CartSheetView } from './ui/cartSheet'
+import { mountOrderSummary, type OrderSummaryView } from './ui/orderSummary'
 import { findProduct, mountProductDetail, type ProductDetailView } from './ui/productDetail'
 import { PeerSession, type PeerStatus } from './webrtc/peer'
 import {
@@ -130,6 +131,7 @@ type SheetController = {
   cart: CartSheetView | null
   detail: ProductDetailView | null
   detailProductId: string | null
+  summary: OrderSummaryView | null
 }
 
 function buildDataChannelHandler(
@@ -137,6 +139,13 @@ function buildDataChannelHandler(
   cart: CartStore,
   sheets: SheetController,
   openDetail: (productId: string) => void,
+  showSummary: (payload: {
+    orderId: string
+    ts: number
+    from: string
+    lines: import('./protocol/dataChannel').OrderLine[]
+    totalCents: number
+  }) => void,
 ): (raw: string) => void {
   let pointTimer: ReturnType<typeof setTimeout> | null = null
   return (raw) => {
@@ -164,6 +173,15 @@ function buildDataChannelHandler(
           sheets.detail.setCurrentUnits(msg.size, msg.units)
         }
         return
+      case 'orderConfirm':
+        showSummary({
+          orderId: msg.orderId,
+          ts: msg.ts,
+          from: msg.from,
+          lines: msg.lines,
+          totalCents: msg.totalCents,
+        })
+        return
     }
   }
 }
@@ -177,7 +195,12 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
   })
 
   const cart = new CartStore()
-  const sheets: SheetController = { cart: null, detail: null, detailProductId: null }
+  const sheets: SheetController = {
+    cart: null,
+    detail: null,
+    detailProductId: null,
+    summary: null,
+  }
   let session: PeerSession | null = null
   let cleanedUp = false
   const cleanup = (reason: string) => {
@@ -185,6 +208,7 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
     cleanedUp = true
     sheets.cart?.destroy()
     sheets.detail?.destroy()
+    sheets.summary?.destroy()
     session?.close(reason)
     signaling.close(reason)
     audio.getTracks().forEach((t) => t.stop())
@@ -251,6 +275,30 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
     })
   }
 
+  const showSummary = (payload: {
+    orderId: string
+    ts: number
+    from: string
+    lines: import('./protocol/dataChannel').OrderLine[]
+    totalCents: number
+  }) => {
+    sheets.detail?.destroy()
+    sheets.detail = null
+    sheets.detailProductId = null
+    sheets.cart?.destroy()
+    sheets.cart = null
+    if (sheets.summary) {
+      sheets.summary.destroy()
+      sheets.summary = null
+    }
+    sheets.summary = mountOrderSummary(view.host(), payload, info.sellerName, {
+      onClose: () => {
+        cleanup('order_closed')
+        showLanding()
+      },
+    })
+  }
+
   const view = renderLiveCall(root!, info, {
     onToggleMute: (muted) => session?.setLocalMuted(muted),
     onHangup: () => {
@@ -279,7 +327,7 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
     {
       onStatus: (status, detail) => view.setStatus(mapPeerStatus(status), detail),
       onRemoteAudio: (stream) => attachRemoteAudio(stream),
-      onDataChannelMessage: buildDataChannelHandler(view, cart, sheets, openDetail),
+      onDataChannelMessage: buildDataChannelHandler(view, cart, sheets, openDetail, showSummary),
     },
   )
 

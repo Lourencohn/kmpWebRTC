@@ -49,6 +49,26 @@ sealed class DataChannelMessage {
         val ts: Long,
         val from: String,
     ) : DataChannelMessage()
+
+    @Serializable
+    @SerialName("orderConfirm")
+    data class OrderConfirm(
+        val orderId: String,
+        val ts: Long,
+        val from: String,
+        val lines: List<OrderLine>,
+        val totalCents: Long,
+    ) : DataChannelMessage()
+}
+
+@Serializable
+data class OrderLine(
+    val productId: String,
+    val size: String,
+    val units: Int,
+    val unitPriceCents: Long,
+) {
+    val subtotalCents: Long get() = unitPriceCents * units
 }
 
 val DataChannelJson: Json = Json {
