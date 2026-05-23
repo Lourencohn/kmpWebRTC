@@ -1140,11 +1140,16 @@ main#app:has(.live-call) {
   align-self: center;
 }
 
-.order-summary-close {
+.order-summary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.order-summary-close,
+.order-summary-print {
   appearance: none;
   border: none;
-  background: var(--jade);
-  color: white;
   padding: 14px 18px;
   border-radius: 14px;
   font: inherit;
@@ -1154,10 +1159,110 @@ main#app:has(.live-call) {
   transition: filter 120ms ease, transform 120ms ease;
 }
 
-.order-summary-close:hover { filter: brightness(1.04); }
-.order-summary-close:active { transform: scale(0.985); }
+.order-summary-close {
+  background: var(--jade);
+  color: white;
+}
+
+.order-summary-print {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.order-summary-close:hover,
+.order-summary-print:hover { filter: brightness(1.04); }
+.order-summary-close:active,
+.order-summary-print:active { transform: scale(0.985); }
+
+.order-summary-date {
+  font-family: var(--f-mono);
+  color: var(--ink-3);
+}
 
 @keyframes order-summary-rise {
   from { transform: translateY(28px); opacity: 0.4; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+@media print {
+  html, body {
+    background: white !important;
+    color: black !important;
+  }
+
+  main#app {
+    min-height: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  body.is-printing-ready > *:not(.order-summary),
+  body.is-printing-ready main#app > *:not(.order-summary) {
+    display: none !important;
+  }
+
+  .order-summary {
+    position: static !important;
+    inset: auto !important;
+    padding: 0 !important;
+    animation: none !important;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    z-index: auto !important;
+  }
+
+  .order-summary-header {
+    padding: 0 0 12px !important;
+  }
+
+  .order-summary-badge {
+    display: none !important;
+  }
+
+  .order-summary-title {
+    font-size: 22px !important;
+    color: black !important;
+  }
+
+  .order-summary-sub,
+  .order-summary-id,
+  .order-summary-line-meta,
+  .order-summary-line-ref,
+  .order-summary-total-label,
+  .order-summary-total-meta {
+    color: #333 !important;
+  }
+
+  .order-summary-lines {
+    overflow: visible !important;
+    padding: 0 !important;
+    gap: 4px !important;
+  }
+
+  .order-summary-line {
+    background: white !important;
+    border-color: #999 !important;
+    page-break-inside: avoid;
+  }
+
+  .order-summary-footer {
+    background: white !important;
+    padding: 12px 0 0 !important;
+    border-top: 1px solid #999;
+  }
+
+  .order-summary-actions {
+    display: none !important;
+  }
+
+  #remote-audio,
+  .connection-banner {
+    display: none !important;
+  }
+
+  @page {
+    margin: 16mm;
+  }
 }

@@ -143,13 +143,13 @@
 - [x] `OrderSummaryOverlay` no vendedor + `mountOrderSummary` no cliente.
 - [x] Tap "Fechar e encerrar" / "Fechar" → hangup + retorno pra `InviteScreen` / landing.
 
-### Fase 2 — persistência + recibo (pendente)
-- [ ] `OrderEntity` + `OrderLineEntity` em SQLDelight (vendedor); `OrderRepository.persist(summary)`.
-- [ ] Seção "Pedidos fechados hoje" na `SellerHomeScreen` listando os Orders locais.
-- [ ] `POST /order` no signaling server (em memória, seguindo padrão `SessionStore`); cliente envia opcionalmente via fetch após receber `OrderConfirm`.
-- [ ] `SummaryScreen` (vendedor) com métricas da sessão (tempo em foco por SKU, contagem de `PointAt`, duração total) — precisa de `SessionEventLog` no commonMain.
-- [ ] `BuyerConfirmation` (cliente) com botão "Salvar PDF" via `window.print()` + stylesheet `@media print`.
-- [ ] Vendedor recebe push do pedido (depende de persistência server-side).
+### Fase 2 — persistência + recibo (parcial)
+- [x] `OrderEntity` + `OrderLineEntity` em SQLDelight (vendedor); `OrderRepository.persist(summary)`.
+- [x] Seção "Pedidos fechados hoje" na `SellerHomeScreen` listando os Orders locais.
+- [x] `POST /order` no signaling server (em memória, seguindo padrão `SessionStore`); cliente envia opcionalmente via fetch após receber `OrderConfirm`.
+- [x] `BuyerConfirmation` (cliente) com botão "Salvar PDF" via `window.print()` + stylesheet `@media print`.
+- [ ] `SummaryScreen` (vendedor) com métricas da sessão (tempo em foco por SKU, contagem de `PointAt`, duração total) — precisa de `SessionEventLog` no commonMain (movido para M12).
+- [ ] Vendedor recebe push do pedido (movido para M19; depende de canal externo).
 
 **Aceitação**: encerrar a chamada gera um Order persistido localmente (Fase 2 inicial) e no servidor (Fase 2 final); PDF baixável pelo cliente; tela de resumo do vendedor com métricas mínimas.
 

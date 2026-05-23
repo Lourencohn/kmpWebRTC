@@ -1,0 +1,49 @@
+CREATE TABLE IF NOT EXISTS OrderEntity (
+    orderId TEXT NOT NULL PRIMARY KEY,
+    sessionId TEXT,
+    sessionToken TEXT,
+    clientName TEXT,
+    clientShop TEXT,
+    sellerName TEXT NOT NULL,
+    totalCents INTEGER NOT NULL,
+    confirmedByMe INTEGER NOT NULL,
+    createdAtMs INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_created ON OrderEntity(createdAtMs);
+CREATE INDEX IF NOT EXISTS idx_order_session ON OrderEntity(sessionId);
+
+CREATE TABLE IF NOT EXISTS OrderLineEntity (
+    orderId TEXT NOT NULL,
+    productId TEXT NOT NULL,
+    size TEXT NOT NULL,
+    units INTEGER NOT NULL,
+    unitPriceCents INTEGER NOT NULL,
+    PRIMARY KEY (orderId, productId, size),
+    FOREIGN KEY (orderId) REFERENCES OrderEntity(orderId) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_orderline_order ON OrderLineEntity(orderId);
+
+insertOrder:
+INSERT OR IGNORE INTO OrderEntity(orderId, sessionId, sessionToken, clientName, clientShop, sellerName, totalCents, confirmedByMe, createdAtMs)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+insertOrderLine:
+INSERT OR REPLACE INTO OrderLineEntity(orderId, productId, size, units, unitPriceCents)
+VALUES (?, ?, ?, ?, ?);
+
+selectOrderById:
+SELECT * FROM OrderEntity WHERE orderId = ?;
+
+selectOrdersBetween:
+SELECT * FROM OrderEntity WHERE createdAtMs >= ? AND createdAtMs < ? ORDER BY createdAtMs DESC;
+
+selectAllOrders:
+SELECT * FROM OrderEntity ORDER BY createdAtMs DESC;
+
+selectOrderLines:
+SELECT productId, size, units, unitPriceCents FROM OrderLineEntity WHERE orderId = ? ORDER BY rowid ASC;
+
+deleteOrder:
+DELETE FROM OrderEntity WHERE orderId = ?;

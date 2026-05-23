@@ -1,6 +1,7 @@
 package app.trovata.cast.feature.call
 
 import app.trovata.cast.data.local.CartRepository
+import app.trovata.cast.data.local.OrderRepository
 import app.trovata.cast.data.sample.SampleCatalog
 import app.trovata.cast.data.signaling.KtorSignalingTransport
 import app.trovata.cast.data.signaling.SignalingClient
@@ -75,8 +76,10 @@ class LiveCallScreenModel(
     private val clientName: String?,
     private val httpClient: HttpClient,
     private val cartRepository: CartRepository,
+    private val orderRepository: OrderRepository,
     private val sellerPeerId: String = "seller-${randomSuffix()}",
     private val sellerName: String = "Vendedor",
+    private val clientShop: String? = null,
 ) : ScreenModel {
 
     private val transport = KtorSignalingTransport(
@@ -125,6 +128,13 @@ class LiveCallScreenModel(
         }
         screenModelScope.launch {
             peer.remoteOrderConfirm.collect { msg ->
+                persistOrder(
+                    orderId = msg.orderId,
+                    ts = msg.ts,
+                    lines = msg.lines,
+                    totalCents = msg.totalCents,
+                    confirmedByMe = false,
+                )
                 _state.update {
                     it.copy(
                         summary = OrderSummaryUi(
@@ -216,6 +226,15 @@ class LiveCallScreenModel(
         )
         val sent = peer.publishOrderConfirm(message)
         if (!sent) return
+        screenModelScope.launch {
+            persistOrder(
+                orderId = message.orderId,
+                ts = ts,
+                lines = lines,
+                totalCents = totalCents,
+                confirmedByMe = true,
+            )
+        }
         _state.update {
             it.copy(
                 summary = OrderSummaryUi(
@@ -229,6 +248,28 @@ class LiveCallScreenModel(
                 showProductSheet = false,
             )
         }
+    }
+
+    private suspend fun persistOrder(
+        orderId: String,
+        ts: Long,
+        lines: List<OrderLine>,
+        totalCents: Long,
+        confirmedByMe: Boolean,
+    ) {
+        if (orderRepository.get(orderId) != null) return
+        orderRepository.persist(
+            orderId = orderId,
+            sessionId = sessionId,
+            sessionToken = token,
+            clientName = clientName,
+            clientShop = clientShop,
+            sellerName = sellerName,
+            totalCents = totalCents,
+            confirmedByMe = confirmedByMe,
+            createdAtMs = ts,
+            lines = lines,
+        )
     }
 
     fun hangup() {

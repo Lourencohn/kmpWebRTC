@@ -85,6 +85,7 @@ data class LiveCallScreen(
                 clientName = clientName,
                 httpClient = container.httpClient,
                 cartRepository = container.cartRepository,
+                orderRepository = container.orderRepository,
                 sellerName = sellerName,
             )
         }

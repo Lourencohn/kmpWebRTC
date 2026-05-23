@@ -1,3 +1,4 @@
+import { submitOrder } from './api/orders'
 import { fetchSession, SessionFetchError, type SessionInfo } from './api/sessions'
 import { CartStore } from './cart/store'
 import {
@@ -296,6 +297,19 @@ function startPeer(info: SessionInfo, audio: MediaStream): void {
         cleanup('order_closed')
         showLanding()
       },
+    })
+    void submitOrder(SERVER_BASE, {
+      orderId: payload.orderId,
+      sessionToken: info.token,
+      tsMs: payload.ts,
+      totalCents: payload.totalCents,
+      lines: payload.lines,
+      source: 'Buyer',
+      clientName: info.clientName ?? undefined,
+    }).then((result) => {
+      if (!result.ok && import.meta.env.DEV) {
+        console.warn('[trovatacast/web] submit order failed', result)
+      }
     })
   }
 

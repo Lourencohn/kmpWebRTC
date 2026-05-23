@@ -49,6 +49,7 @@ fun Application.module() {
         ?: "http://localhost:5173"
     val store = SessionStore()
     val rooms = RoomManager()
+    val orders = OrderStore()
 
     routing {
         get("/health") { call.respondText("ok") }
@@ -58,6 +59,7 @@ fun Application.module() {
     }
     sessionRoutes(store, baseUrl)
     signalingRoutes(rooms, store)
+    orderRoutes(orders, store)
 }
 
 @Serializable

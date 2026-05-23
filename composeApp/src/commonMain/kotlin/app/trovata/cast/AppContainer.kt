@@ -2,6 +2,7 @@ package app.trovata.cast
 
 import app.cash.sqldelight.db.SqlDriver
 import app.trovata.cast.data.local.CartRepository
+import app.trovata.cast.data.local.OrderRepository
 import app.trovata.cast.data.local.SessionsRepository
 import app.trovata.cast.data.remote.HttpClientFactory
 import app.trovata.cast.data.remote.SessionsApi
@@ -17,8 +18,9 @@ class AppContainer(driverFactory: DatabaseDriverFactory) {
 
     val sessionsRepository: SessionsRepository = SessionsRepository(database)
     val cartRepository: CartRepository = CartRepository(database)
+    val orderRepository: OrderRepository = OrderRepository(database)
     val sessionsApi: SessionsApi = SessionsApi(httpClient)
-    val sessionsViewModel: SessionsViewModel = SessionsViewModel()
+    val sessionsViewModel: SessionsViewModel = SessionsViewModel(orderRepository = orderRepository)
     val shareController: ShareController = ShareController()
 }
 

@@ -29,6 +29,7 @@ export function mountOrderSummary(
   overlay.dataset.role = 'order-summary'
 
   const totalUnits = payload.lines.reduce((sum, l) => sum + l.units, 0)
+  const dateLabel = formatDateTime(payload.ts)
 
   overlay.innerHTML = `
     <header class="order-summary-header">
@@ -37,7 +38,7 @@ export function mountOrderSummary(
       </div>
       <h1 class="order-summary-title">Pedido pronto</h1>
       <p class="order-summary-sub">${escapeHtml(sellerName)} confirmou o seu pedido.</p>
-      <p class="order-summary-id">ID <code>${escapeHtml(payload.orderId)}</code></p>
+      <p class="order-summary-id">ID <code>${escapeHtml(payload.orderId)}</code> · <span class="order-summary-date">${escapeHtml(dateLabel)}</span></p>
     </header>
     <ul class="order-summary-lines"></ul>
     <footer class="order-summary-footer">
@@ -46,7 +47,10 @@ export function mountOrderSummary(
         <span class="order-summary-total-meta">${totalUnits}un · ${payload.lines.length} ${payload.lines.length === 1 ? 'linha' : 'linhas'}</span>
         <span class="order-summary-total-value">${formatBrl(payload.totalCents)}</span>
       </div>
-      <button type="button" class="order-summary-close" data-action="close">Fechar</button>
+      <div class="order-summary-actions">
+        <button type="button" class="order-summary-print" data-action="print">Salvar PDF</button>
+        <button type="button" class="order-summary-close" data-action="close">Fechar</button>
+      </div>
     </footer>
   `
 
@@ -55,16 +59,38 @@ export function mountOrderSummary(
     linesEl.insertAdjacentHTML('beforeend', lineHtml(line))
   })
 
+  document.body.classList.add('is-printing-ready')
+
   overlay
     .querySelector<HTMLButtonElement>('[data-action="close"]')
     ?.addEventListener('click', () => actions.onClose())
+
+  overlay
+    .querySelector<HTMLButtonElement>('[data-action="print"]')
+    ?.addEventListener('click', () => window.print())
 
   host.appendChild(overlay)
 
   return {
     destroy() {
       overlay.remove()
+      document.body.classList.remove('is-printing-ready')
     },
+  }
+}
+
+function formatDateTime(ms: number): string {
+  try {
+    const formatter = new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    return formatter.format(new Date(ms))
+  } catch {
+    return new Date(ms).toISOString()
   }
 }
 

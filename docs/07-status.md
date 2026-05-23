@@ -19,7 +19,7 @@
 | Infra — Signaling em produção | ✅ concluído | (sem commit ainda) | Fly.io `gru` 256MB sempre-on, HTTPS automático, Dockerfile multi-stage, deploy a partir da raiz |
 | Infra — webBuyer no Cloudflare Pages | ✅ concluído | `578c97f` | `https://trovatacast-buyer.pages.dev` no ar via GH Actions + Wrangler; Fly `PUBLIC_BUYER_URL` setado; cleartext Android e ATS iOS limpos |
 | M8 — Carrinho ao vivo | ✅ concluído | (sem commit ainda) | DC `Navigate` + `CartUpdate` + `BuyerProductDetail` (sheet) + carrinho dock no cliente + gaveta no vendedor + `CartRepository` (SQLDelight) + toast |
-| M9 — Encerrar com pedido pronto | 🟡 fase 1 | (sem commit ainda) | DC `OrderConfirm` + `OrderSummaryOverlay` (vendedor) + `mountOrderSummary` (cliente); PDF + persistência server-side + push ficam pra fase 2 |
+| M9 — Encerrar com pedido pronto | 🟡 fase 2 parcial | (sem commit ainda) | Fase 2: `OrderRepository` (SQLDelight) + "Pedidos fechados hoje" na Home + `POST /order` (mem) + buyer envia + PDF via `window.print()`. Push fica pra M11 |
 | M10 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
 ---
@@ -561,6 +561,79 @@ trovatacast/
 
 ---
 
+## O que foi entregue no M9 — fase 2 (persistência + recibo)
+
+> Acordo com o PO: fase 2 cobre persistência local (vendedor) + server (em memória) + PDF no cliente. Push posterior do pedido fica pra M11/M19.
+
+### Protocolo (`protocol/`)
+- `protocol/Order.kt` — `OrderSubmissionRequest`, `OrderSubmissionResponse`, `OrderRecord`, `enum class OrderSource { Buyer, Seller }`. Reusa `OrderLine` do `DataChannelMessage.kt`.
+- `OrderDtoTest` — 3 testes de round-trip (`OrderSubmissionRequest`, `OrderSubmissionResponse`, `OrderRecord`).
+
+### Persistência local (`composeApp/`)
+- `commonMain/sqldelight/.../Orders.sq` — `OrderEntity(orderId, sessionId, sessionToken, clientName, clientShop, sellerName, totalCents, confirmedByMe, createdAtMs)` + `OrderLineEntity(orderId, productId, size, units, unitPriceCents)` com FK em `OrderEntity`. Índices em `createdAtMs` + `sessionId`. Queries `insertOrder`, `insertOrderLine`, `selectOrderById`, `selectOrdersBetween`, `selectAllOrders`, `selectOrderLines`, `deleteOrder`.
+- `data/local/OrderRepository.kt` — `persist(...)` em uma transação (insert + linhas), `observeBetween(from, until)` retorna `Flow<List<StoredOrder>>` materializando linhas em memória, `observeAll()`, `get(orderId)`.
+- `AppContainer.orderRepository` injeta no `LiveCallScreenModel` e no `SessionsViewModel`.
+- `LiveCallScreenModel.persistOrder(...)` — idempotente (re-checa via `get(orderId)` antes de inserir); dispara tanto no `confirmOrder()` quanto no fluxo `remoteOrderConfirm` (defensivo).
+
+### Home do vendedor — "Pedidos fechados hoje"
+- `SessionsViewModel(orderRepository, timeZone, now)` — calcula `todayWindow()` via `kotlinx.datetime` (LocalDate atStartOfDayIn) e exposes `SellerHomeUiState.closedToday: List<StoredOrder>` populado por `orderRepository.observeBetween(...)`. CoroutineScope próprio (`SupervisorJob() + Dispatchers.Default`) com `dispose()`.
+- `SellerHomeScreen.ClosedTodaySection(orders)` — `TrovataCard` com:
+  - Pill Jade no header: `${orders.size} · R$ X,XX`.
+  - 1 linha por pedido: avatar quadrado Jade + check, nome do cliente · shop, `un · SKUs · HH:mm`, `orderId` em mono small, total em mono à direita.
+  - Footer com `Total do dia · N un` + soma BRL.
+- Helpers locais: `formatBrl(cents)` (sem dependências externas, BRL com separadores) e `formatTime(ms)` via `Instant.toLocalDateTime`.
+- Renderiza apenas se `closedToday.isNotEmpty()`, entre "Esta semana" e "Histórico".
+
+### Server (`signalingServer/`)
+- `server/OrderStore.kt` — `ConcurrentHashMap<orderId, OrderRecord>` + `byToken: ConcurrentHashMap<token, MutableList<orderId>>`. `submit(req)` é idempotente (retorna existing se mesmo `orderId`). `isValid(req)` valida `lines.isNotEmpty()`, `units ∈ (0, MAX]`, `MAX_LINES`, preços ≥ 0.
+- `server/OrderRoutes.kt`:
+  - `POST /order` — valida payload, exige `SessionStore.get(token) != null`, devolve 202 com `OrderSubmissionResponse`.
+  - `GET /order/{orderId}` — devolve `OrderRecord` ou 404.
+  - `GET /session/{token}/orders` — lista `OrderRecord` da sessão.
+- `Main.module()` registra `orderRoutes(orders, store)`.
+- `OrderRoutesTest` — 5 testes: submit+fetch happy path, idempotência (segundo POST com payload diferente preserva original), 404 com token desconhecido, 400 com lines vazias, listagem por token.
+
+### Web buyer (`webBuyer/`)
+- `api/orders.ts` — `submitOrder(baseUrl, req, deps)` com `SubmitOrderResult` discriminado (`ok | network | session_unknown | invalid_payload | server`), injeção de `fetchImpl` para testes.
+- `main.ts.showSummary(payload)` agora dispara `void submitOrder(SERVER_BASE, ...)` em fire-and-forget após montar o overlay; falhas vão pro `console.warn` em DEV.
+- `ui/orderSummary.ts`:
+  - Header ganhou `dateLabel` formatado via `Intl.DateTimeFormat('pt-BR', ...)`.
+  - Footer ganhou `<button data-action="print">Salvar PDF</button>` (chama `window.print()`).
+  - Mount adiciona `document.body.classList.add('is-printing-ready')`; destroy remove.
+- `styles/app.css` — bloco `@media print`:
+  - `body.is-printing-ready > *:not(.order-summary)` → `display: none`.
+  - Overlay rebaixa para `position: static`, cor preta, sem badge nem animação.
+  - Esconde `#remote-audio`, `.connection-banner`, `.order-summary-actions`.
+  - `@page { margin: 16mm }`.
+- `api/__tests__/orders.test.ts` — 8 testes (ok, trailing slash, 404, 400, 500, network, json malformado, schema mismatch).
+
+### Aceitação validada
+- `./gradlew :protocol:jvmTest` ✅ (24 testes; 3 novos em `OrderDtoTest`)
+- `./gradlew :signalingServer:test` ✅ (17 testes; 5 novos em `OrderRoutesTest`)
+- `./gradlew :composeApp:testDebugUnitTest` ✅ (15 testes)
+- `./gradlew :composeApp:assembleDebug` ✅
+- `./gradlew :composeApp:compileKotlinIosSimulatorArm64` ✅
+- `(cd webBuyer && npm run typecheck && npm test && npm run build)` ✅ (65 testes; 8 novos em `orders.test.ts`)
+
+### Como testar manualmente
+1. Subir backend + webBuyer (ou usar produção).
+2. App vendedor: gerar link → iniciar chamada.
+3. Cliente: entrar → adicionar produtos → vendedor toca "Confirmar pedido".
+4. `OrderSummaryOverlay` aparece nos dois lados; cliente vê botão "Salvar PDF" (toca → diálogo de print do browser, com layout `@media print` limpo).
+5. Vendedor toca "Fechar e encerrar" → volta pra `InviteScreen`.
+6. Voltar para a Home do vendedor — seção **"Pedidos fechados hoje"** aparece com o pedido recém-fechado (1 · R$ X,XX no pill Jade).
+7. Verificar server: `curl https://trovatacast-signaling.fly.dev/session/<token>/orders` (em local: `http://localhost:8080/...`) devolve o `OrderRecord` enviado pelo buyer.
+
+### Dívidas conhecidas
+- **Postgres** — `OrderStore` continua em memória; `application.yaml` + `flyway` + `exposed` declarados mas não wired. Migrar quando alguém precisar persistência além do restart do Fly (M11 ou M19 quando push entrar).
+- **Push do pedido** — não envia notificação ao vendedor pós-encerramento. Depende de canal externo (FCM + APNs) ou de o app ficar conectado ao WS após hangup. Fica pra M19.
+- **`SummaryScreen` do vendedor** — métricas da sessão (tempo em foco por SKU, contagem de `PointAt`) continuam não coletadas. Ainda precisa `SessionEventLog` em commonMain. M12 cobre.
+- **Reexibir pedido fechado** — `ClosedTodaySection` mostra a lista mas tap não abre detalhe ainda. Aceitável para a fase 2; entra junto do `SummaryScreen` em M12.
+- **Buyer offline** — `submitOrder` é fire-and-forget; se buyer estiver offline no momento do `OrderConfirm`, o `POST /order` falha silenciosamente (warn no console DEV). Vendedor segue com persistência local válida — não há perda relevante, mas o server fica sem cópia. Fila com retry entraria com persistência server-side real.
+- **Janela "hoje"** — `SessionsViewModel.todayWindow()` é calculada uma vez na construção. Não atualiza automaticamente quando o relógio cruza meia-noite; o usuário verá pedidos do dia anterior até reabrir a Home. Recalcular via flow timer entraria com observabilidade real (M12).
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -578,3 +651,4 @@ trovatacast/
 | 2026-05-22 | Infra: webBuyer no Cloudflare Pages (`trovatacast-buyer.pages.dev`) via GH Actions + Wrangler; Fly `PUBLIC_BUYER_URL` setado; Mac do vendedor não é mais necessário para nenhum componente |
 | 2026-05-23 | M8 fechado: DC `Navigate` + `CartUpdate`, `BuyerProductDetail` sheet, cart dock no cliente, gaveta + toast no vendedor, `CartRepository` (SQLDelight) · 78 testes totais (9 protocol + 15 composeApp + 12 signaling + 54 webBuyer) |
 | 2026-05-23 | M9 fase 1 fechado: DC `OrderConfirm`, botão Confirmar pedido na gaveta, `OrderSummaryOverlay` (vendedor) + `mountOrderSummary` (cliente). PDF, persistência server-side e push ficam pra fase 2 · 83 testes totais (11 protocol + 15 composeApp + 12 signaling + 57 webBuyer) |
+| 2026-05-23 | M9 fase 2 (parcial) fechada: `OrderRepository` + `Orders.sq`, "Pedidos fechados hoje" na Home, `POST /order` em memória + buyer envia, PDF via `window.print()` + `@media print`. `SummaryScreen` (métricas) movido pra M12 e push pra M19 · 121 testes totais (24 protocol + 17 signaling + 15 composeApp + 65 webBuyer) |

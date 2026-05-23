@@ -28,12 +28,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import app.trovata.cast.data.local.StoredOrder
 import app.trovata.cast.data.sample.HistorySession
 import app.trovata.cast.data.sample.HistoryStatus
 import app.trovata.cast.data.sample.LiveWaitingSession
 import app.trovata.cast.data.sample.SessionTag
 import app.trovata.cast.data.sample.UpcomingSession
 import app.trovata.cast.feature.sessions.SessionsViewModel
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Avatar
 import app.trovata.cast.ui.components.Btn
@@ -75,6 +79,10 @@ fun SellerHomeScreen(
 
             if (state.data.thisWeek.isNotEmpty()) {
                 item { UpcomingSection(title = "Esta semana", sessions = state.data.thisWeek, onOpen = onOpenPrep) }
+            }
+
+            if (state.closedToday.isNotEmpty()) {
+                item { ClosedTodaySection(state.closedToday) }
             }
 
             if (state.data.history.isNotEmpty()) {
@@ -358,4 +366,154 @@ private fun tagStyle(tag: SessionTag): Pair<PillTone, ImageVector> = when (tag) 
     SessionTag.PrimeiraSessao -> PillTone.Brand to TrovataIcons.zap
     SessionTag.Reposicao -> PillTone.Jade to TrovataIcons.trend
     SessionTag.TopVenda -> PillTone.Warn to TrovataIcons.flame
+}
+
+@Composable
+private fun ClosedTodaySection(orders: List<StoredOrder>) {
+    val colors = TrovataTokens.colors
+    val totalCents = orders.sumOf { it.totalCents }
+    val totalUnits = orders.sumOf { order -> order.lines.sumOf { it.units } }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        SectionLabel(
+            text = "Pedidos fechados hoje",
+            action = {
+                Pill(
+                    text = "${orders.size} · ${formatBrl(totalCents)}",
+                    tone = PillTone.Jade,
+                    icon = TrovataIcons.check,
+                )
+            },
+        )
+        TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
+            Column {
+                orders.forEachIndexed { index, order ->
+                    ClosedOrderRow(order)
+                    if (index < orders.lastIndex) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(colors.line),
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(colors.line),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Total do dia · $totalUnits un",
+                        color = colors.ink3,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = formatBrl(totalCents),
+                        style = TrovataTokens.type.mono.copy(
+                            fontSize = 14.sp,
+                            color = colors.jade2,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClosedOrderRow(order: StoredOrder) {
+    val colors = TrovataTokens.colors
+    val clientLabel = order.clientName ?: "Cliente"
+    val firstName = clientLabel.split(' ').first()
+    val unitsTotal = order.lines.sumOf { it.units }
+    val skuCount = order.lines.distinctBy { it.productId }.size
+    val timeLabel = formatTime(order.createdAtMs)
+    val statusBg = if (order.confirmedByMe) colors.jadeTint else colors.surface2
+    val statusFg = if (order.confirmedByMe) colors.jade2 else colors.ink3
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(statusBg, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = TrovataIcons.check,
+                contentDescription = null,
+                tint = statusFg,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = firstName,
+                    color = colors.ink,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                order.clientShop?.let { shop ->
+                    Text(
+                        text = " · $shop",
+                        color = colors.ink4,
+                        fontSize = 13.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Text(
+                text = "$unitsTotal un · $skuCount SKUs · $timeLabel",
+                color = colors.ink3,
+                fontSize = 11.5.sp,
+            )
+            Text(
+                text = order.orderId,
+                style = TrovataTokens.type.mono.copy(
+                    fontSize = 10.5.sp,
+                    color = colors.ink4,
+                ),
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        Text(
+            text = formatBrl(order.totalCents),
+            style = TrovataTokens.type.mono.copy(
+                fontSize = 13.5.sp,
+                color = colors.ink,
+                fontWeight = FontWeight.SemiBold,
+            ),
+        )
+    }
+}
+
+private fun formatBrl(totalCents: Long): String {
+    val reais = totalCents / 100
+    val cents = (totalCents % 100).let { if (it < 0) -it else it }
+    val reaisFormatted = reais.toString().reversed().chunked(3).joinToString(".").reversed()
+    val centsFormatted = cents.toString().padStart(2, '0')
+    return "R$ $reaisFormatted,$centsFormatted"
+}
+
+private fun formatTime(ms: Long): String {
+    val dateTime = Instant.fromEpochMilliseconds(ms).toLocalDateTime(TimeZone.currentSystemDefault())
+    val hh = dateTime.hour.toString().padStart(2, '0')
+    val mm = dateTime.minute.toString().padStart(2, '0')
+    return "$hh:$mm"
 }
