@@ -17,6 +17,7 @@
 | M6 — Áudio P2P | ✅ concluído | `45d455f` m6 | Mute na UI dos dois lados via DC `Mute` + áudio remoto anexado (`onTrack` no app, `<audio autoplay>` no web) + banner refinado |
 | M7 — Co-presença básica | ✅ concluído | `7f1f6bc` m7 | DC `Scroll` (lossy ~30Hz, `sample(33)`) + `PointAt` (ordered) + catálogo grid em LiveCallScreen + productCard.ts no web + halo no cliente |
 | Infra — Signaling em produção | ✅ concluído | (sem commit ainda) | Fly.io `gru` 256MB sempre-on, HTTPS automático, Dockerfile multi-stage, deploy a partir da raiz |
+| Infra — webBuyer no Cloudflare Pages | 🚧 prep concluído | — | Workflow GH Actions + cleanups (proxy Vite, ATS iOS, cleartext Android) prontos; falta criar projeto Pages + secrets |
 | M8 — Carrinho ao vivo | 🚧 próximo | — | `Navigate`, `CartUpdate`, `BuyerProductDetail`, gaveta no vendedor |
 | M9 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 
@@ -398,26 +399,34 @@ trovatacast/
 
 ---
 
-## Próximo passo de infra — webBuyer no Cloudflare Pages
+## Infra — webBuyer no Cloudflare Pages (prep concluído)
 
 Sem isso, o link gerado pelo signaling continua apontando pra `http://localhost:5173` e o vendedor precisa do Mac rodando `npm run dev` pro cliente abrir. Cloudflare Pages serve estático grátis com HTTPS + CDN + zero cold start.
 
-### Fluxo planejado
-1. Conta Cloudflare (grátis, sem cartão) + projeto Pages conectado ao repo GitHub.
-2. `.github/workflows/web-buyer-deploy.yml` que, em cada push na `main`, faz `npm ci && npm run build` no `webBuyer/` e publica o `dist/` em produção via `cloudflare/wrangler-action` ou integração nativa do Pages.
-3. URL final esperada: `https://trovatacast-buyer.pages.dev` (ou domínio custom depois).
-4. `VITE_SIGNALING_BASE` setado no Pages como variável de build apontando pra `https://trovatacast-signaling.fly.dev`.
-5. No Fly.io: `fly secrets set PUBLIC_BUYER_URL=https://<url-final> --app trovatacast-signaling` pra que o `POST /session` retorne URLs corretas.
+### O que está pronto no repo
+- [.github/workflows/web-buyer-deploy.yml](../.github/workflows/web-buyer-deploy.yml) — em cada push na `main` que toca `webBuyer/**`: roda `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, e publica `webBuyer/dist` em `trovatacast-buyer` via `cloudflare/wrangler-action@v3` (`pages deploy`).
+- `VITE_SIGNALING_BASE` é injetado no build a partir de `vars.VITE_SIGNALING_BASE` (variável de repo do GitHub), com fallback hardcoded para `https://trovatacast-signaling.fly.dev`.
+- Proxy `http://127.0.0.1:8080` removido de [webBuyer/vite.config.ts](../webBuyer/vite.config.ts).
+- `cleartextTrafficPermitted` removido (arquivo e referência no manifest) — Android passou a ser HTTPS-only.
+- `NSAllowsArbitraryLoads` removido de [iosApp/iosApp/Info.plist](../iosApp/iosApp/Info.plist) (mantém `NSAllowsLocalNetworking` que não viola ATS no review).
+
+### Passos manuais que faltam (uma vez só, no painel/CLI)
+1. **Cloudflare**:
+   - Criar conta Cloudflare (grátis, sem cartão).
+   - Em **Workers & Pages → Create application → Pages → Direct Upload**, criar projeto `trovatacast-buyer`. Não conectar repo (o GH Action publica via Wrangler).
+   - Copiar o **Account ID** que aparece no canto direito do dashboard.
+   - Em **My Profile → API Tokens → Create Token**, usar template **Edit Cloudflare Workers** ou criar custom com permissão `Account > Cloudflare Pages > Edit` no account de destino.
+2. **GitHub** (Settings → Secrets and variables → Actions):
+   - Secret `CF_API_TOKEN` = token gerado acima.
+   - Secret `CF_ACCOUNT_ID` = account id copiado.
+   - (Opcional) Variable `VITE_SIGNALING_BASE` se um dia mudar de URL do signaling.
+3. **Push pra `main`** com mudança em `webBuyer/**` (ou rodar o workflow via `workflow_dispatch`). Conferir que o job verde no Actions imprime `https://trovatacast-buyer.pages.dev` (ou `https://<sha>.trovatacast-buyer.pages.dev`).
+4. **Fly.io**: `fly secrets set PUBLIC_BUYER_URL=https://trovatacast-buyer.pages.dev --app trovatacast-signaling` — assim `POST /session` retorna URLs corretas.
 
 ### Validação esperada
-- Gerar sessão no app vendedor → link copiado vem com `https://<url-final>/?t=<token>`.
+- Gerar sessão no app vendedor → link copiado vem com `https://trovatacast-buyer.pages.dev/?t=<token>`.
 - Cliente abre o link em qualquer celular/rede → conecta direto, sem Mac.
 - Mac desligado durante todo o fluxo.
-
-### Limpezas que entram junto
-- Remover `cleartextTrafficPermitted` para `10.0.2.2`/`localhost` em [network_security_config.xml](../composeApp/src/androidMain/res/xml/network_security_config.xml) (não é mais necessário).
-- Remover `NSAllowsArbitraryLoads` em [Info.plist](../iosApp/iosApp/Info.plist) (Apple rejeita em App Review).
-- Remover proxy `http://127.0.0.1:8080` em [vite.config.ts](../webBuyer/vite.config.ts) — produção não usa Vite dev server.
 
 ---
 
@@ -449,3 +458,4 @@ Critério de aceitação: pedido se constrói em tempo real visto pelos dois lad
 | 2026-05-21 | M7 fechado: DC Scroll/PointAt + grade de catálogo na LiveCall + halo de produto apontado |
 | 2026-05-22 | Infra: signaling deployado no Fly.io `gru`, clientes apontados para `https://trovatacast-signaling.fly.dev`, Mac não mais necessário para o servidor |
 | 2026-05-22 | Validação E2E: iPhone em 3G + buyer desktop através do Fly.io estabeleceram WSS + WebRTC; ficou registrada dívida de `AURemoteIO` no iOS após reconnect (M10) e webBuyer ainda local (próximo passo de infra) |
+| 2026-05-22 | Infra (prep): workflow `web-buyer-deploy.yml` para Cloudflare Pages, proxy do Vite removido, ATS iOS limpo e `network_security_config.xml` Android excluído; faltam só secrets do GitHub e `fly secrets set PUBLIC_BUYER_URL=…` |

@@ -1,0 +1,47 @@
+name: webBuyer (Cloudflare Pages)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "webBuyer/**"
+      - ".github/workflows/web-buyer-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: web-buyer-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: build + deploy to Pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    defaults:
+      run:
+        working-directory: webBuyer
+    env:
+      VITE_SIGNALING_BASE: ${{ vars.VITE_SIGNALING_BASE || 'https://trovatacast-signaling.fly.dev' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: webBuyer/package-lock.json
+
+      - run: npm ci || npm install
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          workingDirectory: webBuyer
+          command: pages deploy dist --project-name=trovatacast-buyer --branch=main
