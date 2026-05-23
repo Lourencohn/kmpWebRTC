@@ -22,10 +22,10 @@ private func configureAudioSession() {
     defer { session.unlockForConfiguration() }
     do {
         try session.setCategory(
-            AVAudioSession.Category.playAndRecord.rawValue,
+            .playAndRecord,
             with: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
         )
-        try session.setMode(AVAudioSession.Mode.voiceChat.rawValue)
+        try session.setMode(.voiceChat)
         try session.overrideOutputAudioPort(.speaker)
         try session.setActive(true)
     } catch {
