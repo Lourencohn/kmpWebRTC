@@ -50,6 +50,7 @@ import app.trovata.cast.ui.icons.TrovataIcons
 fun CatalogScreen(
     modifier: Modifier = Modifier,
     onOpenAccount: () -> Unit = {},
+    onOpenProduct: (app.trovata.cast.data.sample.Product) -> Unit = {},
 ) {
     val colors = TrovataTokens.colors
     val products = SampleCatalog.products
@@ -106,6 +107,7 @@ fun CatalogScreen(
                             product = product,
                             growth = listOf(42, 28, 12)[index],
                             ordersLabel = listOf("18 ped.", "14 ped.", "9 ped.")[index],
+                            onClick = { onOpenProduct(product) },
                         )
                     }
                 }
@@ -146,6 +148,7 @@ fun CatalogScreen(
                                         product = product,
                                         size = ProductCardSize.Sm,
                                         modifier = Modifier.weight(1f),
+                                        onClick = { onOpenProduct(product) },
                                     )
                                 }
                                 if (pair.size == 1) {
@@ -396,13 +399,19 @@ private fun TopOfWeekCard(
     product: app.trovata.cast.data.sample.Product,
     growth: Int,
     ordersLabel: String,
+    onClick: () -> Unit = {},
 ) {
     val colors = TrovataTokens.colors
     Column(
         modifier = Modifier.width(158.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        ProductCard(product = product, size = ProductCardSize.Sm, modifier = Modifier.fillMaxWidth())
+        ProductCard(
+            product = product,
+            size = ProductCardSize.Sm,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onClick,
+        )
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),

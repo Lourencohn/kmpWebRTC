@@ -5,8 +5,10 @@ import app.trovata.cast.AppContainerHolder
 import app.trovata.cast.ui.screens.account.AccountScreen
 import app.trovata.cast.ui.screens.auth.AuthLoginScreen
 import app.trovata.cast.ui.screens.auth.AuthSetupScreen
+import app.trovata.cast.data.sample.SampleCatalog
 import app.trovata.cast.ui.screens.auth.AuthVerifyScreen
 import app.trovata.cast.ui.screens.auth.AuthWelcomeScreen
+import app.trovata.cast.ui.screens.catalog.ProductDetailScreen
 import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
 import app.trovata.cast.ui.screens.sessions.IncomingCallScreen
 import app.trovata.cast.ui.screens.sessions.SessionPrepScreen
@@ -39,6 +41,20 @@ data class SessionPrepRoute(val clientName: String? = null) : Screen {
             onStartCall = {
                 navigator.push(CatalogPickerScreen(clientName = clientName))
             },
+        )
+    }
+}
+
+data class ProductDetailRoute(val productRef: String) : Screen {
+    @Composable
+    override fun Content() {
+        val navigator = LocalNavigator.currentOrThrow
+        val product = SampleCatalog.products.firstOrNull { it.ref == productRef }
+            ?: return run { navigator.pop() }
+        ProductDetailScreen(
+            product = product,
+            onBack = { navigator.pop() },
+            onStartSession = { navigator.push(CatalogPickerScreen()) },
         )
     }
 }

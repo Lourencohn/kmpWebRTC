@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import app.trovata.cast.AppContainerHolder
 import app.trovata.cast.navigation.AccountRoute
 import app.trovata.cast.navigation.IncomingCallRoute
+import app.trovata.cast.navigation.ProductDetailRoute
 import app.trovata.cast.navigation.SessionPrepRoute
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.SellerTab
@@ -51,7 +52,12 @@ object TabsHostRoute : Screen {
                         onInviteClient = { navigator.push(CatalogPickerScreen()) },
                         onOpenAccount = openAccount,
                     )
-                    SellerTab.Catalogo -> CatalogScreen(onOpenAccount = openAccount)
+                    SellerTab.Catalogo -> CatalogScreen(
+                        onOpenAccount = openAccount,
+                        onOpenProduct = { product ->
+                            navigator.push(ProductDetailRoute(productRef = product.ref))
+                        },
+                    )
                     SellerTab.Clientes -> ClientsScreen(onOpenAccount = openAccount)
                     SellerTab.Insights -> InsightsScreen(onOpenAccount = openAccount)
                 }

@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.AppContainerHolder
-import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.sample.SampleCatalog
 import app.trovata.cast.feature.call.CartLineUi
 import app.trovata.cast.feature.call.CartToast
@@ -62,6 +61,7 @@ import app.trovata.cast.ui.components.ProductCardSize
 import app.trovata.cast.ui.components.ProductRow
 import app.trovata.cast.ui.components.ProductRowSize
 import app.trovata.cast.ui.icons.TrovataIcons
+import app.trovata.cast.ui.screens.catalog.ProductDetailScreen
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -101,6 +101,7 @@ data class LiveCallScreen(
 
         LiveCallBody(
             state = state,
+            clientName = clientName,
             onHangup = {
                 screenModel.hangup()
                 navigator.pop()
@@ -108,6 +109,7 @@ data class LiveCallScreen(
             onToggleMute = { screenModel.toggleMute() },
             onScroll = { ref, offset -> screenModel.publishScroll(ref, offset) },
             onPointAt = { ref -> screenModel.publishPointAt(ref) },
+            onOpenDetail = { ref -> screenModel.openProductDetail(ref) },
             onOpenCart = { screenModel.openCartDrawer() },
             onDismissCart = { screenModel.dismissCartDrawer() },
             onDismissProductSheet = { screenModel.dismissProductSheet() },
@@ -119,10 +121,12 @@ data class LiveCallScreen(
 @Composable
 private fun LiveCallBody(
     state: LiveCallUiState,
+    clientName: String?,
     onHangup: () -> Unit,
     onToggleMute: () -> Unit,
     onScroll: (productId: String, offset: Float) -> Unit,
     onPointAt: (productId: String) -> Unit,
+    onOpenDetail: (productId: String) -> Unit,
     onOpenCart: () -> Unit,
     onDismissCart: () -> Unit,
     onDismissProductSheet: () -> Unit,
@@ -142,6 +146,7 @@ private fun LiveCallBody(
                     CatalogPanel(
                         onScroll = onScroll,
                         onPointAt = onPointAt,
+                        onOpenDetail = onOpenDetail,
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
@@ -170,11 +175,19 @@ private fun LiveCallBody(
         if (state.showProductSheet && state.focusedProductId != null) {
             val product = SampleCatalog.products.firstOrNull { it.ref == state.focusedProductId }
             if (product != null) {
-                ProductDetailSheet(
-                    product = product,
-                    state = state,
-                    onDismiss = onDismissProductSheet,
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(colors.bg),
+                ) {
+                    ProductDetailScreen(
+                        product = product,
+                        inCallContext = true,
+                        customerName = clientName,
+                        onBack = onDismissProductSheet,
+                        onPointAt = onPointAt,
+                    )
+                }
             }
         }
 
@@ -232,6 +245,7 @@ private fun CallTopBar(state: LiveCallUiState, modifier: Modifier = Modifier) {
 private fun CatalogPanel(
     onScroll: (productId: String, offset: Float) -> Unit,
     onPointAt: (productId: String) -> Unit,
+    onOpenDetail: (productId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = TrovataTokens.colors
@@ -302,12 +316,14 @@ private fun CatalogPanel(
                     product = product,
                     size = ProductCardSize.Md,
                     pointed = pointedRef == product.ref,
-                    onClick = if (pointing) {
-                        {
+                    onClick = {
+                        if (pointing) {
                             pointedRef = product.ref
                             onPointAt(product.ref)
+                        } else {
+                            onOpenDetail(product.ref)
                         }
-                    } else null,
+                    },
                 )
             }
         }
@@ -435,92 +451,6 @@ private fun CartToastView(toast: CartToast, modifier: Modifier = Modifier) {
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProductDetailSheet(
-    product: Product,
-    state: LiveCallUiState,
-    onDismiss: () -> Unit,
-) {
-    val colors = TrovataTokens.colors
-    val lines = state.cart.filter { it.productId == product.ref }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
-            .clickable(onClick = onDismiss),
-    ) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(colors.bg, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .clickable(enabled = false) { }
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .size(width = 36.dp, height = 4.dp)
-                    .background(colors.line, RoundedCornerShape(2.dp)),
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Pill(text = "Cliente está vendo", tone = PillTone.Brand, icon = TrovataIcons.eye)
-                Spacer(modifier = Modifier.weight(1f))
-                IconBtn(
-                    icon = TrovataIcons.chev,
-                    onClick = onDismiss,
-                    kind = IconBtnKind.Line,
-                    size = 36.dp,
-                    contentDescription = "Fechar",
-                )
-            }
-            ProductRow(product = product, size = ProductRowSize.Lg)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                product.sizes.forEach { size ->
-                    val units = lines.firstOrNull { it.size == size }?.units ?: 0
-                    SizeChip(label = size, units = units)
-                }
-            }
-            Text(
-                text = if (lines.isEmpty()) "Aguardando o cliente escolher" else "${lines.sumOf { it.units }}un adicionadas",
-                color = colors.ink3,
-                fontSize = 12.5.sp,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SizeChip(label: String, units: Int) {
-    val colors = TrovataTokens.colors
-    val active = units > 0
-    Column(
-        modifier = Modifier
-            .background(if (active) colors.jadeTint else colors.surface2, RoundedCornerShape(10.dp))
-            .border(1.dp, if (active) colors.jade else colors.line, RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = label,
-            color = if (active) colors.jade2 else colors.ink2,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        if (active) {
-            Text(
-                text = "${units}un",
-                color = colors.jade2,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
             )
         }
     }

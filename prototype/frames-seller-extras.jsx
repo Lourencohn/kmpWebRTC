@@ -684,4 +684,231 @@ function SellerAccount() {
   );
 }
 
-Object.assign(window, { Sparkline, HBar, StatusDot, SellerCatalog, SellerClients, SellerInsights, SellerAccount });
+function SellerCatalogProductDetail() {
+  const p = CATALOG[1];
+  const tint = BgTints[p.tint];
+  const sizes = [
+    { s: 'P',  stock: 24, on: false },
+    { s: 'M',  stock: 36, on: true  },
+    { s: 'G',  stock: 18, on: false },
+    { s: 'GG', stock:  6, on: false },
+  ];
+  const colors = [
+    { hex: '#4A5A52', name: 'Verde-musgo', on: true },
+    { hex: '#C7B79B', name: 'Linho cru',   on: false },
+    { hex: '#3A3A38', name: 'Grafite',     on: false },
+    { hex: '#A5806A', name: 'Caramelo',    on: false },
+  ];
+  return (
+    <div style={{ paddingTop: STATUS_PAD, minHeight: '100%', background: 'var(--bg)', position: 'relative' }}>
+      <div style={{
+        padding: '0 14px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <IconBtn icon="back" kind="line" size={36}/>
+        <div style={{ textAlign: 'center', flex: 1 }}>
+          <div style={{ fontSize: 10.5, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+            Detalhes do produto
+          </div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, fontFamily: 'var(--f-mono)', letterSpacing: '0.04em' }}>
+            {p.ref}
+          </div>
+        </div>
+        <IconBtn icon="share" kind="line" size={36}/>
+      </div>
+
+      <div style={{ padding: '0 14px 12px' }}>
+        <div style={{
+          height: 280, borderRadius: 18, position: 'relative', overflow: 'hidden',
+          background: tint.bg, color: tint.fg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="62%" height="62%" viewBox="0 0 100 100">{Garments[p.garment]}</svg>
+
+          {p.tag && (
+            <span style={{
+              position: 'absolute', top: 12, left: 12, padding: '4px 10px',
+              background: p.tag === 'Pré-venda' ? 'var(--warn)' : (p.tag === 'Top venda' ? 'var(--jade)' : 'var(--ink)'),
+              color: '#fff', fontSize: 11, fontWeight: 600, borderRadius: 7, letterSpacing: '-0.005em',
+            }}>{p.tag}</span>
+          )}
+
+          <div style={{
+            position: 'absolute', top: 12, right: 12, padding: '5px 10px',
+            background: 'rgba(14,17,22,.78)', color: '#fff', borderRadius: 8,
+            fontSize: 10.5, fontWeight: 600, letterSpacing: '0.04em',
+            display: 'flex', alignItems: 'center', gap: 5,
+            backdropFilter: 'blur(8px)',
+          }}>
+            <Icon d={Icons.layers} size={11} sw={2.2}/>1 / 4
+          </div>
+
+          <div style={{
+            position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: 5,
+          }}>
+            {[0,1,2,3].map(i => (
+              <span key={i} style={{
+                width: i === 0 ? 16 : 6, height: 6, borderRadius: 3,
+                background: i === 0 ? 'rgba(0,0,0,.65)' : 'rgba(0,0,0,.20)',
+              }}/>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{
+              flex: 1, height: 56, borderRadius: 8,
+              background: tint.bg, color: tint.fg,
+              border: `1.5px solid ${i === 0 ? 'var(--ink)' : 'var(--line)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: i === 0 ? 1 : 0.7,
+            }}>
+              <svg width="68%" height="68%" viewBox="0 0 100 100">{Garments[p.garment]}</svg>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: '0 16px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.2 }}>{p.name}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-3)' }}>
+              Linho 100% · feito em São Paulo
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 9.5, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Atacado</div>
+            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--f-mono)', letterSpacing: '-0.02em' }}>{p.price}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>min {p.moq}un</div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <SectionLabel action={<span style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{colors.length} disponíveis</span>}>
+            Cor · <b style={{ color: 'var(--ink-2)' }}>{colors.find(c => c.on).name}</b>
+          </SectionLabel>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {colors.map((c, i) => (
+              <div key={i} style={{
+                width: 38, height: 38, borderRadius: '50%', background: c.hex, flexShrink: 0,
+                border: c.on ? '2.5px solid var(--ink)' : '2px solid var(--surface)',
+                outline: c.on ? '1.5px solid var(--surface)' : '1px solid var(--line)',
+              }}/>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel action={<Pill tone="jade" icon="check">Em estoque</Pill>}>
+            Grade · estoque por tamanho
+          </SectionLabel>
+          <Card pad={0}>
+            {sizes.map((s, i, arr) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px',
+                borderBottom: i < arr.length - 1 ? '1px solid var(--line)' : 'none',
+                background: s.on ? 'var(--brand-tint)' : 'transparent',
+              }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 10,
+                  background: s.on ? 'var(--brand)' : 'var(--surface-2)',
+                  color: s.on ? '#fff' : 'var(--ink-2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, fontFamily: 'var(--f-mono)', fontSize: 13, flexShrink: 0,
+                }}>{s.s}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>Tamanho {s.s}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>
+                    {s.stock >= 12 ? 'Disponibilidade alta' : s.stock >= 6 ? 'Estoque limitado' : 'Pouquíssimas peças'}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'var(--f-mono)', letterSpacing: '-0.01em' }}>{s.stock}</div>
+                  <div style={{ fontSize: 9.5, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>un</div>
+                </div>
+              </div>
+            ))}
+          </Card>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel>Composição & cuidados</SectionLabel>
+          <Card pad={14}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {[
+                ['Tecido', 'Linho 100%'],
+                ['Gramatura', '160 g/m²'],
+                ['Origem', 'São Paulo · BR'],
+                ['Lavagem', '30°C · sem alvejante'],
+              ].map((r, i) => (
+                <div key={i}>
+                  <div style={{ fontSize: 10, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{r[0]}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, marginTop: 2 }}>{r[1]}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel action={<Pill tone="brand" icon="trend">Subindo</Pill>}>
+            Performance · últimas 4 semanas
+          </SectionLabel>
+          <Card pad={14}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1,
+                          background: 'var(--line)', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
+              {[
+                ['Sessões', '23'],
+                ['Conversão', '74%'],
+                ['Ped. médio', '14un'],
+              ].map((m, i) => (
+                <div key={i} style={{ background: 'var(--surface)', padding: '10px 8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9.5, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>{m[0]}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, fontFamily: 'var(--f-mono)', letterSpacing: '-0.02em', marginTop: 2 }}>{m[1]}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', marginRight: 4 }}>
+                {[320, 28, 280].map((h, i) => (
+                  <Avatar key={i} name={['L V', 'D A', 'R S'][i]} hue={h} size={22}
+                    style={{ marginLeft: i ? -6 : 0, border: '2px solid var(--surface)' }}/>
+                ))}
+              </div>
+              <div style={{ flex: 1, fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.4 }}>
+                Luciana, Diego e Renata pediram esta peça nas últimas semanas.
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div style={{ marginTop: 16, marginBottom: 120 }}>
+          <SectionLabel>Combina bem com</SectionLabel>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '0 -16px', padding: '0 16px 4px' }}>
+            {[CATALOG[4], CATALOG[8], CATALOG[7]].map(rel => (
+              <div key={rel.ref} style={{ minWidth: 132, flexShrink: 0 }}>
+                <ProductCard p={rel} size="sm"/>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0,
+        padding: '12px 14px calc(22px + 8px)',
+        background: 'rgba(255,255,255,.94)', backdropFilter: 'blur(20px)',
+        borderTop: '1px solid var(--line)',
+        display: 'flex', gap: 8, alignItems: 'center',
+      }}>
+        <IconBtn icon="heart" kind="line" size={44}/>
+        <Btn kind="surface" size="md" icon="plus" style={{ flex: 1 }}>Sessão</Btn>
+        <Btn kind="primary" size="md" icon="video" style={{ flex: 1.4 }}>Mostrar agora</Btn>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { Sparkline, HBar, StatusDot, SellerCatalog, SellerCatalogProductDetail, SellerClients, SellerInsights, SellerAccount });

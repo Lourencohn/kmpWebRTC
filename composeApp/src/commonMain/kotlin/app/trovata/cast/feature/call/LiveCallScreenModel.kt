@@ -187,6 +187,11 @@ class LiveCallScreenModel(
         peer.publishPointAt(productId)
     }
 
+    fun openProductDetail(productId: String) {
+        _state.update { it.copy(focusedProductId = productId, showProductSheet = true) }
+        peer.publishNavigate(productId)
+    }
+
     fun openCartDrawer() {
         _state.update { it.copy(showCartDrawer = true) }
     }

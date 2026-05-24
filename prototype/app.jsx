@@ -179,6 +179,17 @@ function App() {
         </DCSection>
 
         {/* ───────────────────────────────────────────────── */}
+        <DCSection id="product-detail" title="10 · Detalhes do produto · navegação livre"
+                   subtitle="Quando se toca em um card — no Catálogo do vendedor ou no navegador do cliente — abre a ficha completa, com botão de voltar.">
+          <DCArtboard id="seller-product-detail" label="Vendedor · Ficha do produto" width={PHONE_W} height={PHONE_H}>
+            <Seller><SellerCatalogProductDetail/></Seller>
+          </DCArtboard>
+          <DCArtboard id="buyer-product-browse" label="Cliente · Ficha do produto" width={PHONE_W} height={PHONE_H}>
+            <Buyer><BuyerProductBrowse/></Buyer>
+          </DCArtboard>
+        </DCSection>
+
+        {/* ───────────────────────────────────────────────── */}
         <DCSection id="auth" title="9 · Entrar no app"
                    subtitle="Fluxo de login pelo WhatsApp — sem senha, sem fricção. O primeiro acesso configura a marca representada.">
           <DCArtboard id="auth-welcome" label="Boas-vindas" width={PHONE_W} height={PHONE_H}>
