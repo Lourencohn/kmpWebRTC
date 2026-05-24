@@ -156,8 +156,42 @@ function App() {
         {/* ───────────────────────────────────────────────── */}
         <DCSection id="pipeline" title="7 · Inteligência sobre a relação"
                    subtitle="Cada sessão alimenta o pipeline. O TrovataCast vira a memória comercial da carteira.">
-          <DCArtboard id="seller-pipeline" label="Vendedor · Pipeline + insights" width={PHONE_W} height={PHONE_H}>
+          <DCArtboard id="seller-pipeline" label="Vendedor · Pipeline (legado)" width={PHONE_W} height={PHONE_H}>
             <Seller><SellerPipeline/></Seller>
+          </DCArtboard>
+          <DCArtboard id="seller-insights" label="Vendedor · Insights (novo)" width={PHONE_W} height={PHONE_H}>
+            <Seller><SellerInsights/></Seller>
+          </DCArtboard>
+        </DCSection>
+
+        {/* ───────────────────────────────────────────────── */}
+        <DCSection id="tabs" title="8 · As outras abas do app"
+                   subtitle="Catálogo, Clientes e Conta — o vendedor entre as chamadas.">
+          <DCArtboard id="seller-catalog" label="Vendedor · Catálogo" width={PHONE_W} height={PHONE_H}>
+            <Seller><SellerCatalog/></Seller>
+          </DCArtboard>
+          <DCArtboard id="seller-clients" label="Vendedor · Clientes" width={PHONE_W} height={PHONE_H}>
+            <Seller><SellerClients/></Seller>
+          </DCArtboard>
+          <DCArtboard id="seller-account" label="Vendedor · Minha conta" width={PHONE_W} height={PHONE_H}>
+            <Seller><SellerAccount/></Seller>
+          </DCArtboard>
+        </DCSection>
+
+        {/* ───────────────────────────────────────────────── */}
+        <DCSection id="auth" title="9 · Entrar no app"
+                   subtitle="Fluxo de login pelo WhatsApp — sem senha, sem fricção. O primeiro acesso configura a marca representada.">
+          <DCArtboard id="auth-welcome" label="Boas-vindas" width={PHONE_W} height={PHONE_H}>
+            <Seller><AuthWelcome/></Seller>
+          </DCArtboard>
+          <DCArtboard id="auth-login" label="Número de WhatsApp" width={PHONE_W} height={PHONE_H}>
+            <Seller><AuthLogin/></Seller>
+          </DCArtboard>
+          <DCArtboard id="auth-verify" label="Código de 6 dígitos" width={PHONE_W} height={PHONE_H}>
+            <Seller><AuthVerify/></Seller>
+          </DCArtboard>
+          <DCArtboard id="auth-setup" label="Primeiro acesso · marca" width={PHONE_W} height={PHONE_H}>
+            <Seller><AuthSetup/></Seller>
           </DCArtboard>
         </DCSection>
 

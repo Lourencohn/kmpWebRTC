@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TrovataCast — Preview</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+  <style>
+    body { background: #F0EEE9; padding: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(4, 380px); gap: 24px; }
+    .card { width: 380px; height: 780px; border-radius: 32px; overflow: hidden; box-shadow: 0 24px 48px rgba(14,17,22,.12), 0 0 0 1px rgba(14,17,22,.08); position: relative; }
+    .label { font-family: var(--f-sans); color: var(--ink-3); font-size: 12px; font-weight: 600; padding: 6px 0; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.08em; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="ios-frame.jsx"></script>
+  <script type="text/babel" src="android-frame.jsx"></script>
+  <script type="text/babel" src="ui.jsx"></script>
+  <script type="text/babel" src="catalog.jsx"></script>
+  <script type="text/babel" src="frames-seller.jsx"></script>
+  <script type="text/babel" src="frames-seller-extras.jsx"></script>
+  <script type="text/babel" src="frames-auth.jsx"></script>
+
+  <script type="text/babel">
+    function PreviewCard({ label, children }) {
+      return (
+        <div>
+          <div className="card tc">
+            <IOSDevice width={380} height={780}>{children}</IOSDevice>
+          </div>
+          <div className="label">{label}</div>
+        </div>
+      );
+    }
+
+    function Preview() {
+      return (
+        <div className="grid">
+          <PreviewCard label="Catálogo"><SellerCatalog/></PreviewCard>
+          <PreviewCard label="Clientes"><SellerClients/></PreviewCard>
+          <PreviewCard label="Insights"><SellerInsights/></PreviewCard>
+          <PreviewCard label="Minha conta"><SellerAccount/></PreviewCard>
+          <PreviewCard label="Boas-vindas"><AuthWelcome/></PreviewCard>
+          <PreviewCard label="Login WhatsApp"><AuthLogin/></PreviewCard>
+          <PreviewCard label="Verificação"><AuthVerify/></PreviewCard>
+          <PreviewCard label="Marca"><AuthSetup/></PreviewCard>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Preview/>);
+  </script>
+</body>
+</html>
