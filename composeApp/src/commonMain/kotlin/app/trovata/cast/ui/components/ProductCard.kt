@@ -1,5 +1,6 @@
 package app.trovata.cast.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -33,6 +35,7 @@ import app.trovata.cast.data.sample.ProductSwatchPalette
 import app.trovata.cast.data.sample.ProductTag
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.color.oklch
+import org.jetbrains.compose.resources.painterResource
 
 enum class ProductCardSize { Sm, Md, Lg }
 
@@ -70,12 +73,21 @@ fun ProductCard(
                 .height(dims.imageHeight)
                 .background(tint.background),
         ) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Garment(
-                    kind = product.garment,
-                    tint = tint.foreground,
-                    size = dims.imageHeight * 0.74f,
+            if (product.image != null) {
+                Image(
+                    painter = painterResource(product.image),
+                    contentDescription = product.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
                 )
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Garment(
+                        kind = product.garment,
+                        tint = tint.foreground,
+                        size = dims.imageHeight * 0.74f,
+                    )
+                }
             }
             if (product.tag != null) {
                 TagChip(

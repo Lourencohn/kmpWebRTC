@@ -10,12 +10,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import app.trovata.cast.AppContainerHolder
+import app.trovata.cast.navigation.AccountRoute
 import app.trovata.cast.navigation.IncomingCallRoute
 import app.trovata.cast.navigation.SessionPrepRoute
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.SellerTab
 import app.trovata.cast.ui.components.TabBar
-import app.trovata.cast.ui.icons.TrovataIcons
+import app.trovata.cast.ui.screens.catalog.CatalogScreen
+import app.trovata.cast.ui.screens.clients.ClientsScreen
+import app.trovata.cast.ui.screens.insights.InsightsScreen
 import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
 import app.trovata.cast.ui.screens.sessions.SellerHomeScreen
 import cafe.adriel.voyager.core.screen.Screen
@@ -30,6 +33,7 @@ object TabsHostRoute : Screen {
         val viewModel = container.sessionsViewModel
         val homeState by viewModel.home.collectAsState()
         val colors = TrovataTokens.colors
+        val openAccount: () -> Unit = { navigator.push(AccountRoute) }
 
         Column(modifier = Modifier.fillMaxSize().background(colors.bg)) {
             Box(
@@ -45,40 +49,11 @@ object TabsHostRoute : Screen {
                             navigator.push(SessionPrepRoute(clientName = upcoming.client.name))
                         },
                         onInviteClient = { navigator.push(CatalogPickerScreen()) },
+                        onOpenAccount = openAccount,
                     )
-                    SellerTab.Catalogo -> EmptyTabScreen(
-                        eyebrow = "Catálogo",
-                        title = "Sua coleção, num só lugar",
-                        subtitle = "Organize a Outono 26 e prepare o que vai mostrar.",
-                        icon = TrovataIcons.grid,
-                        bullets = listOf(
-                            "Curadoria de drops e cápsulas por estação.",
-                            "Filtros por tag (Novo, Top venda, Pré-venda).",
-                            "Pré-visualização da grade do cliente antes da chamada.",
-                        ),
-                    )
-                    SellerTab.Clientes -> EmptyTabScreen(
-                        eyebrow = "Clientes",
-                        title = "Quem compra com você",
-                        subtitle = "Histórico, sugestões e contatos prontos para convidar.",
-                        icon = TrovataIcons.users,
-                        bullets = listOf(
-                            "Lista de lojas com últimas compras e itens preferidos.",
-                            "Sugestões de reposição a partir do histórico.",
-                            "Convite direto: 1 toque e a sessão começa.",
-                        ),
-                    )
-                    SellerTab.Insights -> EmptyTabScreen(
-                        eyebrow = "Insights",
-                        title = "O que está vendendo",
-                        subtitle = "Métricas das sessões, top SKUs e conversão.",
-                        icon = TrovataIcons.trend,
-                        bullets = listOf(
-                            "Top produtos vistos × pedidos por coleção.",
-                            "Taxa de fechamento por cliente.",
-                            "Tempo médio de sessão e itens por pedido.",
-                        ),
-                    )
+                    SellerTab.Catalogo -> CatalogScreen(onOpenAccount = openAccount)
+                    SellerTab.Clientes -> ClientsScreen(onOpenAccount = openAccount)
+                    SellerTab.Insights -> InsightsScreen(onOpenAccount = openAccount)
                 }
             }
             TabBar(active = homeState.activeTab, onSelect = viewModel::selectTab)

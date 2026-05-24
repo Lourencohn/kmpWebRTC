@@ -45,8 +45,8 @@ import app.trovata.cast.ui.components.BtnKind
 import app.trovata.cast.ui.components.BtnSize
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
-import app.trovata.cast.ui.components.ScreenHeader
 import app.trovata.cast.ui.components.SectionLabel
+import app.trovata.cast.ui.components.TabHeader
 import app.trovata.cast.ui.components.TrovataCard
 import app.trovata.cast.ui.icons.TrovataIcons
 
@@ -57,6 +57,7 @@ fun SellerHomeScreen(
     onOpenIncoming: (LiveWaitingSession) -> Unit = {},
     onOpenPrep: (UpcomingSession) -> Unit = {},
     onInviteClient: () -> Unit = {},
+    onOpenAccount: () -> Unit = {},
 ) {
     val state by viewModel.home.collectAsState()
     val colors = TrovataTokens.colors
@@ -67,7 +68,15 @@ fun SellerHomeScreen(
             contentPadding = PaddingValues(top = 56.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            item { HomeHeader(state.data.collectionEyebrow, state.data.greetingTitle, state.data.greetingSubtitle) }
+            item {
+                TabHeader(
+                    eyebrow = state.data.collectionEyebrow,
+                    title = state.data.greetingTitle,
+                    subtitle = state.data.greetingSubtitle,
+                    onOpenAccount = onOpenAccount,
+                    secondaryIcon = TrovataIcons.bell,
+                )
+            }
 
             item { PrimaryAction(onClick = onInviteClient) }
 
@@ -90,24 +99,6 @@ fun SellerHomeScreen(
             }
         }
     }
-}
-
-@Composable
-private fun HomeHeader(eyebrow: String, title: String, subtitle: String) {
-    val colors = TrovataTokens.colors
-    ScreenHeader(
-        title = title,
-        subtitle = subtitle,
-        eyebrow = {
-            Text(
-                text = eyebrow.uppercase(),
-                color = colors.ink4,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.08.em,
-            )
-        },
-    )
 }
 
 @Composable

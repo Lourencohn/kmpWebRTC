@@ -100,7 +100,7 @@ function AuthWelcome() {
           fontSize: 10.5, color: 'var(--ink-4)', fontWeight: 500,
         }}>
           <span>Vendedor</span>
-          <span style={{ color: 'var(--ink-5)' }}>iPhone</span>
+          <span style={{ color: 'var(--ink-5)' }}>App</span>
           <span style={{ color: 'var(--ink-5)' }}>↔</span>
           <span style={{ color: 'var(--ink-5)' }}>Navegador</span>
           <span>Cliente</span>

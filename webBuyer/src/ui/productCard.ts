@@ -15,13 +15,15 @@ export function renderProductCard(product: Product, opts: ProductCardOptions = {
   card.style.setProperty('--card-tint-bg', tint.background)
   card.style.setProperty('--card-tint-fg', tint.foreground)
 
+  const visual = product.image
+    ? `<img class="product-card-photo" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" loading="lazy"/>`
+    : `<svg class="product-card-silhouette" viewBox="0 0 100 120" aria-hidden="true">${garmentSilhouette(product.garment)}</svg>`
+
   card.innerHTML = `
     <div class="product-card-frame">
       <span class="product-card-ref">${escapeHtml(product.ref)}</span>
       ${product.tag ? `<span class="product-card-tag" data-tag="${product.tag}">${escapeHtml(tagLabel(product.tag))}</span>` : ''}
-      <svg class="product-card-silhouette" viewBox="0 0 100 120" aria-hidden="true">
-        ${garmentSilhouette(product.garment)}
-      </svg>
+      ${visual}
       <div class="product-card-halo" aria-hidden="true">
         <span class="product-card-halo-label">Apontando</span>
       </div>

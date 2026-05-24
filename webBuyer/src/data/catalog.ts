@@ -26,6 +26,7 @@ export type Product = {
   sizes: string[]
   colorCount: number
   tag?: ProductTag
+  image?: string
 }
 
 export const FashionTints: GarmentTint[] = [
@@ -45,17 +46,16 @@ export function tintFor(index: number): GarmentTint {
 }
 
 export const SampleCatalog = {
-  collection: 'Coleção Outono · Atelier Norte',
+  collection: 'Verão 26 · Atelier Norte',
   products: [
-    { ref: 'AN-104', name: 'Blusa Tricot Canelado', garment: 'sweater', tintIndex: 0, price: 'R$ 89,90', moq: 6, sizes: ['PP','P','M','G','GG'], colorCount: 3, tag: 'novo' },
-    { ref: 'AN-217', name: 'Camisa Linho Manga Longa', garment: 'shirt', tintIndex: 1, price: 'R$ 119,00', moq: 6, sizes: ['P','M','G','GG'], colorCount: 4 },
-    { ref: 'AN-088', name: 'Vestido Midi Algodão', garment: 'dress', tintIndex: 4, price: 'R$ 159,00', moq: 4, sizes: ['P','M','G'], colorCount: 2, tag: 'topVenda' },
-    { ref: 'AN-301', name: 'Polo Bordado Frente', garment: 'polo', tintIndex: 3, price: 'R$ 99,00', moq: 6, sizes: ['P','M','G','GG'], colorCount: 5 },
-    { ref: 'AN-156', name: 'Calça Wide Alfaiataria', garment: 'pants', tintIndex: 5, price: 'R$ 169,00', moq: 4, sizes: ['36','38','40','42','44'], colorCount: 3 },
-    { ref: 'AN-422', name: 'Jaqueta Sarja Oversized', garment: 'jacket', tintIndex: 2, price: 'R$ 229,00', moq: 3, sizes: ['P','M','G'], colorCount: 2, tag: 'preVenda' },
-    { ref: 'AN-512', name: 'Camiseta Algodão Pima', garment: 'tee', tintIndex: 6, price: 'R$ 59,90', moq: 8, sizes: ['PP','P','M','G','GG'], colorCount: 6 },
-    { ref: 'AN-077', name: 'Tênis Couro Curado', garment: 'shoe', tintIndex: 0, price: 'R$ 279,00', moq: 3, sizes: ['36','37','38','39','40','41','42','43'], colorCount: 2 },
-    { ref: 'AN-621', name: 'Saia Plissada Midi', garment: 'skirt', tintIndex: 7, price: 'R$ 139,00', moq: 4, sizes: ['P','M','G'], colorCount: 3 },
+    { ref: 'CH-3485059', name: 'Bolsa Contemporâneo Couro', garment: 'shirt', tintIndex: 2, price: 'R$ 189,90', moq: 4, sizes: ['Único'], colorCount: 2, tag: 'novo', image: '/products/product_ch_3485059.webp' },
+    { ref: 'CH-3485087', name: 'Bolsa Elegance Monograma', garment: 'shirt', tintIndex: 2, price: 'R$ 249,00', moq: 4, sizes: ['Único'], colorCount: 1, tag: 'topVenda', image: '/products/product_ch_3485087.webp' },
+    { ref: 'CH-3484980', name: 'Bolsa Matelassê Cute', garment: 'shirt', tintIndex: 5, price: 'R$ 199,00', moq: 6, sizes: ['Único'], colorCount: 1, image: '/products/product_ch_3484980.webp' },
+    { ref: 'CH-3485025', name: 'Bolsa New Cristal Nude', garment: 'shirt', tintIndex: 0, price: 'R$ 219,00', moq: 4, sizes: ['Único'], colorCount: 2, tag: 'novo', image: '/products/product_ch_3485025.webp' },
+    { ref: 'CH-3485278', name: 'Bolsa Couro Texturizado', garment: 'shirt', tintIndex: 2, price: 'R$ 169,00', moq: 6, sizes: ['Único'], colorCount: 1, image: '/products/product_ch_3485278.webp' },
+    { ref: 'CH-3485310', name: 'Bolsa Carbono Trama', garment: 'shirt', tintIndex: 5, price: 'R$ 229,00', moq: 4, sizes: ['Único'], colorCount: 1, tag: 'preVenda', image: '/products/product_ch_3485310.webp' },
+    { ref: 'LEE-2842', name: 'Bolsa Cute Bear Bege', garment: 'shirt', tintIndex: 6, price: 'R$ 179,00', moq: 4, sizes: ['Único'], colorCount: 1, image: '/products/product_lee_2842.webp' },
+    { ref: 'DM-2025', name: 'Bolsa Dumond Shopping', garment: 'shirt', tintIndex: 3, price: 'R$ 269,00', moq: 3, sizes: ['Único'], colorCount: 1, tag: 'topVenda', image: '/products/product_dm_2025.webp' },
   ] satisfies Product[],
 } as const
 

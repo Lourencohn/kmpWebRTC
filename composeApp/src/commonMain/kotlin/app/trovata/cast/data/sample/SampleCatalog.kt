@@ -1,7 +1,17 @@
 package app.trovata.cast.data.sample
 
 import androidx.compose.ui.graphics.Color
+import app.trovata.cast.resources.Res
+import app.trovata.cast.resources.product_ch_3484980
+import app.trovata.cast.resources.product_ch_3485025
+import app.trovata.cast.resources.product_ch_3485059
+import app.trovata.cast.resources.product_ch_3485087
+import app.trovata.cast.resources.product_ch_3485278
+import app.trovata.cast.resources.product_ch_3485310
+import app.trovata.cast.resources.product_dm_2025
+import app.trovata.cast.resources.product_lee_2842
 import app.trovata.cast.ui.components.GarmentKind
+import org.jetbrains.compose.resources.DrawableResource
 
 data class GarmentTint(val background: Color, val foreground: Color)
 
@@ -32,21 +42,109 @@ data class Product(
     val sizes: List<String>,
     val colorCount: Int,
     val tag: ProductTag? = null,
+    val image: DrawableResource? = null,
 )
 
 object SampleCatalog {
-    val collection: String = "Coleção Outono · Atelier Norte"
+    val collection: String = "Verão 26 · Atelier Norte"
 
     val products: List<Product> = listOf(
-        Product("AN-104", "Blusa Tricot Canelado", GarmentKind.Sweater, 0, "R$ 89,90", 6, listOf("PP", "P", "M", "G", "GG"), 3, ProductTag.Novo),
-        Product("AN-217", "Camisa Linho Manga Longa", GarmentKind.Shirt, 1, "R$ 119,00", 6, listOf("P", "M", "G", "GG"), 4, null),
-        Product("AN-088", "Vestido Midi Algodão", GarmentKind.Dress, 4, "R$ 159,00", 4, listOf("P", "M", "G"), 2, ProductTag.TopVenda),
-        Product("AN-301", "Polo Bordado Frente", GarmentKind.Polo, 3, "R$ 99,00", 6, listOf("P", "M", "G", "GG"), 5, null),
-        Product("AN-156", "Calça Wide Alfaiataria", GarmentKind.Pants, 5, "R$ 169,00", 4, listOf("36", "38", "40", "42", "44"), 3, null),
-        Product("AN-422", "Jaqueta Sarja Oversized", GarmentKind.Jacket, 2, "R$ 229,00", 3, listOf("P", "M", "G"), 2, ProductTag.PreVenda),
-        Product("AN-512", "Camiseta Algodão Pima", GarmentKind.Tee, 6, "R$ 59,90", 8, listOf("PP", "P", "M", "G", "GG"), 6, null),
-        Product("AN-077", "Tênis Couro Curado", GarmentKind.Shoe, 0, "R$ 279,00", 3, listOf("36", "37", "38", "39", "40", "41", "42", "43"), 2, null),
-        Product("AN-621", "Saia Plissada Midi", GarmentKind.Skirt, 7, "R$ 139,00", 4, listOf("P", "M", "G"), 3, null),
+        Product(
+            ref = "CH-3485059",
+            name = "Bolsa Contemporâneo Couro",
+            garment = GarmentKind.Shirt,
+            tintIndex = 2,
+            price = "R$ 189,90",
+            moq = 4,
+            sizes = listOf("Único"),
+            colorCount = 2,
+            tag = ProductTag.Novo,
+            image = Res.drawable.product_ch_3485059,
+        ),
+        Product(
+            ref = "CH-3485087",
+            name = "Bolsa Elegance Monograma",
+            garment = GarmentKind.Shirt,
+            tintIndex = 2,
+            price = "R$ 249,00",
+            moq = 4,
+            sizes = listOf("Único"),
+            colorCount = 1,
+            tag = ProductTag.TopVenda,
+            image = Res.drawable.product_ch_3485087,
+        ),
+        Product(
+            ref = "CH-3484980",
+            name = "Bolsa Matelassê Cute",
+            garment = GarmentKind.Shirt,
+            tintIndex = 5,
+            price = "R$ 199,00",
+            moq = 6,
+            sizes = listOf("Único"),
+            colorCount = 1,
+            tag = null,
+            image = Res.drawable.product_ch_3484980,
+        ),
+        Product(
+            ref = "CH-3485025",
+            name = "Bolsa New Cristal Nude",
+            garment = GarmentKind.Shirt,
+            tintIndex = 0,
+            price = "R$ 219,00",
+            moq = 4,
+            sizes = listOf("Único"),
+            colorCount = 2,
+            tag = ProductTag.Novo,
+            image = Res.drawable.product_ch_3485025,
+        ),
+        Product(
+            ref = "CH-3485278",
+            name = "Bolsa Couro Texturizado",
+            garment = GarmentKind.Shirt,
+            tintIndex = 2,
+            price = "R$ 169,00",
+            moq = 6,
+            sizes = listOf("Único"),
+            colorCount = 1,
+            tag = null,
+            image = Res.drawable.product_ch_3485278,
+        ),
+        Product(
+            ref = "CH-3485310",
+            name = "Bolsa Carbono Trama",
+            garment = GarmentKind.Shirt,
+            tintIndex = 5,
+            price = "R$ 229,00",
+            moq = 4,
+            sizes = listOf("Único"),
+            colorCount = 1,
+            tag = ProductTag.PreVenda,
+            image = Res.drawable.product_ch_3485310,
+        ),
+        Product(
+            ref = "LEE-2842",
+            name = "Bolsa Cute Bear Bege",
+            garment = GarmentKind.Shirt,
+            tintIndex = 6,
+            price = "R$ 179,00",
+            moq = 4,
+            sizes = listOf("Único"),
+            colorCount = 1,
+            tag = null,
+            image = Res.drawable.product_lee_2842,
+        ),
+        Product(
+            ref = "DM-2025",
+            name = "Bolsa Dumond Shopping",
+            garment = GarmentKind.Shirt,
+            tintIndex = 3,
+            price = "R$ 269,00",
+            moq = 3,
+            sizes = listOf("Único"),
+            colorCount = 1,
+            tag = ProductTag.TopVenda,
+            image = Res.drawable.product_dm_2025,
+        ),
     )
 }
 
