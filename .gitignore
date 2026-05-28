@@ -96,3 +96,5 @@ private/
 .claude/sessions/
 .claude/cache/
 
+API.json
+
