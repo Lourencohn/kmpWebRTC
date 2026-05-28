@@ -33,6 +33,7 @@ import app.trovata.cast.data.sample.AccountRow
 import app.trovata.cast.data.sample.AccountStat
 import app.trovata.cast.data.sample.SampleAccount
 import app.trovata.cast.data.sample.SupportRow
+import app.trovata.cast.feature.account.AccountUiState
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Avatar
 import app.trovata.cast.ui.components.Btn
@@ -46,6 +47,7 @@ import app.trovata.cast.ui.icons.TrovataIcons
 
 @Composable
 fun AccountScreen(
+    state: AccountUiState,
     modifier: Modifier = Modifier,
     onBack: () -> Unit = {},
     onSignOut: () -> Unit = {},
@@ -60,15 +62,15 @@ fun AccountScreen(
         ) {
             item { TopBar(onBack = onBack) }
 
-            item { ProfileHeader() }
+            item { ProfileHeader(state) }
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     SectionLabel(
-                        text = "Marca representada",
+                        text = "Empresa representada",
                         action = { Pill(text = "Sincronizada", tone = PillTone.Jade, icon = TrovataIcons.check) },
                     )
-                    BrandIdentityCard()
+                    BrandIdentityCard(state)
                 }
             }
 
@@ -80,21 +82,21 @@ fun AccountScreen(
                             Text(text = "maio · em curso", color = colors.ink4, fontSize = 11.sp)
                         },
                     )
-                    PerformanceStrip(SampleAccount.performance)
+                    PerformanceStrip(state.performance)
                 }
             }
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     SectionLabel(text = "Conta")
-                    AccountRowsCard(SampleAccount.account)
+                    AccountRowsCard(state.accountRows)
                 }
             }
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     SectionLabel(text = "Suporte e privacidade")
-                    SupportRowsCard(SampleAccount.support)
+                    SupportRowsCard(state.support)
                 }
             }
 
@@ -137,7 +139,7 @@ private fun TopBar(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ProfileHeader() {
+private fun ProfileHeader(state: AccountUiState) {
     val colors = TrovataTokens.colors
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -145,7 +147,7 @@ private fun ProfileHeader() {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Avatar(name = SampleAccount.displayName, hue = SampleAccount.avatarHue, size = 86.dp)
+            Avatar(name = state.displayName, hue = SampleAccount.avatarHue, size = 86.dp)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -164,7 +166,7 @@ private fun ProfileHeader() {
             }
         }
         Text(
-            text = SampleAccount.displayName,
+            text = state.displayName,
             color = colors.ink,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
@@ -172,7 +174,7 @@ private fun ProfileHeader() {
             modifier = Modifier.padding(top = 4.dp),
         )
         Text(
-            text = SampleAccount.role,
+            text = state.role,
             color = colors.ink3,
             fontSize = 13.sp,
         )
@@ -185,12 +187,12 @@ private fun ProfileHeader() {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CountInline(value = SampleAccount.activeClients.toString(), label = " clientes")
+            CountInline(value = state.activeClients.toString(), label = " clientes")
             Text(text = "·", color = colors.ink5, fontSize = 11.sp)
-            CountInline(value = SampleAccount.monthsOnNetwork.toString(), label = " meses na rede")
+            CountInline(value = state.monthsOnNetwork.toString(), label = " meses na rede")
             Text(text = "·", color = colors.ink5, fontSize = 11.sp)
             Text(
-                text = "★ ${SampleAccount.tierLabel}",
+                text = "★ ${state.tierLabel}",
                 color = colors.jade2,
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -217,7 +219,7 @@ private fun CountInline(value: String, label: String) {
 }
 
 @Composable
-private fun BrandIdentityCard() {
+private fun BrandIdentityCard(state: AccountUiState) {
     val colors = TrovataTokens.colors
     val brand = SampleAccount.brand
     val shape = RoundedCornerShape(16.dp)
@@ -246,14 +248,14 @@ private fun BrandIdentityCard() {
             ) {
                 Column {
                     Text(
-                        text = "ATELIER",
+                        text = "EMPRESA",
                         color = Color.White.copy(alpha = 0.55f),
                         fontSize = 9.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.16.em,
                     )
                     Text(
-                        text = "Norte",
+                        text = state.brandName,
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
@@ -273,7 +275,7 @@ private fun BrandIdentityCard() {
                 }
             }
             Text(
-                text = "${brand.tagline}\n${brand.collection}",
+                text = state.brandSubtitle,
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = 11.5.sp,
                 lineHeight = 16.sp,

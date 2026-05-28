@@ -85,6 +85,9 @@ kotlin {
 
             implementation(libs.qrose)
 
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor)
+
             implementation(libs.webrtc.kmp)
         }
         androidMain.dependencies {

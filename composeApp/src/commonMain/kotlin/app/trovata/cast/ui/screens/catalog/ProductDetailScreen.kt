@@ -58,6 +58,7 @@ import app.trovata.cast.ui.components.ProductCard
 import app.trovata.cast.ui.components.ProductCardSize
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.icons.TrovataIcons
+import coil3.compose.AsyncImage
 import org.jetbrains.compose.resources.painterResource
 
 data class ProductDetailSizeStock(
@@ -74,6 +75,7 @@ data class ProductDetailColor(
 fun ProductDetailScreen(
     product: Product,
     modifier: Modifier = Modifier,
+    imageUrls: List<String> = emptyList(),
     inCallContext: Boolean = false,
     customerName: String? = null,
     onBack: () -> Unit,
@@ -82,6 +84,7 @@ fun ProductDetailScreen(
     onStartSession: ((Product) -> Unit)? = null,
 ) {
     val colors = TrovataTokens.colors
+    val images = remember(product.ref, imageUrls) { imageUrls.ifEmpty { listOfNotNull(product.imageUrl) } }
     val sizes = remember(product.ref) { sampleSizesFor(product) }
     val swatches = remember(product.ref) { sampleSwatchesFor(product) }
     val related = remember(product.ref) {
@@ -104,6 +107,7 @@ fun ProductDetailScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 ProductHero(
                     product = product,
+                    images = images,
                     activeIndex = galleryIndex,
                     onIndexChange = { galleryIndex = it },
                 )
@@ -202,12 +206,15 @@ private fun DetailTopBar(product: Product, onBack: () -> Unit) {
 @Composable
 private fun ProductHero(
     product: Product,
+    images: List<String>,
     activeIndex: Int,
     onIndexChange: (Int) -> Unit,
 ) {
     val colors = TrovataTokens.colors
     val tint = FashionPalette[product.tintIndex]
     val shape = RoundedCornerShape(18.dp)
+    val count = if (images.isNotEmpty()) images.size else 4
+    val safeIndex = activeIndex.coerceIn(0, (count - 1).coerceAtLeast(0))
     Column(modifier = Modifier.padding(horizontal = 14.dp)) {
         Box(
             modifier = Modifier
@@ -217,15 +224,20 @@ private fun ProductHero(
                 .background(tint.background),
             contentAlignment = Alignment.Center,
         ) {
-            if (product.image != null) {
-                Image(
+            when {
+                images.isNotEmpty() -> AsyncImage(
+                    model = images[safeIndex],
+                    contentDescription = product.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                product.image != null -> Image(
                     painter = painterResource(product.image),
                     contentDescription = product.name,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-            } else {
-                Garment(kind = product.garment, tint = tint.foreground, size = 180.dp)
+                else -> Garment(kind = product.garment, tint = tint.foreground, size = 180.dp)
             }
             product.tag?.let { tag ->
                 HeroTag(
@@ -251,7 +263,7 @@ private fun ProductHero(
                     modifier = Modifier.size(11.dp),
                 )
                 Text(
-                    text = "${activeIndex + 1} / 4",
+                    text = "${safeIndex + 1} / $count",
                     color = Color.White,
                     fontSize = 10.5.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -264,8 +276,8 @@ private fun ProductHero(
                     .padding(bottom = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                repeat(4) { i ->
-                    val active = i == activeIndex
+                repeat(count) { i ->
+                    val active = i == safeIndex
                     Box(
                         modifier = Modifier
                             .width(if (active) 16.dp else 6.dp)
@@ -280,8 +292,8 @@ private fun ProductHero(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            repeat(4) { i ->
-                val active = i == activeIndex
+            repeat(count) { i ->
+                val active = i == safeIndex
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -292,18 +304,24 @@ private fun ProductHero(
                             if (active) 1.5.dp else 1.dp,
                             if (active) colors.ink else colors.line,
                             RoundedCornerShape(8.dp),
-                        ),
+                        )
+                        .clickableNoIndication { onIndexChange(i) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (product.image != null) {
-                        Image(
+                    when {
+                        images.isNotEmpty() -> AsyncImage(
+                            model = images[i],
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        product.image != null -> Image(
                             painter = painterResource(product.image),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
                         )
-                    } else {
-                        Garment(kind = product.garment, tint = tint.foreground, size = 36.dp)
+                        else -> Garment(kind = product.garment, tint = tint.foreground, size = 36.dp)
                     }
                 }
             }

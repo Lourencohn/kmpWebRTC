@@ -54,7 +54,7 @@ data class PrazoDto(
     val descricao: String? = null,
     val parcelas: Long? = null,
     val tipo: String? = null,
-    @SerialName("prazo_medio") val prazoMedio: Long? = null,
+    @SerialName("prazo_medio") val prazoMedio: Double? = null,
     @SerialName("dias_parcela_1") val diasParcela1: Long? = null,
     @SerialName("dias_parcela_2") val diasParcela2: Long? = null,
     @SerialName("dias_parcela_3") val diasParcela3: Long? = null,

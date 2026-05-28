@@ -14,6 +14,7 @@ Login real e sync **funcionam**. Após logar e escolher a empresa **2507**, o `s
 |---|---:|---|
 | `ProductEntity` (produtos-pre) | **979** | preço final e marca preenchidos |
 | `ProductPriceEntity` (itens-preços) | **972** | tabela `1` = "TABELA PADRAO" |
+| `PrazoEntity` | (a confirmar) | ✅ bug de desserialização corrigido (§5.1) — re-sincronizar p/ popular |
 | `ClientEntity` | **24.444** | base real de clientes |
 | `CategoriaEntity` | 35 | |
 | `MarcaEntity` | 41 | ex. "3 CORAÇÕES", "RB AMORE" |
@@ -38,8 +39,12 @@ Identidade real disponível em `AuthRepository`: `user` = `{ id: 1, name: "TROVA
 | Seleção de empresa | ✅ real |
 | Sync incremental (catálogo, preços, clientes, taxonomia) | ✅ real |
 | `CatalogRepository` / `ClientsRepository` (leitura) | ✅ prontos, com fallback p/ mock |
-| **Tela "Prep / picker de catálogo"** (`CatalogPickerScreen`) | ✅ **única tela já ligada** (via `loadProducts = { catalogRepository.uiProducts() }`) |
-| Telas Sessões, Catálogo (tab), Clientes, Insights, Conta, LiveCall | ❌ ainda leem `data/sample/*` |
+| Identidade global (usuário + empresa ativa) | ✅ `AuthRepository.activeCompany` persistida; alimenta Conta + header do Catálogo |
+| **Prep / picker de catálogo** (`CatalogPickerScreen`) | ✅ ligada (`catalogRepository.uiProducts()`) |
+| **Catálogo (tab)** (`CatalogScreen` + `CatalogScreenModel`) | ✅ ligada — 979 produtos reais, grade lazy, KPIs derivados (SKUs/marcas/categorias/com preço); `ProductDetailRoute` resolve via repo |
+| **Conta** (`AccountScreen` + `AccountScreenModel`) | ✅ identidade real (nome/email do usuário, empresa ativa); performance/tier ainda mock (sem fonte) |
+| **Clientes** (`ClientsScreen` + `ClientsScreenModel`) | ✅ busca local paginada (`searchClients`/`firstClients`, LIMIT 60); LTV/sparkline/segmentos/"sugestões TC" removidos (sem fonte) |
+| Telas Sessões, Insights, LiveCall | ❌ ainda leem `data/sample/*` |
 
 ---
 
@@ -63,19 +68,19 @@ Repositórios disponíveis (em [data/local/](../composeApp/src/commonMain/kotlin
 
 ## 4. Inventário por tela (o que falta)
 
-### 4.1 Catálogo — tab principal ❌
+### 4.1 Catálogo — tab principal ✅ (ligado)
 - **Arquivos:** [CatalogScreen.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/ui/screens/catalog/CatalogScreen.kt), [ProductDetailScreen.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/ui/screens/catalog/ProductDetailScreen.kt), componentes [ProductCard.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/ui/components/ProductCard.kt)/[ProductRow.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/ui/components/ProductRow.kt), e [Routes.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/navigation/Routes.kt) (`ProductDetailRoute`).
 - **Mock:** lê `SampleCatalog.products` direto (sem ScreenModel).
 - **Fonte real:** `CatalogRepository` (979 produtos prontos). **Maior ganho, dados 100% disponíveis.**
-- **Falta:** criar `CatalogScreenModel` (observar `observeCatalog`), trocar `SampleCatalog.products` → state; resolver imagem (API **não tem imagem** → manter placeholder/`FashionPalette`); header "ATELIER NORTE · VERÃO 26" → nome da empresa + coleção (coleção vazia p/ 2507 → ocultar). KPIs "8 SKUs / 3 estreias / 1 pré-venda" são mock (derivar de contagem real ou ocultar). `ProductDetailRoute` deve buscar via repo, não `SampleCatalog`.
+- **Falta:** criar `CatalogScreenModel` (observar `observeCatalog`), trocar `SampleCatalog.products` → state; imagens reais via recurso `arquivos` (ver §8 — a suposição inicial de "API não tem imagem" estava errada); header "ATELIER NORTE · VERÃO 26" → nome da empresa + coleção (coleção vazia p/ 2507 → ocultar). KPIs "8 SKUs / 3 estreias / 1 pré-venda" são mock (derivar de contagem real ou ocultar). `ProductDetailRoute` deve buscar via repo, não `SampleCatalog`.
 
-### 4.2 Clientes ❌
+### 4.2 Clientes ✅ (ligado)
 - **Arquivo:** [ClientsScreen.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/ui/screens/clients/ClientsScreen.kt).
 - **Mock:** `SampleClients` (Diego/Renata/Paulo, LTV, sparkline, segmentos Recentes/Top/Atenção/Novos, "prontos para abordar").
 - **Fonte real:** `ClientsRepository` (24.444 clientes prontos: nome, razão social, doc, cidade, contato).
 - **Falta:** `ClientsScreenModel` observando `observeClients()`. **Sem fonte na API:** LTV, sparkline de atividade, segmentação, "ao vivo agora", "sugestões TC". Decidir: ocultar/calcular localmente (de `OrderEntity`) ou manter como mock claramente rotulado. Considerar paginação/busca local (são 24k linhas).
 
-### 4.3 Conta ❌
+### 4.3 Conta ✅ (ligado)
 - **Arquivos:** [AccountScreen.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/ui/screens/account/AccountScreen.kt), [AccountChip.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/ui/components/AccountChip.kt).
 - **Mock:** `SampleAccount` ("Camila Tavares", "camila@ateliernorte.com.br", "Atelier Norte", Top 3%) + `SampleAuth`.
 - **Fonte real:** `AuthRepository.user` (nome/email reais) + `Company` selecionada (marca/empresa). Iniciais do avatar ("CT") → derivar do `user.name`.
@@ -102,14 +107,14 @@ Repositórios disponíveis (em [data/local/](../composeApp/src/commonMain/kotlin
 
 ## 5. Pendências técnicas encontradas no device
 
-### 5.1 ❌ Bug: sync de `prazos` falha na desserialização
-`SyncStateEntity` registrou para `prazos`:
+### 5.1 ✅ Bug corrigido: sync de `prazos` falhava na desserialização
+`SyncStateEntity` registrava para `prazos`:
 ```
 network_error: Unexpected JSON token at offset ...: Unexpected symbol '.' in numeric literal
 ... "prazo_medio":17.5 ...
 ```
-**Causa:** [PricingDto.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/data/remote/sfa/dto/PricingDto.kt) declara `PrazoDto.prazoMedio: Long?`, mas a API retorna **decimal** (`17.5`). Um único registro inválido derruba a **página inteira** → `PrazoEntity` fica com 0 linhas.
-**Correção:** mudar `prazoMedio` para `Double?` (e ajustar `PrazoEntity.prazoMedio` para `REAL`, ou arredondar na ingestão). Revisar outros campos numéricos que possam vir decimais (`parcela_minima`, `perc_*` já são `String?`, ok).
+**Causa:** [PricingDto.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/data/remote/sfa/dto/PricingDto.kt) declarava `PrazoDto.prazoMedio: Long?`, mas a API retorna **decimal** (`17.5`). Um único registro inválido derrubava a **página inteira** → `PrazoEntity` ficava com 0 linhas.
+**Correção aplicada:** `prazoMedio` agora é `Double?` no DTO e `PrazoEntity.prazoMedio` é `REAL` ([Pricing.sq](../composeApp/src/commonMain/sqldelight/app/trovata/cast/db/Pricing.sq)). Falta re-sincronizar no device para confirmar a contagem de linhas. Ainda **pendente** a robustez por-registro (§5.2): hoje um registro ruim em outra entidade ainda derruba a página.
 
 ### 5.2 ⚠️ Robustez: um registro ruim derruba a página toda
 O decode é por página (`SfaListEnvelope<T>`). Vale tornar o mapeamento resiliente por-registro (decodificar como `JsonElement` e mapear item a item dentro de try/catch), de modo que um campo inesperado não zere a entidade inteira.
@@ -125,13 +130,17 @@ O decode é por página (`SfaListEnvelope<T>`). Vale tornar o mapeamento resilie
 
 ## 6. Ordem recomendada (próximos diálogos)
 
-1. **Fix `prazos` (§5.1)** — 1 linha de DTO; destrava o sync completo.
-2. **Catálogo (tab)** — maior ganho, dados 100% prontos (979 produtos). Criar `CatalogScreenModel` + `ProductDetailRoute` real.
-3. **Conta** — ligar `AuthRepository.user` + empresa ativa (remove "Camila Tavares").
-4. **Clientes** — `ClientsScreenModel` com busca/paginação local (24k linhas); decidir o destino dos campos sem fonte (LTV/segmentos).
-5. **Header/identidade** global (empresa + coleção).
-6. **LiveCall** — preço pela tabela do cliente.
-7. **Sessões / Insights** — dependem de domínio próprio (sessões/pedidos) — tratar quando houver `OrderEntity`/`SessionEntity` reais.
+1. ✅ **Fix `prazos` (§5.1)** — DTO `Double?` + coluna `REAL`. Falta re-sincronizar no device.
+2. ✅ **Catálogo (tab)** — `CatalogScreenModel` + grade lazy + `ProductDetailRoute` via repo.
+3. ✅ **Conta** — `AccountScreenModel` lê `AuthRepository.user` + `activeCompany` (remove "Camila Tavares").
+4. ✅ **Clientes** — `ClientsScreenModel` com busca local (`searchClients`, LIMIT 60); campos sem fonte (LTV/sparkline/segmentos/"sugestões TC") **removidos** em vez de mockados.
+5. ✅ **Header/identidade** global — `AuthRepository.activeCompany` persistida e consumida pelo Catálogo e Conta. Coleção fica oculta enquanto `ColecaoEntity` estiver vazia (empresa 2507).
+6. ⏭️ **LiveCall** — preço pela tabela do cliente (`ClientEntity.tabelaPrecoId`). Próximo.
+7. ⏭️ **Sessões / Insights** — dependem de domínio próprio (sessões/pedidos) — tratar quando houver `OrderEntity`/`SessionEntity` reais.
+
+Pendências técnicas ainda abertas: **§5.2** (decode resiliente por-registro), **§5.3** (MOQ/coleção vazios p/ 2507).
+
+> **Decisão de design (Clientes):** como `CatalogClient` não tem LTV/atividade/segmento e a API não fornece, a tela foi redesenhada para uma **lista buscável honesta** (nome, razão social/CNPJ, contato, telefone, status ativo) com ação "Convidar" → `CatalogPickerScreen`. O fallback mock pré-sync vira o estado vazio "Nenhum cliente encontrado" (sem clientes fictícios). `SampleClients.kt` permanece no repo, sem uso na tela.
 
 Sempre seguir a receita do §3 (repositório → ScreenModel → fallback gated) e nunca apagar os `Sample*` (viram fallback pré-sync).
 
@@ -155,3 +164,29 @@ adb exec-out run-as $PKG cat shared_prefs/trovatacast.auth.xml
 ```
 
 Disparar sync manualmente (após login) é automático via `AppContainer.startCatalogSync()`; para forçar tudo (inclusive `vendedores-clientes`), chamar `catalogSyncService.syncAll()`.
+
+---
+
+## 8. Imagens reais de produto (assets / `arquivos`) ✅
+
+Mapeado a partir do app `trovata-offline` (que já busca as imagens) e implementado no TrovataCast.
+
+- **Endpoint:** `GET {base}/empresas/{empresa}/arquivos?page&per_page=100` (recurso **`arquivos`**). Não aparece na coleção Postman `API.json` (incompleta), mas o offline usa exatamente esse caminho.
+- **Payload (`AssetDto`):** `id`, `id_erp`, `produto_id_erp`, `complemento_1_id_erp`, `sequencia`, `caminho_thumb`, `caminho_detail`, `caminho_media`, `caminho_original`, `situacao`, `updated_at`, `deleted_at`. Os `caminho_*` já são **URLs completas/públicas** (sem header de auth — passadas direto ao image loader).
+- **Vínculo:** asset → produto por `produto_id_erp = ProductEntity.idErp` (ordenar por `sequencia`).
+- **Implementação:**
+  - DTO [AssetDto.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/data/remote/sfa/dto/AssetDto.kt); tabela [Assets.sq](../composeApp/src/commonMain/sqldelight/app/trovata/cast/db/Assets.sq) (`AssetEntity` + `assetsQueries`).
+  - Sync `syncArquivos()` em [CatalogSyncService.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/data/sync/CatalogSyncService.kt) (no `syncEssentials` e no `ORDER`).
+  - `CatalogRepository`: `assemble()` resolve uma thumb por produto (`selectThumbsForProducts`, primeiro por `sequencia`) → `CatalogProduct.imageUrl`; `gallery(idErp)` retorna a lista para o detalhe.
+  - UI: **Coil 3** (`coil-compose` + `coil-network-ktor3`), `ImageLoader` singleton em [App.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/App.kt). `ProductCard` e `ProductDetailScreen` usam `AsyncImage(imageUrl)`; fallback: imagem local (sample) → `Garment`.
+- **Ordem de fallback de URL:** card = `thumb ?: detail ?: media`; galeria do detalhe = `detail ?: media ?: original ?: thumb`.
+- **Pendente:** confirmar no device que `arquivos` popula (e que a empresa logada tem assets); variações por cor via `complemento_1_id_erp` ainda não são usadas (mostramos 1 imagem por asset/sequência).
+
+## 9. Paginação do catálogo (páginas numeradas) ✅
+
+Antes ambas as telas carregavam os 979 produtos numa lista única ("scroll infinito"). Agora paginam por **páginas numeradas** (Anterior / "Página X de Y" / Próxima):
+
+- **Aba Catálogo** ([CatalogScreenModel.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/feature/catalog/CatalogScreenModel.kt)): `pageSize = 24`, carrega via `CatalogRepository.page(limit, offset)`; reage à contagem via `observeCount()` (Flow) → repopula ao terminar o sync. KPIs do header vêm de contagens reais (`stats()`: marcas/categorias/com preço) em vez de varrer todos os produtos. "Em destaque" só na página 1.
+- **Montar catálogo** ([CatalogPickerScreenModel.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/feature/catalog/CatalogPickerScreenModel.kt)): `pageSize = 30`, `countProducts()` + `uiPage(limit, offset)`. A seleção persiste entre páginas guardando `selectedProducts: Map<ref, Product>`, então o contador de SKUs soma corretamente itens escolhidos em páginas diferentes.
+- Queries: `selectProductsPaged(LIMIT, OFFSET)` + `countDistinctMarcas/Categorias` + `countPricedProducts` em [Catalog.sq](../composeApp/src/commonMain/sqldelight/app/trovata/cast/db/Catalog.sq).
+- **Nota:** filtros (Novos/Top/Pré-venda) operam só sobre a página atual; com dados reais (sem `tag`) apenas "Todos" tem efeito — comportamento pré-existente.

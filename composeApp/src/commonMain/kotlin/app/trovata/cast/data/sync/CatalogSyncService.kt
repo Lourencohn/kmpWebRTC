@@ -7,6 +7,7 @@ import app.trovata.cast.data.remote.sfa.SfaApi
 import app.trovata.cast.data.remote.sfa.SfaApiResult
 import app.trovata.cast.data.remote.sfa.SfaListEnvelope
 import app.trovata.cast.data.remote.sfa.SfaParse
+import app.trovata.cast.data.remote.sfa.dto.AssetDto
 import app.trovata.cast.data.remote.sfa.dto.ClientDto
 import app.trovata.cast.data.remote.sfa.dto.CommercialProductDto
 import app.trovata.cast.data.remote.sfa.dto.ComplementoDto
@@ -56,6 +57,7 @@ class CatalogSyncService(
     private val pricing = db.pricingQueries
     private val taxonomy = db.taxonomyQueries
     private val people = db.peopleQueries
+    private val assets = db.assetsQueries
     private val sync = db.syncStateQueries
 
     fun observeSyncState(): Flow<List<SyncStatus>> =
@@ -75,7 +77,7 @@ class CatalogSyncService(
             ::syncCategorias, ::syncColecoes, ::syncMarcas,
             ::syncComplementos1, ::syncComplementos2, ::syncComplementos3,
             ::syncTabelasPrecos, ::syncProdutosPre, ::syncProdutosComerciais,
-            ::syncItensPrecos, ::syncPrazos, ::syncClientes,
+            ::syncItensPrecos, ::syncPrazos, ::syncArquivos, ::syncClientes,
         )
         return SyncReport(essentials.map { it() })
     }
@@ -85,7 +87,7 @@ class CatalogSyncService(
         ::syncLinhas, ::syncFamiliasComerciais, ::syncNichos, ::syncEspecies, ::syncTiposProdutos,
         ::syncComplementos1, ::syncComplementos2, ::syncComplementos3, ::syncGradesPadroes,
         ::syncTabelasPrecos, ::syncProdutosPre, ::syncProdutosComerciais, ::syncItensPrecos,
-        ::syncPrazos, ::syncTiposVendas, ::syncVendedores, ::syncClientes, ::syncVendedoresClientes,
+        ::syncPrazos, ::syncArquivos, ::syncTiposVendas, ::syncVendedores, ::syncClientes, ::syncVendedoresClientes,
     )
 
     suspend fun syncCategorias() = syncResource<TaxonomyDto>("categorias", 100, { it.updatedAt }, taxonomy::deleteCategoriasByIds) { r ->
@@ -183,6 +185,16 @@ class CatalogSyncService(
             pricing.upsertPrazo(
                 it.id, it.idErp, it.descricao, it.parcelas, it.tipo, it.prazoMedio, it.diasParcelasCsv(),
                 it.situacao, it.percDesconto?.toDoubleOrNull(), it.updatedAt, SfaParse.parseIsoToMs(it.updatedAt),
+            )
+        }
+    }
+
+    suspend fun syncArquivos() = syncResource<AssetDto>("arquivos", 100, { it.updatedAt }, assets::deleteAssetsByIds) { r ->
+        r.forEach {
+            assets.upsertAsset(
+                it.id, it.idErp, it.nome, it.caminhoOriginal, it.caminhoMedia, it.caminhoDetail, it.caminhoThumb,
+                it.tipo, it.tipoMime, it.sequencia, it.situacao, it.complemento1IdErp, it.produtoIdErp,
+                it.updatedAt, SfaParse.parseIsoToMs(it.updatedAt), it.deletedAt,
             )
         }
     }

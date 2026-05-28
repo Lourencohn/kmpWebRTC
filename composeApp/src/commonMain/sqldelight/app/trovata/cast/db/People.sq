@@ -68,6 +68,16 @@ SELECT * FROM ClientEntity WHERE vendedorIdErp = ? AND deletedAt IS NULL ORDER B
 countClients:
 SELECT count(*) FROM ClientEntity WHERE deletedAt IS NULL;
 
+firstClients:
+SELECT * FROM ClientEntity WHERE deletedAt IS NULL ORDER BY nomeFantasia ASC LIMIT ?;
+
+searchClients:
+SELECT * FROM ClientEntity
+WHERE deletedAt IS NULL
+  AND (nomeFantasia LIKE ? OR razaoSocial LIKE ? OR cidadeIdErp LIKE ? OR cpfCnpj LIKE ?)
+ORDER BY nomeFantasia ASC
+LIMIT ?;
+
 deleteClientsByIds:
 DELETE FROM ClientEntity WHERE id IN ?;
 

@@ -14,6 +14,8 @@ import app.trovata.cast.navigation.AccountRoute
 import app.trovata.cast.navigation.IncomingCallRoute
 import app.trovata.cast.navigation.ProductDetailRoute
 import app.trovata.cast.navigation.SessionPrepRoute
+import app.trovata.cast.feature.catalog.CatalogScreenModel
+import app.trovata.cast.feature.clients.ClientsScreenModel
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.SellerTab
 import app.trovata.cast.ui.components.TabBar
@@ -22,6 +24,7 @@ import app.trovata.cast.ui.screens.clients.ClientsScreen
 import app.trovata.cast.ui.screens.insights.InsightsScreen
 import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
 import app.trovata.cast.ui.screens.sessions.SellerHomeScreen
+import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -35,6 +38,16 @@ object TabsHostRoute : Screen {
         val homeState by viewModel.home.collectAsState()
         val colors = TrovataTokens.colors
         val openAccount: () -> Unit = { navigator.push(AccountRoute) }
+
+        val catalogModel = rememberScreenModel(tag = "catalog") {
+            CatalogScreenModel(container.catalogRepository, container.authRepository)
+        }
+        val catalogState by catalogModel.state.collectAsState()
+
+        val clientsModel = rememberScreenModel(tag = "clients") {
+            ClientsScreenModel(container.clientsRepository)
+        }
+        val clientsState by clientsModel.state.collectAsState()
 
         Column(modifier = Modifier.fillMaxSize().background(colors.bg)) {
             Box(
@@ -53,12 +66,22 @@ object TabsHostRoute : Screen {
                         onOpenAccount = openAccount,
                     )
                     SellerTab.Catalogo -> CatalogScreen(
+                        state = catalogState,
                         onOpenAccount = openAccount,
                         onOpenProduct = { product ->
                             navigator.push(ProductDetailRoute(productRef = product.ref))
                         },
+                        onPrevPage = catalogModel::prevPage,
+                        onNextPage = catalogModel::nextPage,
                     )
-                    SellerTab.Clientes -> ClientsScreen(onOpenAccount = openAccount)
+                    SellerTab.Clientes -> ClientsScreen(
+                        state = clientsState,
+                        onQueryChange = clientsModel::setQuery,
+                        onOpenAccount = openAccount,
+                        onInviteClient = { client ->
+                            navigator.push(CatalogPickerScreen(clientName = client.name))
+                        },
+                    )
                     SellerTab.Insights -> InsightsScreen(onOpenAccount = openAccount)
                 }
             }

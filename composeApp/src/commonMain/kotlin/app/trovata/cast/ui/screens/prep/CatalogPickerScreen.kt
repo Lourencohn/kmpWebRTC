@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -32,11 +33,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.AppContainerHolder
 import app.trovata.cast.feature.catalog.CatalogFilter
+import app.trovata.cast.data.sample.Product
 import app.trovata.cast.feature.catalog.CatalogPickerScreenModel
 import app.trovata.cast.feature.catalog.CatalogPickerUiState
 import app.trovata.cast.feature.catalog.ClientDraft
@@ -75,7 +78,8 @@ data class CatalogPickerScreen(
                 createSession = container.sessionsApi::createSession,
                 persistSession = container.sessionsRepository::persistCreated,
                 initialClient = initial,
-                loadProducts = { container.catalogRepository.uiProducts() },
+                countProducts = container.catalogRepository::count,
+                loadPage = { limit, offset -> container.catalogRepository.uiPage(limit, offset) },
             )
         }
         val state by screenModel.state.collectAsState()
@@ -93,6 +97,8 @@ data class CatalogPickerScreen(
             onFilter = screenModel::setFilter,
             onGenerate = { screenModel.generateLink() },
             onDismissError = screenModel::clearError,
+            onPrevPage = screenModel::prevPage,
+            onNextPage = screenModel::nextPage,
         )
     }
 }
@@ -101,10 +107,12 @@ data class CatalogPickerScreen(
 private fun CatalogPickerBody(
     state: CatalogPickerUiState,
     onBack: () -> Unit,
-    onToggle: (String) -> Unit,
+    onToggle: (Product) -> Unit,
     onFilter: (CatalogFilter) -> Unit,
     onGenerate: () -> Unit,
     onDismissError: () -> Unit,
+    onPrevPage: () -> Unit,
+    onNextPage: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
     val visible = state.visibleProducts
@@ -172,8 +180,19 @@ private fun CatalogPickerBody(
                         size = ProductCardSize.Sm,
                         highlight = selected,
                         inCart = if (selected) 1 else 0,
-                        onClick = { onToggle(product.ref) },
+                        onClick = { onToggle(product) },
                     )
+                }
+
+                if (state.totalPages > 1) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        PickerPager(
+                            page = state.page,
+                            totalPages = state.totalPages,
+                            onPrev = onPrevPage,
+                            onNext = onNextPage,
+                        )
+                    }
                 }
             }
         }
@@ -195,6 +214,39 @@ private fun CatalogPickerBody(
                 ErrorBanner(text = error, onDismiss = onDismissError)
             }
         }
+    }
+}
+
+@Composable
+private fun PickerPager(page: Int, totalPages: Int, onPrev: () -> Unit, onNext: () -> Unit) {
+    val colors = TrovataTokens.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Btn(
+            text = "Anterior",
+            onClick = onPrev,
+            kind = BtnKind.Surface,
+            size = BtnSize.Sm,
+            enabled = page > 1,
+        )
+        Text(
+            text = "Página $page de $totalPages",
+            color = colors.ink3,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f),
+        )
+        Btn(
+            text = "Próxima",
+            onClick = onNext,
+            kind = BtnKind.Surface,
+            size = BtnSize.Sm,
+            enabled = page < totalPages,
+        )
     }
 }
 

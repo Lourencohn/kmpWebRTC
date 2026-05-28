@@ -38,6 +38,21 @@ class ClientsRepository(private val db: TrovataDatabase) {
         people.selectClientsByVendedor(sellerErp).executeAsList().map { it.toDomain() }
     }
 
+    suspend fun search(query: String, limit: Int = 60): List<CatalogClient> = withContext(Dispatchers.Default) {
+        val q = query.trim()
+        val rows = if (q.isEmpty()) {
+            people.firstClients(limit.toLong()).executeAsList()
+        } else {
+            val like = "%$q%"
+            people.searchClients(like, like, like, like, limit.toLong()).executeAsList()
+        }
+        rows.map { it.toDomain() }
+    }
+
+    suspend fun count(): Long = withContext(Dispatchers.Default) {
+        people.countClients().executeAsOne()
+    }
+
     suspend fun isEmpty(): Boolean = withContext(Dispatchers.Default) {
         people.countClients().executeAsOne() == 0L
     }

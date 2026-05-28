@@ -64,6 +64,29 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
 selectAllProducts:
 SELECT * FROM ProductEntity WHERE deletedAt IS NULL ORDER BY sequenciaCatalogoLink ASC, descricao ASC;
 
+selectProductsPaged:
+SELECT p.* FROM ProductEntity p
+WHERE p.deletedAt IS NULL
+ORDER BY
+    CASE WHEN EXISTS (
+        SELECT 1 FROM AssetEntity a
+        WHERE a.produtoIdErp = p.idErp
+          AND a.deletedAt IS NULL
+          AND a.caminhoThumb IS NOT NULL
+    ) THEN 0 ELSE 1 END ASC,
+    p.sequenciaCatalogoLink ASC,
+    p.descricao ASC
+LIMIT ? OFFSET ?;
+
+countDistinctMarcas:
+SELECT count(DISTINCT descricaoMarca) FROM ProductEntity WHERE deletedAt IS NULL AND descricaoMarca IS NOT NULL;
+
+countDistinctCategorias:
+SELECT count(DISTINCT descricaoCategoria) FROM ProductEntity WHERE deletedAt IS NULL AND descricaoCategoria IS NOT NULL;
+
+countPricedProducts:
+SELECT count(*) FROM ProductEntity WHERE deletedAt IS NULL AND (precoFinalCents IS NOT NULL OR precoBaseCents IS NOT NULL);
+
 selectProductById:
 SELECT * FROM ProductEntity WHERE id = ?;
 

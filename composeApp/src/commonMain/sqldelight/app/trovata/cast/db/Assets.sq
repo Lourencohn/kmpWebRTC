@@ -1,0 +1,42 @@
+CREATE TABLE IF NOT EXISTS AssetEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    nome TEXT,
+    caminhoOriginal TEXT,
+    caminhoMedia TEXT,
+    caminhoDetail TEXT,
+    caminhoThumb TEXT,
+    tipo TEXT,
+    tipoMime TEXT,
+    sequencia INTEGER,
+    situacao TEXT,
+    complemento1IdErp TEXT,
+    produtoIdErp TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER,
+    deletedAt TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_asset_produto ON AssetEntity(produtoIdErp);
+
+upsertAsset:
+INSERT OR REPLACE INTO AssetEntity(id, idErp, nome, caminhoOriginal, caminhoMedia, caminhoDetail, caminhoThumb, tipo, tipoMime, sequencia, situacao, complemento1IdErp, produtoIdErp, updatedAt, updatedAtMs, deletedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteAssetsByIds:
+DELETE FROM AssetEntity WHERE id IN ?;
+
+selectThumbsForProducts:
+SELECT produtoIdErp, caminhoThumb, caminhoDetail, caminhoMedia
+FROM AssetEntity
+WHERE deletedAt IS NULL AND produtoIdErp IN ?
+ORDER BY sequencia ASC;
+
+selectImagesForProduct:
+SELECT caminhoDetail, caminhoMedia, caminhoThumb, caminhoOriginal
+FROM AssetEntity
+WHERE deletedAt IS NULL AND produtoIdErp = ?
+ORDER BY sequencia ASC;
+
+countAssets:
+SELECT count(*) FROM AssetEntity WHERE deletedAt IS NULL;

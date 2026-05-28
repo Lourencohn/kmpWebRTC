@@ -12,6 +12,7 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
@@ -34,6 +35,10 @@ data class CatalogPickerUiState(
     val selectedSkus: Set<String>,
     val filter: CatalogFilter,
     val client: ClientDraft,
+    val selectedProducts: Map<String, Product> = emptyMap(),
+    val page: Int = 1,
+    val totalPages: Int = 1,
+    val total: Long = 0,
     val isSubmitting: Boolean = false,
     val error: String? = null,
     val createdSession: StoredSessionRecord? = null,
@@ -46,9 +51,7 @@ data class CatalogPickerUiState(
             CatalogFilter.PreVenda -> products.filter { it.tag == ProductTag.PreVenda }
         }
 
-    val skuCount: Int get() = visibleProducts
-        .filter { it.ref in selectedSkus }
-        .sumOf { it.sizes.size * it.colorCount }
+    val skuCount: Int get() = selectedProducts.values.sumOf { it.sizes.size * it.colorCount }
 }
 
 typealias CreateSessionFn = suspend (SessionCreateRequest) -> SessionsApiResult<SessionCreateResponse>
@@ -59,9 +62,12 @@ class CatalogPickerScreenModel(
     private val persistSession: PersistSessionFn,
     private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     initialClient: ClientDraft = ClientDraft(),
-    private val loadProducts: suspend () -> List<Product> = { SampleCatalog.products },
+    private val pageSize: Int = 30,
+    private val countProducts: suspend () -> Long = { SampleCatalog.products.size.toLong() },
+    private val loadPage: suspend (limit: Int, offset: Int) -> List<Product> = { _, _ -> SampleCatalog.products },
 ) : ScreenModel {
 
+    private val _page = MutableStateFlow(1)
     private val _state = MutableStateFlow(
         CatalogPickerUiState(
             products = SampleCatalog.products,
@@ -74,17 +80,37 @@ class CatalogPickerScreenModel(
 
     init {
         screenModelScope.launch {
-            val products = loadProducts()
-            if (products.isNotEmpty()) _state.update { it.copy(products = products) }
+            _page.collectLatest { page -> loadPageInto(page) }
         }
     }
 
-    fun toggle(sku: String) {
-        _state.update { current ->
-            val next = current.selectedSkus.toMutableSet().apply {
-                if (!add(sku)) remove(sku)
+    private suspend fun loadPageInto(page: Int) {
+        val total = countProducts()
+        if (total == 0L) {
+            _state.update {
+                it.copy(products = SampleCatalog.products, page = 1, totalPages = 1, total = SampleCatalog.products.size.toLong())
             }
-            current.copy(selectedSkus = next, error = null)
+            return
+        }
+        val totalPages = ((total + pageSize - 1) / pageSize).toInt().coerceAtLeast(1)
+        val safePage = page.coerceIn(1, totalPages)
+        val products = loadPage(pageSize, (safePage - 1) * pageSize)
+        _state.update { it.copy(products = products, page = safePage, totalPages = totalPages, total = total) }
+    }
+
+    fun nextPage() = _page.update { (it + 1).coerceAtMost(_state.value.totalPages) }
+    fun prevPage() = _page.update { (it - 1).coerceAtLeast(1) }
+
+    fun toggle(product: Product) {
+        _state.update { current ->
+            val selecting = product.ref !in current.selectedSkus
+            val nextSkus = current.selectedSkus.toMutableSet().apply {
+                if (selecting) add(product.ref) else remove(product.ref)
+            }
+            val nextProducts = current.selectedProducts.toMutableMap().apply {
+                if (selecting) put(product.ref, product) else remove(product.ref)
+            }
+            current.copy(selectedSkus = nextSkus, selectedProducts = nextProducts, error = null)
         }
     }
 

@@ -43,6 +43,7 @@ data class Product(
     val colorCount: Int,
     val tag: ProductTag? = null,
     val image: DrawableResource? = null,
+    val imageUrl: String? = null,
 )
 
 object SampleCatalog {

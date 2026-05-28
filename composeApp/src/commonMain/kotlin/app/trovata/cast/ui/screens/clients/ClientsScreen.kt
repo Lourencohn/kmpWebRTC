@@ -13,26 +13,23 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import app.trovata.cast.data.sample.Client
-import app.trovata.cast.data.sample.ClientTag
-import app.trovata.cast.data.sample.ReadyToApproach
-import app.trovata.cast.data.sample.ReadyUrgency
-import app.trovata.cast.data.sample.SampleClients
+import app.trovata.cast.data.local.CatalogClient
+import app.trovata.cast.feature.clients.ClientsUiState
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Avatar
 import app.trovata.cast.ui.components.Btn
@@ -41,15 +38,17 @@ import app.trovata.cast.ui.components.BtnSize
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
 import app.trovata.cast.ui.components.SectionLabel
-import app.trovata.cast.ui.components.Sparkline
 import app.trovata.cast.ui.components.TabHeader
 import app.trovata.cast.ui.components.TrovataCard
 import app.trovata.cast.ui.icons.TrovataIcons
 
 @Composable
 fun ClientsScreen(
+    state: ClientsUiState,
     modifier: Modifier = Modifier,
+    onQueryChange: (String) -> Unit = {},
     onOpenAccount: () -> Unit = {},
+    onInviteClient: (CatalogClient) -> Unit = {},
 ) {
     val colors = TrovataTokens.colors
 
@@ -61,36 +60,33 @@ fun ClientsScreen(
         ) {
             item {
                 TabHeader(
-                    eyebrow = "Carteira · 47 ativos",
+                    eyebrow = "Carteira · ${state.total} clientes",
                     title = "Clientes",
-                    subtitle = "8 prontos para abordar · 3 ao vivo agora",
+                    subtitle = "Base sincronizada",
                     onOpenAccount = onOpenAccount,
                     secondaryIcon = TrovataIcons.filter,
                 )
             }
 
-            item { SmartSuggestion(SampleClients.readyToApproach) }
-
-            item { SearchBox() }
-
-            item { SegmentChips() }
+            item { SearchBox(value = state.query, onValueChange = onQueryChange) }
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     SectionLabel(
-                        text = "Esta semana",
+                        text = if (state.query.isBlank()) "Todos os clientes" else "Resultados",
                         action = {
-                            Pill(text = "3 ao vivo", tone = PillTone.Live, icon = TrovataIcons.signal)
+                            Text(
+                                text = "${state.results.size}",
+                                color = colors.ink4,
+                                style = TrovataTokens.type.mono.copy(fontSize = 11.sp),
+                            )
                         },
                     )
-                    ClientList(SampleClients.recent)
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    SectionLabel(text = "Este mês")
-                    ClientList(SampleClients.month)
+                    when {
+                        state.isLoading -> EmptyState(text = "Carregando clientes...")
+                        state.results.isEmpty() -> EmptyState(text = "Nenhum cliente encontrado")
+                        else -> ClientList(clients = state.results, onInvite = onInviteClient)
+                    }
                 }
             }
         }
@@ -113,121 +109,7 @@ fun ClientsScreen(
 }
 
 @Composable
-private fun SmartSuggestion(items: List<ReadyToApproach>) {
-    val colors = TrovataTokens.colors
-    val shape = RoundedCornerShape(16.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .shadow(1.dp, shape, clip = false)
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(colors.brandTint, colors.surface),
-                ),
-                shape = shape,
-            )
-            .border(1.dp, colors.brandTint, shape),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(colors.brand, RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = TrovataIcons.sparkle,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "SUGESTÕES TC · AGORA",
-                    color = colors.brand2,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.06.em,
-                )
-                Text(
-                    text = "5 clientes prontos para abordar",
-                    color = colors.ink,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = (-0.01).em,
-                    modifier = Modifier.padding(top = 1.dp),
-                )
-            }
-            Icon(
-                imageVector = TrovataIcons.chev,
-                contentDescription = null,
-                tint = colors.brand2,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Box(modifier = Modifier.background(colors.surface, shape)) {
-            Column {
-                items.forEachIndexed { index, item ->
-                    if (index > 0) {
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
-                    } else {
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
-                    }
-                    ReadyRow(item)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReadyRow(item: ReadyToApproach) {
-    val colors = TrovataTokens.colors
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Avatar(name = item.name, hue = item.hue, size = 34.dp)
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = item.name,
-                    color = colors.ink,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = " · ${item.sinceLabel}",
-                    color = colors.ink4,
-                    fontSize = 12.5.sp,
-                )
-            }
-            Text(
-                text = item.shop,
-                color = colors.ink3,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 1.dp),
-            )
-        }
-        Btn(
-            text = "Convidar",
-            onClick = {},
-            kind = if (item.urgency == ReadyUrgency.Urgente) BtnKind.Primary else BtnKind.Soft,
-            size = BtnSize.Sm,
-            icon = TrovataIcons.video,
-        )
-    }
-}
-
-@Composable
-private fun SearchBox() {
+private fun SearchBox(value: String, onValueChange: (String) -> Unit) {
     val colors = TrovataTokens.colors
     Row(
         modifier = Modifier
@@ -244,66 +126,46 @@ private fun SearchBox() {
             tint = colors.ink3,
             modifier = Modifier.size(17.dp),
         )
-        Text(
-            text = "Buscar cliente, cidade, loja...",
-            color = colors.ink4,
-            fontSize = 13.sp,
-        )
-    }
-}
-
-@Composable
-private fun SegmentChips() {
-    val colors = TrovataTokens.colors
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        SampleClients.segments.forEachIndexed { index, seg ->
-            val active = index == 0
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        color = if (active) colors.ink else colors.surface,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = if (active) colors.ink else colors.line,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .padding(vertical = 8.dp, horizontal = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
+        Box(modifier = Modifier.weight(1f)) {
+            if (value.isEmpty()) {
                 Text(
-                    text = seg.label,
-                    color = if (active) Color.White else colors.ink2,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = (-0.01).em,
-                )
-                Text(
-                    text = seg.count.toString(),
-                    style = TrovataTokens.type.mono.copy(
-                        fontSize = 10.5.sp,
-                        color = if (active) Color.White.copy(alpha = 0.7f) else colors.ink4,
-                        fontWeight = FontWeight.Medium,
-                    ),
+                    text = "Buscar cliente, cidade, CNPJ...",
+                    color = colors.ink4,
+                    fontSize = 13.sp,
                 )
             }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = TextStyle(color = colors.ink, fontSize = 13.sp),
+                cursorBrush = SolidColor(colors.brand),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
 
 @Composable
-private fun ClientList(clients: List<Client>) {
+private fun EmptyState(text: String) {
+    val colors = TrovataTokens.colors
+    TrovataCard(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 22.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = text, color = colors.ink3, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun ClientList(clients: List<CatalogClient>, onInvite: (CatalogClient) -> Unit) {
     val colors = TrovataTokens.colors
     TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
         Column {
             clients.forEachIndexed { index, client ->
-                ClientRow(client)
+                ClientRow(client = client, onInvite = onInvite)
                 if (index < clients.lastIndex) {
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
                 }
@@ -313,25 +175,15 @@ private fun ClientList(clients: List<Client>) {
 }
 
 @Composable
-private fun ClientRow(client: Client) {
+private fun ClientRow(client: CatalogClient, onInvite: (CatalogClient) -> Unit) {
     val colors = TrovataTokens.colors
+    val secondary = client.legalName?.takeIf { it != client.name } ?: client.document ?: client.contact
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box {
-            Avatar(name = client.name, hue = client.hue, size = 40.dp)
-            if (client.live) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(12.dp)
-                        .background(colors.jade, CircleShape)
-                        .border(2.dp, colors.surface, CircleShape),
-                )
-            }
-        }
+        Avatar(name = client.name, hue = (client.id % 360).toDouble(), size = 40.dp)
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -343,64 +195,35 @@ private fun ClientRow(client: Client) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                client.tag?.let { tag ->
-                    Pill(
-                        text = when (tag) {
-                            ClientTag.Novo -> "Novo"
-                            ClientTag.TopVenda -> "Top"
-                        },
-                        tone = when (tag) {
-                            ClientTag.Novo -> PillTone.Brand
-                            ClientTag.TopVenda -> PillTone.Jade
-                        },
-                    )
+                if (!client.active) {
+                    Pill(text = "Inativo", tone = PillTone.Neutral)
                 }
             }
-            Text(
-                text = "${client.shop} · ${client.city}",
-                color = colors.ink3,
-                fontSize = 11.5.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 1.dp),
-            )
-            Row(
-                modifier = Modifier.padding(top = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Sparkline(
-                    data = client.activity,
-                    width = 56.dp,
-                    height = 16.dp,
-                    color = if (client.live) colors.jade else colors.ink4,
-                    fill = false,
-                    dot = false,
-                )
+            secondary?.let {
                 Text(
-                    text = "· ${client.lastSession}",
+                    text = it,
+                    color = colors.ink3,
+                    fontSize = 11.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+            client.phone?.let { phone ->
+                Text(
+                    text = phone,
                     color = colors.ink4,
                     style = TrovataTokens.type.mono.copy(fontSize = 10.5.sp),
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = client.ltv,
-                style = TrovataTokens.type.mono.copy(
-                    fontSize = 12.5.sp,
-                    color = colors.ink,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = (-0.01).em,
-                ),
-            )
-            Text(
-                text = "LTV",
-                color = colors.ink4,
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.08.em,
-            )
-        }
+        Btn(
+            text = "Convidar",
+            onClick = { onInvite(client) },
+            kind = BtnKind.Soft,
+            size = BtnSize.Sm,
+            icon = TrovataIcons.video,
+        )
     }
 }

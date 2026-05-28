@@ -35,6 +35,7 @@ import app.trovata.cast.data.sample.ProductSwatchPalette
 import app.trovata.cast.data.sample.ProductTag
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.color.oklch
+import coil3.compose.AsyncImage
 import org.jetbrains.compose.resources.painterResource
 
 enum class ProductCardSize { Sm, Md, Lg }
@@ -73,7 +74,14 @@ fun ProductCard(
                 .height(dims.imageHeight)
                 .background(tint.background),
         ) {
-            if (product.image != null) {
+            if (product.imageUrl != null) {
+                AsyncImage(
+                    model = product.imageUrl,
+                    contentDescription = product.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (product.image != null) {
                 Image(
                     painter = painterResource(product.image),
                     contentDescription = product.name,

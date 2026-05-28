@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,11 +27,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.data.sample.FashionPalette
-import app.trovata.cast.data.sample.SampleCatalog
+import app.trovata.cast.data.sample.Product
+import app.trovata.cast.feature.catalog.CatalogStatItem
+import app.trovata.cast.feature.catalog.CatalogTabUiState
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind
@@ -48,14 +50,16 @@ import app.trovata.cast.ui.icons.TrovataIcons
 
 @Composable
 fun CatalogScreen(
+    state: CatalogTabUiState,
     modifier: Modifier = Modifier,
     onOpenAccount: () -> Unit = {},
-    onOpenProduct: (app.trovata.cast.data.sample.Product) -> Unit = {},
+    onOpenProduct: (Product) -> Unit = {},
+    onPrevPage: () -> Unit = {},
+    onNextPage: () -> Unit = {},
 ) {
     val colors = TrovataTokens.colors
-    val products = SampleCatalog.products
-    val topOfWeek = listOf(products[1], products[3], products[7])
-    val grid = listOf(products[0], products[2], products[4], products[5], products[6])
+    val highlights = state.products.take(3)
+    val gridRows = state.products.chunked(2)
 
     Box(modifier = modifier.fillMaxSize().background(colors.bg)) {
         LazyColumn(
@@ -65,9 +69,9 @@ fun CatalogScreen(
         ) {
             item {
                 TabHeader(
-                    eyebrow = "Atelier Norte · Verão 26",
+                    eyebrow = state.headerEyebrow,
                     title = "Catálogo",
-                    subtitle = "8 SKUs · 3 estreias · 1 pré-venda",
+                    subtitle = state.headerSubtitle,
                     onOpenAccount = onOpenAccount,
                     secondaryIcon = TrovataIcons.plus,
                 )
@@ -75,40 +79,44 @@ fun CatalogScreen(
 
             item { SearchBar() }
 
-            item { FilterChips() }
+            item { FilterChips(state.brandChips) }
 
-            item { CollectionHero() }
+            item { CollectionHero(state, highlights) }
 
-            item { StatsStrip() }
+            item { StatsStrip(state.stats) }
 
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    SectionLabel(
-                        text = "Top da semana",
-                        action = {
-                            Text(
-                                text = "Ver todos",
-                                color = colors.brand,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        },
-                    )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(start = 16.dp, end = 16.dp, top = 0.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    topOfWeek.forEachIndexed { index, product ->
-                        TopOfWeekCard(
-                            product = product,
-                            growth = listOf(42, 28, 12)[index],
-                            ordersLabel = listOf("18 ped.", "14 ped.", "9 ped.")[index],
-                            onClick = { onOpenProduct(product) },
+            if (state.page == 1 && highlights.isNotEmpty()) {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        SectionLabel(
+                            text = "Em destaque",
+                            action = {
+                                Text(
+                                    text = "Ver todos",
+                                    color = colors.brand,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            },
                         )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(start = 16.dp, end = 16.dp, top = 0.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        highlights.forEach { product ->
+                            Box(modifier = Modifier.width(158.dp)) {
+                                ProductCard(
+                                    product = product,
+                                    size = ProductCardSize.Sm,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { onOpenProduct(product) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -116,7 +124,7 @@ fun CatalogScreen(
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     SectionLabel(
-                        text = "Todos os produtos · 47",
+                        text = "Todos os produtos · ${state.products.size}",
                         action = {
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -137,26 +145,37 @@ fun CatalogScreen(
                             }
                         },
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        grid.chunked(2).forEach { pair ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                pair.forEach { product ->
-                                    ProductCard(
-                                        product = product,
-                                        size = ProductCardSize.Sm,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = { onOpenProduct(product) },
-                                    )
-                                }
-                                if (pair.size == 1) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
-                        }
+                }
+            }
+
+            items(gridRows.size) { index ->
+                val pair = gridRows[index]
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    pair.forEach { product ->
+                        ProductCard(
+                            product = product,
+                            size = ProductCardSize.Sm,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onOpenProduct(product) },
+                        )
                     }
+                    if (pair.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            if (state.totalPages > 1) {
+                item {
+                    CatalogPager(
+                        page = state.page,
+                        totalPages = state.totalPages,
+                        onPrev = onPrevPage,
+                        onNext = onNextPage,
+                    )
                 }
             }
         }
@@ -220,16 +239,7 @@ private fun SearchBar() {
 }
 
 @Composable
-private fun FilterChips() {
-    val items = listOf(
-        "Todos" to PillTone.Dark,
-        "Verão 26" to PillTone.Neutral,
-        "Chenson" to PillTone.Neutral,
-        "LEE" to PillTone.Neutral,
-        "Dumond" to PillTone.Neutral,
-        "Top venda" to PillTone.Neutral,
-        "Pré-venda" to PillTone.Neutral,
-    )
+private fun FilterChips(brands: List<String>) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -237,16 +247,16 @@ private fun FilterChips() {
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        items.forEach { (label, tone) ->
-            Pill(text = label, tone = tone)
+        Pill(text = "Todos", tone = PillTone.Dark)
+        brands.forEach { label ->
+            Pill(text = label, tone = PillTone.Neutral)
         }
     }
 }
 
 @Composable
-private fun CollectionHero() {
+private fun CollectionHero(state: CatalogTabUiState, highlights: List<Product>) {
     val colors = TrovataTokens.colors
-    val products = SampleCatalog.products
     val shape = RoundedCornerShape(18.dp)
     Box(
         modifier = Modifier
@@ -271,7 +281,7 @@ private fun CollectionHero() {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "COLEÇÃO EM DESTAQUE",
+                    text = state.heroEyebrow.uppercase(),
                     color = Color.White.copy(alpha = 0.55f),
                     fontSize = 10.5.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -279,24 +289,26 @@ private fun CollectionHero() {
                 )
                 Column {
                     Text(
-                        text = "Verão",
+                        text = state.heroTitle,
                         color = Color.White,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = (-0.035).em,
                         lineHeight = 33.sp,
                     )
-                    Text(
-                        text = "vinte e seis",
-                        color = Color(0xFFE2D7B8),
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = (-0.035).em,
-                        lineHeight = 32.sp,
-                    )
+                    state.heroSubtitle?.let {
+                        Text(
+                            text = it,
+                            color = Color(0xFFE2D7B8),
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = (-0.035).em,
+                            lineHeight = 32.sp,
+                        )
+                    }
                 }
                 Text(
-                    text = "8 SKUs · 3 estreias · Chenson, LEE, Dumond.\nBolsas femininas atacado.",
+                    text = state.heroDescription,
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
@@ -323,7 +335,7 @@ private fun CollectionHero() {
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                listOf(products[0], products[1], products[2]).forEachIndexed { i, p ->
+                highlights.take(3).forEachIndexed { i, p ->
                     val tint = FashionPalette[p.tintIndex]
                     Box(
                         modifier = Modifier
@@ -341,29 +353,50 @@ private fun CollectionHero() {
     }
 }
 
-private data class CatalogStat(val label: String, val value: String, val accent: StatAccent)
-private enum class StatAccent { Ink, Brand, Warn, Live }
+@Composable
+private fun CatalogPager(page: Int, totalPages: Int, onPrev: () -> Unit, onNext: () -> Unit) {
+    val colors = TrovataTokens.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Btn(
+            text = "Anterior",
+            onClick = onPrev,
+            kind = BtnKind.Surface,
+            size = BtnSize.Sm,
+            enabled = page > 1,
+        )
+        Text(
+            text = "Página $page de $totalPages",
+            color = colors.ink3,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f),
+        )
+        Btn(
+            text = "Próxima",
+            onClick = onNext,
+            kind = BtnKind.Surface,
+            size = BtnSize.Sm,
+            enabled = page < totalPages,
+        )
+    }
+}
 
 @Composable
-private fun StatsStrip() {
+private fun StatsStrip(stats: List<CatalogStatItem>) {
     val colors = TrovataTokens.colors
-    val stats = listOf(
-        CatalogStat("SKUs", "8", StatAccent.Ink),
-        CatalogStat("Novos", "3", StatAccent.Brand),
-        CatalogStat("Pré-venda", "1", StatAccent.Warn),
-        CatalogStat("Baixo", "0", StatAccent.Live),
-    )
+    val accents = listOf(colors.ink, colors.brand, colors.warn, colors.live)
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        stats.forEach { stat ->
-            val color = when (stat.accent) {
-                StatAccent.Ink -> colors.ink
-                StatAccent.Brand -> colors.brand
-                StatAccent.Warn -> colors.warn
-                StatAccent.Live -> colors.live
-            }
+        stats.forEachIndexed { index, stat ->
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -382,7 +415,7 @@ private fun StatsStrip() {
                 )
                 Text(
                     text = stat.value,
-                    color = color,
+                    color = accents[index % accents.size],
                     style = TrovataTokens.type.monoBig.copy(
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
@@ -390,51 +423,6 @@ private fun StatsStrip() {
                     ),
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun TopOfWeekCard(
-    product: app.trovata.cast.data.sample.Product,
-    growth: Int,
-    ordersLabel: String,
-    onClick: () -> Unit = {},
-) {
-    val colors = TrovataTokens.colors
-    Column(
-        modifier = Modifier.width(158.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        ProductCard(
-            product = product,
-            size = ProductCardSize.Sm,
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onClick,
-        )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Icon(
-                imageVector = TrovataIcons.trend,
-                contentDescription = null,
-                tint = colors.jade2,
-                modifier = Modifier.size(11.dp),
-            )
-            Text(
-                text = "+$growth%",
-                color = colors.jade2,
-                style = TrovataTokens.type.mono.copy(
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-            )
-            Text(
-                text = "· $ordersLabel",
-                color = colors.ink3,
-                fontSize = 10.5.sp,
-            )
         }
     }
 }

@@ -30,10 +30,14 @@ class AuthRepository(
     private val _companies = MutableStateFlow<List<Company>>(emptyList())
     val companies: StateFlow<List<Company>> = _companies.asStateFlow()
 
+    private val _activeCompany = MutableStateFlow<Company?>(null)
+    val activeCompany: StateFlow<Company?> = _activeCompany.asStateFlow()
+
     init {
         tokens = readTokens()
         selectedEmpresaId = store.get(KEY_EMPRESA)?.toLongOrNull()
         _user.value = readUser()
+        _activeCompany.value = readActiveCompany()
         _isAuthenticated.value = hasUsableSession() && selectedEmpresaId != null
     }
 
@@ -67,6 +71,9 @@ class AuthRepository(
     fun selectCompany(empresaId: Long) {
         selectedEmpresaId = empresaId
         store.put(KEY_EMPRESA, empresaId.toString())
+        val company = _companies.value.firstOrNull { it.id == empresaId }
+        _activeCompany.value = company
+        persistActiveCompany(company)
         _isAuthenticated.value = hasUsableSession()
     }
 
@@ -97,6 +104,7 @@ class AuthRepository(
         selectedEmpresaId = null
         _user.value = null
         _companies.value = emptyList()
+        _activeCompany.value = null
         for (key in ALL_KEYS) store.put(key, null)
         _isAuthenticated.value = false
     }
@@ -148,6 +156,25 @@ class AuthRepository(
         )
     }
 
+    private fun persistActiveCompany(company: Company?) {
+        store.put(KEY_COMPANY_NAME, company?.name)
+        store.put(KEY_COMPANY_LEGAL, company?.legalName)
+        store.put(KEY_COMPANY_CNPJ, company?.cnpj)
+        store.put(KEY_COMPANY_LOGO, company?.logoUrl)
+    }
+
+    private fun readActiveCompany(): Company? {
+        val id = selectedEmpresaId ?: return null
+        val name = store.get(KEY_COMPANY_NAME) ?: return null
+        return Company(
+            id = id,
+            name = name,
+            legalName = store.get(KEY_COMPANY_LEGAL),
+            cnpj = store.get(KEY_COMPANY_CNPJ),
+            logoUrl = store.get(KEY_COMPANY_LOGO),
+        )
+    }
+
     private companion object {
         const val SKEW_MS = 30_000L
         const val KEY_ACCESS = "access_token"
@@ -159,9 +186,14 @@ class AuthRepository(
         const val KEY_USER_NAME = "user_name"
         const val KEY_USER_EMAIL = "user_email"
         const val KEY_USER_AVATAR = "user_avatar"
+        const val KEY_COMPANY_NAME = "company_name"
+        const val KEY_COMPANY_LEGAL = "company_legal"
+        const val KEY_COMPANY_CNPJ = "company_cnpj"
+        const val KEY_COMPANY_LOGO = "company_logo"
         val ALL_KEYS = listOf(
             KEY_ACCESS, KEY_REFRESH, KEY_ACCESS_EXP, KEY_REFRESH_EXP, KEY_EMPRESA,
             KEY_USER_ID, KEY_USER_NAME, KEY_USER_EMAIL, KEY_USER_AVATAR,
+            KEY_COMPANY_NAME, KEY_COMPANY_LEGAL, KEY_COMPANY_CNPJ, KEY_COMPANY_LOGO,
         )
     }
 }

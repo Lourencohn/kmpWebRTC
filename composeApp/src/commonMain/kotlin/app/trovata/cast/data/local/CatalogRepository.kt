@@ -2,6 +2,7 @@ package app.trovata.cast.data.local
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import app.cash.sqldelight.coroutines.mapToOne
 import app.trovata.cast.data.remote.HttpClientFactory
 import app.trovata.cast.data.remote.sfa.dto.GradeBreakDto
 import app.trovata.cast.data.sample.Product
@@ -26,7 +27,10 @@ data class CatalogProduct(
     val colecao: String?,
     val marca: String?,
     val categoria: String?,
+    val imageUrl: String?,
 )
+
+data class CatalogStats(val brands: Int, val categories: Int, val priced: Int)
 
 class CatalogRepository(
     private val db: TrovataDatabase,
@@ -34,19 +38,54 @@ class CatalogRepository(
 ) {
     private val catalog = db.catalogQueries
     private val pricing = db.pricingQueries
+    private val assets = db.assetsQueries
 
     fun observeCatalog(priceTableId: Long? = null): Flow<List<CatalogProduct>> =
         catalog.selectAllProducts().asFlow().mapToList(Dispatchers.Default).map { rows ->
             assemble(rows, priceTableId)
         }
 
+    fun observeCount(): Flow<Long> =
+        catalog.countProducts().asFlow().mapToOne(Dispatchers.Default)
+
+    suspend fun count(): Long = withContext(Dispatchers.Default) {
+        catalog.countProducts().executeAsOne()
+    }
+
+    suspend fun stats(): CatalogStats = withContext(Dispatchers.Default) {
+        CatalogStats(
+            brands = catalog.countDistinctMarcas().executeAsOne().toInt(),
+            categories = catalog.countDistinctCategorias().executeAsOne().toInt(),
+            priced = catalog.countPricedProducts().executeAsOne().toInt(),
+        )
+    }
+
     suspend fun snapshot(priceTableId: Long? = null): List<CatalogProduct> = withContext(Dispatchers.Default) {
         assemble(catalog.selectAllProducts().executeAsList(), priceTableId)
+    }
+
+    suspend fun page(limit: Int, offset: Int, priceTableId: Long? = null): List<CatalogProduct> = withContext(Dispatchers.Default) {
+        assemble(catalog.selectProductsPaged(limit.toLong(), offset.toLong()).executeAsList(), priceTableId)
+    }
+
+    suspend fun uiPage(limit: Int, offset: Int, priceTableId: Long? = null): List<Product> = withContext(Dispatchers.Default) {
+        page(limit, offset, priceTableId).map { it.toUiProduct() }
     }
 
     suspend fun uiProducts(priceTableId: Long? = null): List<Product> = withContext(Dispatchers.Default) {
         val real = assemble(catalog.selectAllProducts().executeAsList(), priceTableId)
         if (real.isEmpty()) SampleCatalog.products else real.map { it.toUiProduct() }
+    }
+
+    suspend fun uiProductByRef(ref: String, priceTableId: Long? = null): Product? = withContext(Dispatchers.Default) {
+        val real = assemble(catalog.selectAllProducts().executeAsList(), priceTableId)
+        if (real.isEmpty()) SampleCatalog.products.firstOrNull { it.ref == ref }
+        else real.firstOrNull { it.ref == ref }?.toUiProduct()
+    }
+
+    suspend fun gallery(productIdErp: String): List<String> = withContext(Dispatchers.Default) {
+        assets.selectImagesForProduct(productIdErp).executeAsList()
+            .mapNotNull { it.caminhoDetail ?: it.caminhoMedia ?: it.caminhoOriginal ?: it.caminhoThumb }
     }
 
     suspend fun isEmpty(): Boolean = withContext(Dispatchers.Default) {
@@ -60,6 +99,7 @@ class CatalogRepository(
         val priceByPre = (priceTableId?.let { pricing.selectPricesForTable(it).executeAsList() } ?: emptyList())
             .filter { it.produtoPreId != null }
             .associateBy { it.produtoPreId!! }
+        val imageByErp = imageMapFor(rows.mapNotNull { it.idErp })
 
         return rows.map { p ->
             val commercial = commercialByPre[p.id]?.minByOrNull { it.qtdeMinimaVenda ?: Long.MAX_VALUE }
@@ -76,8 +116,21 @@ class CatalogRepository(
                 colecao = p.descricaoColecao,
                 marca = p.descricaoMarca,
                 categoria = p.descricaoCategoria,
+                imageUrl = p.idErp?.let { imageByErp[it] },
             )
         }
+    }
+
+    private fun imageMapFor(erps: List<String>): Map<String, String> {
+        if (erps.isEmpty()) return emptyMap()
+        val map = HashMap<String, String>()
+        assets.selectThumbsForProducts(erps).executeAsList().forEach { row ->
+            val erp = row.produtoIdErp ?: return@forEach
+            if (erp in map) return@forEach
+            val url = row.caminhoThumb ?: row.caminhoDetail ?: row.caminhoMedia ?: return@forEach
+            map[erp] = url
+        }
+        return map
     }
 
     private fun parseGrade(listaGradeJson: String?): GradeInfo {
@@ -104,6 +157,7 @@ fun CatalogProduct.toUiProduct(): Product = Product(
     colorCount = colorCount,
     tag = null,
     image = null,
+    imageUrl = imageUrl,
 )
 
 fun centsToBrl(cents: Long): String {

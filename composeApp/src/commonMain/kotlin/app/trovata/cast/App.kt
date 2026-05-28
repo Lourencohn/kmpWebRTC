@@ -14,6 +14,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import app.trovata.cast.navigation.AuthWelcomeRoute
 import app.trovata.cast.theme.TrovataTheme
+import coil3.ImageLoader
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.network.ktor3.KtorNetworkFetcherFactory
+import coil3.request.crossfade
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.screens.tabs.TabsHostRoute
 import cafe.adriel.voyager.core.screen.Screen
@@ -24,6 +28,13 @@ import cafe.adriel.voyager.transitions.SlideTransition
 fun App() {
     val container = AppContainerHolder.current
     val isAuthenticated by container.authRepository.isAuthenticated.collectAsState()
+
+    setSingletonImageLoaderFactory { context ->
+        ImageLoader.Builder(context)
+            .components { add(KtorNetworkFetcherFactory()) }
+            .crossfade(true)
+            .build()
+    }
 
     LaunchedEffect(isAuthenticated) {
         if (isAuthenticated) container.startCatalogSync()

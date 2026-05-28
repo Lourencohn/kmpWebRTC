@@ -4,12 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import app.trovata.cast.AppContainerHolder
+import app.trovata.cast.data.sample.Product
+import app.trovata.cast.feature.account.AccountScreenModel
 import app.trovata.cast.feature.auth.LoginScreenModel
 import app.trovata.cast.ui.screens.account.AccountScreen
 import app.trovata.cast.ui.screens.auth.AuthLoginScreen
 import app.trovata.cast.ui.screens.auth.CompanySelectionScreen
-import app.trovata.cast.data.sample.SampleCatalog
 import app.trovata.cast.ui.screens.auth.AuthWelcomeScreen
 import app.trovata.cast.ui.screens.catalog.ProductDetailScreen
 import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
@@ -52,14 +54,22 @@ data class SessionPrepRoute(val clientName: String? = null) : Screen {
 data class ProductDetailRoute(val productRef: String) : Screen {
     @Composable
     override fun Content() {
+        val container = AppContainerHolder.current
         val navigator = LocalNavigator.currentOrThrow
-        val product = SampleCatalog.products.firstOrNull { it.ref == productRef }
-            ?: return run { navigator.pop() }
-        ProductDetailScreen(
-            product = product,
-            onBack = { navigator.pop() },
-            onStartSession = { navigator.push(CatalogPickerScreen()) },
-        )
+        val product by produceState<Product?>(initialValue = null, productRef) {
+            value = container.catalogRepository.uiProductByRef(productRef)
+        }
+        val images by produceState(initialValue = emptyList<String>(), productRef) {
+            value = container.catalogRepository.gallery(productRef)
+        }
+        product?.let {
+            ProductDetailScreen(
+                product = it,
+                imageUrls = images,
+                onBack = { navigator.pop() },
+                onStartSession = { navigator.push(CatalogPickerScreen()) },
+            )
+        }
     }
 }
 
@@ -68,7 +78,10 @@ object AccountRoute : Screen {
     override fun Content() {
         val container = AppContainerHolder.current
         val navigator = LocalNavigator.currentOrThrow
+        val model = rememberScreenModel { AccountScreenModel(container.authRepository) }
+        val state by model.state.collectAsState()
         AccountScreen(
+            state = state,
             onBack = { navigator.pop() },
             onSignOut = { container.authRepository.logout() },
         )
