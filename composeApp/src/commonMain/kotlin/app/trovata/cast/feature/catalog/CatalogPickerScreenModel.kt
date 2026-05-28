@@ -59,6 +59,7 @@ class CatalogPickerScreenModel(
     private val persistSession: PersistSessionFn,
     private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     initialClient: ClientDraft = ClientDraft(),
+    private val loadProducts: suspend () -> List<Product> = { SampleCatalog.products },
 ) : ScreenModel {
 
     private val _state = MutableStateFlow(
@@ -70,6 +71,13 @@ class CatalogPickerScreenModel(
         ),
     )
     val state: StateFlow<CatalogPickerUiState> = _state.asStateFlow()
+
+    init {
+        screenModelScope.launch {
+            val products = loadProducts()
+            if (products.isNotEmpty()) _state.update { it.copy(products = products) }
+        }
+    }
 
     fun toggle(sku: String) {
         _state.update { current ->

@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -23,6 +24,10 @@ import cafe.adriel.voyager.transitions.SlideTransition
 fun App() {
     val container = AppContainerHolder.current
     val isAuthenticated by container.authRepository.isAuthenticated.collectAsState()
+
+    LaunchedEffect(isAuthenticated) {
+        if (isAuthenticated) container.startCatalogSync()
+    }
 
     TrovataTheme {
         Box(

@@ -75,6 +75,7 @@ data class CatalogPickerScreen(
                 createSession = container.sessionsApi::createSession,
                 persistSession = container.sessionsRepository::persistCreated,
                 initialClient = initial,
+                loadProducts = { container.catalogRepository.uiProducts() },
             )
         }
         val state by screenModel.state.collectAsState()

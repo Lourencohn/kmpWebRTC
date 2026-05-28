@@ -1,0 +1,90 @@
+CREATE TABLE IF NOT EXISTS ProductEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    descricao2 TEXT,
+    apelido TEXT,
+    unidade TEXT,
+    codigoBarras TEXT,
+    ncm TEXT,
+    situacao TEXT,
+    precoBaseCents INTEGER,
+    precoFinalCents INTEGER,
+    listaMultiploVenda INTEGER,
+    tipoComplemento1 TEXT,
+    tipoComplemento2 TEXT,
+    tipoComplemento3 TEXT,
+    categoriaId INTEGER,
+    colecaoId INTEGER,
+    marcaId INTEGER,
+    grupoProdutoId INTEGER,
+    generoId INTEGER,
+    linhaId INTEGER,
+    descricaoCategoria TEXT,
+    descricaoColecao TEXT,
+    descricaoMarca TEXT,
+    descricaoGrupoProduto TEXT,
+    sequenciaCatalogoLink TEXT,
+    createdAt TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER,
+    deletedAt TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_iderp ON ProductEntity(idErp);
+CREATE INDEX IF NOT EXISTS idx_product_updated ON ProductEntity(updatedAtMs);
+CREATE INDEX IF NOT EXISTS idx_product_colecao ON ProductEntity(colecaoId);
+
+CREATE TABLE IF NOT EXISTS CommercialProductEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    produtoPreId INTEGER,
+    nivel INTEGER,
+    vendaLiberada INTEGER NOT NULL DEFAULT 0,
+    listaMultiploVenda INTEGER,
+    multiploVenda INTEGER,
+    qtdeMinimaVenda INTEGER,
+    qtdeMinimaItemVenda INTEGER,
+    qtdeMaximaVenda INTEGER,
+    valorMinimoVendaCents INTEGER,
+    permiteSortir INTEGER NOT NULL DEFAULT 0,
+    percDesconto REAL,
+    dataValidadeDesconto TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_comm_iderp ON CommercialProductEntity(idErp);
+CREATE INDEX IF NOT EXISTS idx_comm_pre ON CommercialProductEntity(produtoPreId);
+
+upsertProduct:
+INSERT OR REPLACE INTO ProductEntity(id, idErp, descricao, descricao2, apelido, unidade, codigoBarras, ncm, situacao, precoBaseCents, precoFinalCents, listaMultiploVenda, tipoComplemento1, tipoComplemento2, tipoComplemento3, categoriaId, colecaoId, marcaId, grupoProdutoId, generoId, linhaId, descricaoCategoria, descricaoColecao, descricaoMarca, descricaoGrupoProduto, sequenciaCatalogoLink, createdAt, updatedAt, updatedAtMs, deletedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAllProducts:
+SELECT * FROM ProductEntity WHERE deletedAt IS NULL ORDER BY sequenciaCatalogoLink ASC, descricao ASC;
+
+selectProductById:
+SELECT * FROM ProductEntity WHERE id = ?;
+
+selectProductByErp:
+SELECT * FROM ProductEntity WHERE idErp = ?;
+
+countProducts:
+SELECT count(*) FROM ProductEntity WHERE deletedAt IS NULL;
+
+deleteProductsByIds:
+DELETE FROM ProductEntity WHERE id IN ?;
+
+upsertCommercial:
+INSERT OR REPLACE INTO CommercialProductEntity(id, idErp, produtoPreId, nivel, vendaLiberada, listaMultiploVenda, multiploVenda, qtdeMinimaVenda, qtdeMinimaItemVenda, qtdeMaximaVenda, valorMinimoVendaCents, permiteSortir, percDesconto, dataValidadeDesconto, updatedAt, updatedAtMs)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectCommercialByPreId:
+SELECT * FROM CommercialProductEntity WHERE produtoPreId = ?;
+
+selectAllCommercial:
+SELECT * FROM CommercialProductEntity;
+
+deleteCommercialByIds:
+DELETE FROM CommercialProductEntity WHERE id IN ?;

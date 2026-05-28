@@ -1,0 +1,18 @@
+CREATE TABLE IF NOT EXISTS SyncStateEntity (
+    entity TEXT NOT NULL PRIMARY KEY,
+    cursorUpdatedAt TEXT,
+    lastSyncAtMs INTEGER,
+    lastPage INTEGER NOT NULL DEFAULT 0,
+    inFlight INTEGER NOT NULL DEFAULT 0,
+    lastError TEXT
+);
+
+upsertSyncState:
+INSERT OR REPLACE INTO SyncStateEntity(entity, cursorUpdatedAt, lastSyncAtMs, lastPage, inFlight, lastError)
+VALUES (?, ?, ?, ?, ?, ?);
+
+selectSyncState:
+SELECT * FROM SyncStateEntity WHERE entity = ?;
+
+selectAllSyncState:
+SELECT * FROM SyncStateEntity;

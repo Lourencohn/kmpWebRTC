@@ -1,0 +1,229 @@
+CREATE TABLE IF NOT EXISTS CategoriaEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_categoria_iderp ON CategoriaEntity(idErp);
+
+CREATE TABLE IF NOT EXISTS ColecaoEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_colecao_iderp ON ColecaoEntity(idErp);
+
+CREATE TABLE IF NOT EXISTS MarcaEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_marca_iderp ON MarcaEntity(idErp);
+
+CREATE TABLE IF NOT EXISTS GrupoProdutoEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS GeneroEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS LinhaEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS FamiliaComercialEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS NichoEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS EspecieEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS TipoProdutoEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS Complemento1Entity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    tipoComplementoIdErp TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_compl1_iderp ON Complemento1Entity(idErp);
+
+CREATE TABLE IF NOT EXISTS Complemento2Entity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    tipoComplementoIdErp TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_compl2_iderp ON Complemento2Entity(idErp);
+
+CREATE TABLE IF NOT EXISTS Complemento3Entity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    descricao TEXT,
+    tipoComplementoIdErp TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_compl3_iderp ON Complemento3Entity(idErp);
+
+CREATE TABLE IF NOT EXISTS GradePadraoEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    sequencia INTEGER,
+    complemento2Id INTEGER,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+upsertCategoria:
+INSERT OR REPLACE INTO CategoriaEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllCategorias:
+SELECT * FROM CategoriaEntity ORDER BY descricao ASC;
+deleteCategoriasByIds:
+DELETE FROM CategoriaEntity WHERE id IN ?;
+
+upsertColecao:
+INSERT OR REPLACE INTO ColecaoEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllColecoes:
+SELECT * FROM ColecaoEntity ORDER BY descricao ASC;
+deleteColecoesByIds:
+DELETE FROM ColecaoEntity WHERE id IN ?;
+
+upsertMarca:
+INSERT OR REPLACE INTO MarcaEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllMarcas:
+SELECT * FROM MarcaEntity ORDER BY descricao ASC;
+deleteMarcasByIds:
+DELETE FROM MarcaEntity WHERE id IN ?;
+
+upsertGrupoProduto:
+INSERT OR REPLACE INTO GrupoProdutoEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllGruposProdutos:
+SELECT * FROM GrupoProdutoEntity ORDER BY descricao ASC;
+deleteGruposProdutosByIds:
+DELETE FROM GrupoProdutoEntity WHERE id IN ?;
+
+upsertGenero:
+INSERT OR REPLACE INTO GeneroEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllGeneros:
+SELECT * FROM GeneroEntity ORDER BY descricao ASC;
+deleteGenerosByIds:
+DELETE FROM GeneroEntity WHERE id IN ?;
+
+upsertLinha:
+INSERT OR REPLACE INTO LinhaEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllLinhas:
+SELECT * FROM LinhaEntity ORDER BY descricao ASC;
+deleteLinhasByIds:
+DELETE FROM LinhaEntity WHERE id IN ?;
+
+upsertFamiliaComercial:
+INSERT OR REPLACE INTO FamiliaComercialEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllFamiliasComerciais:
+SELECT * FROM FamiliaComercialEntity ORDER BY descricao ASC;
+deleteFamiliasComerciaisByIds:
+DELETE FROM FamiliaComercialEntity WHERE id IN ?;
+
+upsertNicho:
+INSERT OR REPLACE INTO NichoEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllNichos:
+SELECT * FROM NichoEntity ORDER BY descricao ASC;
+deleteNichosByIds:
+DELETE FROM NichoEntity WHERE id IN ?;
+
+upsertEspecie:
+INSERT OR REPLACE INTO EspecieEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllEspecies:
+SELECT * FROM EspecieEntity ORDER BY descricao ASC;
+deleteEspeciesByIds:
+DELETE FROM EspecieEntity WHERE id IN ?;
+
+upsertTipoProduto:
+INSERT OR REPLACE INTO TipoProdutoEntity(id, idErp, descricao, situacao, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllTiposProdutos:
+SELECT * FROM TipoProdutoEntity ORDER BY descricao ASC;
+deleteTiposProdutosByIds:
+DELETE FROM TipoProdutoEntity WHERE id IN ?;
+
+upsertComplemento1:
+INSERT OR REPLACE INTO Complemento1Entity(id, idErp, descricao, tipoComplementoIdErp, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllComplementos1:
+SELECT * FROM Complemento1Entity ORDER BY descricao ASC;
+deleteComplementos1ByIds:
+DELETE FROM Complemento1Entity WHERE id IN ?;
+
+upsertComplemento2:
+INSERT OR REPLACE INTO Complemento2Entity(id, idErp, descricao, tipoComplementoIdErp, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllComplementos2:
+SELECT * FROM Complemento2Entity ORDER BY descricao ASC;
+deleteComplementos2ByIds:
+DELETE FROM Complemento2Entity WHERE id IN ?;
+
+upsertComplemento3:
+INSERT OR REPLACE INTO Complemento3Entity(id, idErp, descricao, tipoComplementoIdErp, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllComplementos3:
+SELECT * FROM Complemento3Entity ORDER BY descricao ASC;
+deleteComplementos3ByIds:
+DELETE FROM Complemento3Entity WHERE id IN ?;
+
+upsertGradePadrao:
+INSERT OR REPLACE INTO GradePadraoEntity(id, idErp, sequencia, complemento2Id, updatedAt, updatedAtMs) VALUES (?, ?, ?, ?, ?, ?);
+selectAllGradesPadroes:
+SELECT * FROM GradePadraoEntity ORDER BY sequencia ASC;
+deleteGradesPadroesByIds:
+DELETE FROM GradePadraoEntity WHERE id IN ?;

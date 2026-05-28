@@ -20,6 +20,13 @@ object HttpClientFactory {
         explicitNulls = false
     }
 
+    val sfaJson: Json = Json {
+        ignoreUnknownKeys = true
+        explicitNulls = false
+        isLenient = true
+        coerceInputValues = true
+    }
+
     fun create(): HttpClient = HttpClient(httpClientEngine()) {
         expectSuccess = false
         install(ContentNegotiation) { json(json) }
@@ -29,6 +36,19 @@ object HttpClientFactory {
         }
         install(Logging) { level = LogLevel.INFO }
         install(WebSockets)
+        defaultRequest {
+            header(HttpHeaders.Accept, "application/json")
+        }
+    }
+
+    fun createSfa(): HttpClient = HttpClient(httpClientEngine()) {
+        expectSuccess = false
+        install(ContentNegotiation) { json(sfaJson) }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60_000
+            connectTimeoutMillis = 10_000
+        }
+        install(Logging) { level = LogLevel.INFO }
         defaultRequest {
             header(HttpHeaders.Accept, "application/json")
         }

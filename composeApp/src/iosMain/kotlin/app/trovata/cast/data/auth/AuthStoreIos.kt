@@ -5,13 +5,13 @@ import platform.Foundation.NSUserDefaults
 actual class AuthStore {
     private val defaults: NSUserDefaults = NSUserDefaults.standardUserDefaults
 
-    actual fun isAuthenticated(): Boolean = defaults.boolForKey(KEY_AUTH)
+    actual fun get(key: String): String? = defaults.stringForKey(key)
 
-    actual fun setAuthenticated(value: Boolean) {
-        defaults.setBool(value, KEY_AUTH)
-    }
-
-    private companion object {
-        const val KEY_AUTH = "trovatacast.is_authenticated"
+    actual fun put(key: String, value: String?) {
+        if (value == null) {
+            defaults.removeObjectForKey(key)
+        } else {
+            defaults.setObject(value, key)
+        }
     }
 }

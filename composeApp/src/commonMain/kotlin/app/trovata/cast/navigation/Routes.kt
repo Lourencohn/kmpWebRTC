@@ -1,17 +1,21 @@
 package app.trovata.cast.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import app.trovata.cast.AppContainerHolder
+import app.trovata.cast.feature.auth.LoginScreenModel
 import app.trovata.cast.ui.screens.account.AccountScreen
 import app.trovata.cast.ui.screens.auth.AuthLoginScreen
-import app.trovata.cast.ui.screens.auth.AuthSetupScreen
+import app.trovata.cast.ui.screens.auth.CompanySelectionScreen
 import app.trovata.cast.data.sample.SampleCatalog
-import app.trovata.cast.ui.screens.auth.AuthVerifyScreen
 import app.trovata.cast.ui.screens.auth.AuthWelcomeScreen
 import app.trovata.cast.ui.screens.catalog.ProductDetailScreen
 import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
 import app.trovata.cast.ui.screens.sessions.IncomingCallScreen
 import app.trovata.cast.ui.screens.sessions.SessionPrepScreen
+import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -66,7 +70,7 @@ object AccountRoute : Screen {
         val navigator = LocalNavigator.currentOrThrow
         AccountScreen(
             onBack = { navigator.pop() },
-            onSignOut = { container.authRepository.signOut() },
+            onSignOut = { container.authRepository.logout() },
         )
     }
 }
@@ -85,36 +89,36 @@ object AuthWelcomeRoute : Screen {
 object AuthLoginRoute : Screen {
     @Composable
     override fun Content() {
+        val container = AppContainerHolder.current
         val navigator = LocalNavigator.currentOrThrow
+        val model = rememberScreenModel { LoginScreenModel(container.authRepository) }
+        val state by model.state.collectAsState()
+
+        LaunchedEffect(state.success) {
+            val success = state.success ?: return@LaunchedEffect
+            if (success.needsCompanySelection) navigator.push(CompanySelectionRoute)
+        }
+
         AuthLoginScreen(
+            state = state,
             onBack = { navigator.pop() },
-            onContinue = { navigator.push(AuthVerifyRoute) },
-            onUseEmail = { navigator.push(AuthVerifyRoute) },
-            onCreateAccount = { navigator.push(AuthVerifyRoute) },
+            onEmailChange = model::setEmail,
+            onPasswordChange = model::setPassword,
+            onSubmit = model::submit,
         )
     }
 }
 
-object AuthVerifyRoute : Screen {
-    @Composable
-    override fun Content() {
-        val navigator = LocalNavigator.currentOrThrow
-        AuthVerifyScreen(
-            onBack = { navigator.pop() },
-            onContinue = { navigator.push(AuthSetupRoute) },
-            onChangeNumber = { navigator.pop() },
-        )
-    }
-}
-
-object AuthSetupRoute : Screen {
+object CompanySelectionRoute : Screen {
     @Composable
     override fun Content() {
         val container = AppContainerHolder.current
         val navigator = LocalNavigator.currentOrThrow
-        AuthSetupScreen(
+        val companies by container.authRepository.companies.collectAsState()
+        CompanySelectionScreen(
+            companies = companies,
             onBack = { navigator.pop() },
-            onFinish = { container.authRepository.signIn() },
+            onSelect = { container.authRepository.selectCompany(it.id) },
         )
     }
 }

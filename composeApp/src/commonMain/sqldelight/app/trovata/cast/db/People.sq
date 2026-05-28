@@ -1,0 +1,95 @@
+CREATE TABLE IF NOT EXISTS ClientEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    vendedorIdErp TEXT,
+    cidadeIdErp TEXT,
+    situacao TEXT,
+    nomeFantasia TEXT,
+    razaoSocial TEXT,
+    cpfCnpj TEXT,
+    endereco TEXT,
+    bairro TEXT,
+    cep TEXT,
+    telefone TEXT,
+    celular TEXT,
+    email TEXT,
+    contato TEXT,
+    tabelaPrecoId INTEGER,
+    prazoId INTEGER,
+    percDesconto REAL,
+    updatedAt TEXT,
+    updatedAtMs INTEGER,
+    deletedAt TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_iderp ON ClientEntity(idErp);
+CREATE INDEX IF NOT EXISTS idx_client_vendedor ON ClientEntity(vendedorIdErp);
+
+CREATE TABLE IF NOT EXISTS SellerEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    nomeFantasia TEXT,
+    razaoSocial TEXT,
+    email TEXT,
+    telefone TEXT,
+    situacao TEXT,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_seller_iderp ON SellerEntity(idErp);
+
+CREATE TABLE IF NOT EXISTS SellerClientEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    vendedorIdErp TEXT NOT NULL,
+    clienteIdErp TEXT NOT NULL,
+    vendedorId INTEGER,
+    clienteId INTEGER,
+    updatedAt TEXT,
+    updatedAtMs INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_sellerclient_vend ON SellerClientEntity(vendedorIdErp);
+CREATE INDEX IF NOT EXISTS idx_sellerclient_cli ON SellerClientEntity(clienteIdErp);
+
+upsertClient:
+INSERT OR REPLACE INTO ClientEntity(id, idErp, vendedorIdErp, cidadeIdErp, situacao, nomeFantasia, razaoSocial, cpfCnpj, endereco, bairro, cep, telefone, celular, email, contato, tabelaPrecoId, prazoId, percDesconto, updatedAt, updatedAtMs, deletedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAllClients:
+SELECT * FROM ClientEntity WHERE deletedAt IS NULL ORDER BY nomeFantasia ASC;
+
+selectClientById:
+SELECT * FROM ClientEntity WHERE id = ?;
+
+selectClientsByVendedor:
+SELECT * FROM ClientEntity WHERE vendedorIdErp = ? AND deletedAt IS NULL ORDER BY nomeFantasia ASC;
+
+countClients:
+SELECT count(*) FROM ClientEntity WHERE deletedAt IS NULL;
+
+deleteClientsByIds:
+DELETE FROM ClientEntity WHERE id IN ?;
+
+upsertSeller:
+INSERT OR REPLACE INTO SellerEntity(id, idErp, nomeFantasia, razaoSocial, email, telefone, situacao, updatedAt, updatedAtMs)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAllSellers:
+SELECT * FROM SellerEntity ORDER BY nomeFantasia ASC;
+
+selectSellerByErp:
+SELECT * FROM SellerEntity WHERE idErp = ?;
+
+deleteSellersByIds:
+DELETE FROM SellerEntity WHERE id IN ?;
+
+upsertSellerClient:
+INSERT OR REPLACE INTO SellerClientEntity(id, vendedorIdErp, clienteIdErp, vendedorId, clienteId, updatedAt, updatedAtMs)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+selectClientErpsBySeller:
+SELECT clienteIdErp FROM SellerClientEntity WHERE vendedorIdErp = ?;
+
+deleteSellerClientsByIds:
+DELETE FROM SellerClientEntity WHERE id IN ?;
