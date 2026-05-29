@@ -9,6 +9,7 @@ import app.trovata.cast.feature.catalog.CatalogPickerScreenModel
 import app.trovata.cast.feature.catalog.CatalogScreenModel
 import app.trovata.cast.feature.catalog.ClientDraft
 import app.trovata.cast.feature.clients.ClientsScreenModel
+import app.trovata.cast.feature.dashboard.DashboardScreenModel
 import app.trovata.cast.feature.insights.InsightsScreenModel
 import app.trovata.cast.feature.sessions.SessionsViewModel
 import org.koin.dsl.module
@@ -21,6 +22,7 @@ val screenModelModule = module {
     factory { CatalogScreenModel(get(), get(), get()) }
     factory { ClientsScreenModel(get(), get()) }
     factory { InsightsScreenModel(get(), get(), get(), get()) }
+    factory { DashboardScreenModel(get(), get(), get(), get(), get()) }
     factory { (initial: ClientDraft) ->
         val sessionsApi = get<SessionsApi>()
         val sessionsRepository = get<SessionsRepository>()

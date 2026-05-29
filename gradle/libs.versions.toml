@@ -37,6 +37,9 @@ voyager = "1.1.0-beta03"
 # QR code (Compose Multiplatform)
 qrose = "1.0.1"
 
+# Charts (Compose Multiplatform) — pinned to the last release built against Compose 1.7.3
+vico = "2.1.1"
+
 # Logging
 kermit = "2.0.5"
 
@@ -119,6 +122,9 @@ voyager-koin = { module = "cafe.adriel.voyager:voyager-koin", version.ref = "voy
 
 # QR
 qrose = { module = "io.github.alexzhirkevich:qrose", version.ref = "qrose" }
+
+# Charts
+vico-multiplatform = { module = "com.patrykandpatrick.vico:multiplatform", version.ref = "vico" }
 
 # Logging
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }

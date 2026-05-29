@@ -13,6 +13,7 @@ import app.trovata.cast.navigation.AccountRoute
 import app.trovata.cast.navigation.ProductDetailRoute
 import app.trovata.cast.feature.catalog.CatalogScreenModel
 import app.trovata.cast.feature.clients.ClientsScreenModel
+import app.trovata.cast.feature.dashboard.DashboardScreenModel
 import app.trovata.cast.feature.insights.InsightsScreenModel
 import app.trovata.cast.feature.sessions.SessionsViewModel
 import app.trovata.cast.theme.TrovataTokens
@@ -20,6 +21,7 @@ import app.trovata.cast.ui.components.SellerTab
 import app.trovata.cast.ui.components.TabBar
 import app.trovata.cast.ui.screens.catalog.CatalogScreen
 import app.trovata.cast.ui.screens.clients.ClientsScreen
+import app.trovata.cast.ui.screens.dashboard.DashboardScreen
 import app.trovata.cast.ui.screens.insights.InsightsScreen
 import app.trovata.cast.ui.screens.invite.InviteScreen
 import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
@@ -48,6 +50,9 @@ object TabsHostRoute : Screen {
         val insightsModel = koinScreenModel<InsightsScreenModel>()
         val insightsState by insightsModel.state.collectAsState()
 
+        val dashboardModel = koinScreenModel<DashboardScreenModel>()
+        val dashboardState by dashboardModel.state.collectAsState()
+
         Column(modifier = Modifier.fillMaxSize().background(colors.bg)) {
             Box(
                 modifier = Modifier
@@ -55,6 +60,12 @@ object TabsHostRoute : Screen {
                     .weight(1f),
             ) {
                 when (homeState.activeTab) {
+                    SellerTab.Painel -> DashboardScreen(
+                        state = dashboardState,
+                        onOpenAccount = openAccount,
+                        onPeriodChange = dashboardModel::setPeriod,
+                        onMetricChange = dashboardModel::setMetric,
+                    )
                     SellerTab.Sessoes -> SellerHomeScreen(
                         viewModel = viewModel,
                         onInviteClient = { navigator.push(CatalogPickerScreen()) },

@@ -32,7 +32,7 @@ data class SellerHomeUiState(
     val eyebrow: String = "Sessões",
     val title: String = "Suas sessões",
     val subtitle: String = "",
-    val activeTab: SellerTab = SellerTab.Sessoes,
+    val activeTab: SellerTab = SellerTab.Painel,
     val recentSessions: List<StoredSessionRecord> = emptyList(),
     val closedToday: List<StoredOrder> = emptyList(),
 )
@@ -58,7 +58,7 @@ class SessionsViewModel(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    private val _activeTab = MutableStateFlow(SellerTab.Sessoes)
+    private val _activeTab = MutableStateFlow(SellerTab.Painel)
     private val _home = MutableStateFlow(SellerHomeUiState())
     val home: StateFlow<SellerHomeUiState> = _home.asStateFlow()
 

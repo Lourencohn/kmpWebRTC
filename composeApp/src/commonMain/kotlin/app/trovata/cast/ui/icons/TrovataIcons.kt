@@ -70,4 +70,5 @@ object TrovataIcons {
     val arrowLeft = strokeIcon("arrowLeft", "M19 12H5M11 5l-7 7 7 7")
     val sparkle = strokeIcon("sparkle", "M12 3v3M12 18v3M3 12h3M18 12h3M5.5 5.5l2 2M16.5 16.5l2 2M5.5 18.5l2-2M16.5 7.5l2-2")
     val signal = strokeIcon("signal", "M2 12h2M6 9v6M10 6v12M14 9v6M18 12h2")
+    val chart = strokeIcon("chart", "M4 4v16h16M8 16v-4M12 16V8M16 16v-6")
 }
