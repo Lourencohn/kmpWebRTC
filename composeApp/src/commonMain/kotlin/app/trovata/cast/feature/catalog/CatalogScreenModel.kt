@@ -8,6 +8,7 @@ import app.trovata.cast.data.local.toUiProduct
 import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.sample.ProductTag
 import app.trovata.cast.data.sample.SampleCatalog
+import app.trovata.cast.data.sync.CatalogSyncCoordinator
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,38 +34,48 @@ data class CatalogTabUiState(
     val page: Int = 1,
     val totalPages: Int = 1,
     val total: Long = 0,
+    val syncing: Boolean = false,
 )
 
 class CatalogScreenModel(
     private val catalogRepository: CatalogRepository,
     authRepository: AuthRepository,
+    syncCoordinator: CatalogSyncCoordinator,
 ) : ScreenModel {
 
     private val pageSize = 24
     private val _page = MutableStateFlow(1)
-    private val _state = MutableStateFlow(sampleState(authRepository.activeCompany.value))
+    private val _state = MutableStateFlow(sampleState(authRepository.activeCompany.value, false))
     val state: StateFlow<CatalogTabUiState> = _state.asStateFlow()
 
     init {
         screenModelScope.launch {
-            combine(_page, catalogRepository.observeCount(), authRepository.activeCompany) { page, count, company ->
-                Triple(page, count, company)
-            }.collectLatest { (page, count, company) ->
-                _state.value = buildState(page, count, company)
+            combine(
+                _page,
+                catalogRepository.observeCount(),
+                catalogRepository.observeAssetCount(),
+                authRepository.activeCompany,
+                syncCoordinator.isSyncing,
+            ) { page, count, _, company, syncing ->
+                State(page, count, company, syncing)
+            }.collectLatest { s ->
+                _state.value = buildState(s.page, s.count, s.company, s.syncing)
             }
         }
     }
 
+    private data class State(val page: Int, val count: Long, val company: Company?, val syncing: Boolean)
+
     fun nextPage() = _page.update { (it + 1).coerceAtMost(_state.value.totalPages) }
     fun prevPage() = _page.update { (it - 1).coerceAtLeast(1) }
 
-    private suspend fun buildState(page: Int, count: Long, company: Company?): CatalogTabUiState {
-        if (count == 0L) return sampleState(company)
+    private suspend fun buildState(page: Int, count: Long, company: Company?, syncing: Boolean): CatalogTabUiState {
+        if (count == 0L) return sampleState(company, syncing)
         val totalPages = ((count + pageSize - 1) / pageSize).toInt().coerceAtLeast(1)
         val safePage = page.coerceIn(1, totalPages)
         val products = catalogRepository.page(pageSize, (safePage - 1) * pageSize)
         val stats = catalogRepository.stats()
-        return realState(products, stats, count, safePage, totalPages, company)
+        return realState(products, stats, count, safePage, totalPages, company, syncing)
     }
 
     private fun realState(
@@ -74,6 +85,7 @@ class CatalogScreenModel(
         page: Int,
         totalPages: Int,
         company: Company?,
+        syncing: Boolean,
     ): CatalogTabUiState {
         val collection = products.firstNotNullOfOrNull { it.colecao }
         val companyName = company?.name ?: "Catálogo"
@@ -81,7 +93,7 @@ class CatalogScreenModel(
         return CatalogTabUiState(
             products = products.map { it.toUiProduct() },
             headerEyebrow = companyName,
-            headerSubtitle = summary,
+            headerSubtitle = if (syncing) "$summary · sincronizando…" else summary,
             heroEyebrow = if (collection != null) "Coleção em destaque" else "Catálogo ativo",
             heroTitle = collection ?: companyName,
             heroSubtitle = collection?.let { companyName },
@@ -96,16 +108,17 @@ class CatalogScreenModel(
             page = page,
             totalPages = totalPages,
             total = total,
+            syncing = syncing,
         )
     }
 
-    private fun sampleState(company: Company?): CatalogTabUiState {
+    private fun sampleState(company: Company?, syncing: Boolean): CatalogTabUiState {
         val products = SampleCatalog.products
         val brand = company?.name ?: "Atelier Norte"
         return CatalogTabUiState(
             products = products,
             headerEyebrow = "$brand · Verão 26",
-            headerSubtitle = "${products.size} SKUs · 3 estreias · 1 pré-venda",
+            headerSubtitle = if (syncing) "Sincronizando catálogo…" else "${products.size} SKUs · 3 estreias · 1 pré-venda",
             heroEyebrow = "Coleção em destaque",
             heroTitle = "Verão",
             heroSubtitle = "vinte e seis",
@@ -120,6 +133,7 @@ class CatalogScreenModel(
             page = 1,
             totalPages = 1,
             total = products.size.toLong(),
+            syncing = syncing,
         )
     }
 }

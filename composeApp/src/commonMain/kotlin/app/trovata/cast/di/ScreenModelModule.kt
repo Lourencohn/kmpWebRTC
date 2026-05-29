@@ -18,8 +18,8 @@ val screenModelModule = module {
 
     factory { LoginScreenModel(get()) }
     factory { AccountScreenModel(get(), get(), get()) }
-    factory { CatalogScreenModel(get(), get()) }
-    factory { ClientsScreenModel(get()) }
+    factory { CatalogScreenModel(get(), get(), get()) }
+    factory { ClientsScreenModel(get(), get()) }
     factory { InsightsScreenModel(get(), get(), get(), get()) }
     factory { (initial: ClientDraft) ->
         val sessionsApi = get<SessionsApi>()

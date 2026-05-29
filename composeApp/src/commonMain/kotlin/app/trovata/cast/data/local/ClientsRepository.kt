@@ -2,6 +2,7 @@ package app.trovata.cast.data.local
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import app.cash.sqldelight.coroutines.mapToOne
 import app.trovata.cast.db.ClientEntity
 import app.trovata.cast.db.TrovataDatabase
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +30,9 @@ class ClientsRepository(private val db: TrovataDatabase) {
 
     fun observeClients(): Flow<List<CatalogClient>> =
         people.selectAllClients().asFlow().mapToList(Dispatchers.Default).map { rows -> rows.map { it.toDomain() } }
+
+    fun observeCount(): Flow<Long> =
+        people.countClients().asFlow().mapToOne(Dispatchers.Default)
 
     suspend fun byId(id: Long): CatalogClient? = withContext(Dispatchers.Default) {
         people.selectClientById(id).executeAsOneOrNull()?.toDomain()

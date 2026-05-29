@@ -48,6 +48,9 @@ class CatalogRepository(
     fun observeCount(): Flow<Long> =
         catalog.countProducts().asFlow().mapToOne(Dispatchers.Default)
 
+    fun observeAssetCount(): Flow<Long> =
+        assets.countAssets().asFlow().mapToOne(Dispatchers.Default)
+
     suspend fun count(): Long = withContext(Dispatchers.Default) {
         catalog.countProducts().executeAsOne()
     }

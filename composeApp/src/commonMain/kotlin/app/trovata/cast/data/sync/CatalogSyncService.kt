@@ -76,9 +76,9 @@ class CatalogSyncService(
     suspend fun syncEssentials(): SyncReport {
         val essentials: List<suspend () -> SyncEntityResult> = listOf(
             ::syncCategorias, ::syncColecoes, ::syncMarcas,
-            ::syncComplementos1, ::syncComplementos2, ::syncComplementos3,
-            ::syncTabelasPrecos, ::syncProdutosPre, ::syncProdutosComerciais,
-            ::syncItensPrecos, ::syncPrazos, ::syncArquivos, ::syncClientes,
+            ::syncProdutosPre, ::syncArquivos, ::syncClientes,
+            ::syncTabelasPrecos, ::syncComplementos1, ::syncComplementos2, ::syncComplementos3,
+            ::syncItensPrecos, ::syncProdutosComerciais, ::syncPrazos,
         )
         return SyncReport(essentials.map { it() })
     }
@@ -122,13 +122,13 @@ class CatalogSyncService(
         r.forEach { taxonomy.upsertTipoProduto(it.id, it.idErp, it.descricao, it.situacao, it.updatedAt, SfaParse.parseIsoToMs(it.updatedAt)) }
     }
 
-    suspend fun syncComplementos1() = syncResource<ComplementoDto>("complementos-1", 200, { it.updatedAt }, taxonomy::deleteComplementos1ByIds) { r ->
+    suspend fun syncComplementos1() = syncResource<ComplementoDto>("complementos-1", 1000, { it.updatedAt }, taxonomy::deleteComplementos1ByIds) { r ->
         r.forEach { taxonomy.upsertComplemento1(it.id, it.idErp, it.descricao, it.tipoComplementoIdErp, it.updatedAt, SfaParse.parseIsoToMs(it.updatedAt)) }
     }
-    suspend fun syncComplementos2() = syncResource<ComplementoDto>("complementos-2", 200, { it.updatedAt }, taxonomy::deleteComplementos2ByIds) { r ->
+    suspend fun syncComplementos2() = syncResource<ComplementoDto>("complementos-2", 1000, { it.updatedAt }, taxonomy::deleteComplementos2ByIds) { r ->
         r.forEach { taxonomy.upsertComplemento2(it.id, it.idErp, it.descricao, it.tipoComplementoIdErp, it.updatedAt, SfaParse.parseIsoToMs(it.updatedAt)) }
     }
-    suspend fun syncComplementos3() = syncResource<ComplementoDto>("complementos-3", 200, { it.updatedAt }, taxonomy::deleteComplementos3ByIds) { r ->
+    suspend fun syncComplementos3() = syncResource<ComplementoDto>("complementos-3", 1000, { it.updatedAt }, taxonomy::deleteComplementos3ByIds) { r ->
         r.forEach { taxonomy.upsertComplemento3(it.id, it.idErp, it.descricao, it.tipoComplementoIdErp, it.updatedAt, SfaParse.parseIsoToMs(it.updatedAt)) }
     }
     suspend fun syncGradesPadroes() = syncResource<GradePadraoDto>("grades-padroes", 200, { it.updatedAt }, taxonomy::deleteGradesPadroesByIds) { r ->
@@ -145,7 +145,7 @@ class CatalogSyncService(
         }
     }
 
-    suspend fun syncProdutosPre() = syncResource<ProductDto>("produtos-pre", 200, { it.updatedAt }, catalog::deleteProductsByIds) { r ->
+    suspend fun syncProdutosPre() = syncResource<ProductDto>("produtos-pre", 1000, { it.updatedAt }, catalog::deleteProductsByIds) { r ->
         r.forEach {
             catalog.upsertProduct(
                 it.id, it.idErp, it.descricao, it.descricao2, it.apelido, it.unidade, it.codigoBarras, it.ncm, it.situacao,
@@ -170,7 +170,7 @@ class CatalogSyncService(
         }
     }
 
-    suspend fun syncItensPrecos() = syncResource<ProductPriceDto>("itens-tabelas-precos-pre", 300, { it.updatedAt }, pricing::deleteProductPricesByIds) { r ->
+    suspend fun syncItensPrecos() = syncResource<ProductPriceDto>("itens-tabelas-precos-pre", 1000, { it.updatedAt }, pricing::deleteProductPricesByIds) { r ->
         r.forEach {
             val gradeJson = it.listaGrade?.let { g -> json.encodeToString(g) }
             pricing.upsertProductPrice(
@@ -190,7 +190,7 @@ class CatalogSyncService(
         }
     }
 
-    suspend fun syncArquivos() = syncResource<AssetDto>("arquivos", 100, { it.updatedAt }, assets::deleteAssetsByIds) { r ->
+    suspend fun syncArquivos() = syncResource<AssetDto>("arquivos", 1000, { it.updatedAt }, assets::deleteAssetsByIds) { r ->
         r.forEach {
             assets.upsertAsset(
                 it.id, it.idErp, it.nome, it.caminhoOriginal, it.caminhoMedia, it.caminhoDetail, it.caminhoThumb,
@@ -216,7 +216,7 @@ class CatalogSyncService(
         }
     }
 
-    suspend fun syncClientes() = syncResource<ClientDto>("clientes", 500, { it.updatedAt }, people::deleteClientsByIds) { r ->
+    suspend fun syncClientes() = syncResource<ClientDto>("clientes", 1000, { it.updatedAt }, people::deleteClientsByIds) { r ->
         r.forEach {
             people.upsertClient(
                 it.id, it.idErp, it.vendedorIdErp, it.cidadeIdErp, it.situacao, it.nomeFantasia, it.razaoSocial, it.cpfCnpj,

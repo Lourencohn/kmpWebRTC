@@ -62,7 +62,7 @@ fun ClientsScreen(
                 TabHeader(
                     eyebrow = "Carteira · ${state.total} clientes",
                     title = "Clientes",
-                    subtitle = "Base sincronizada",
+                    subtitle = if (state.syncing) "Sincronizando…" else "Base sincronizada",
                     onOpenAccount = onOpenAccount,
                     secondaryIcon = TrovataIcons.filter,
                 )
