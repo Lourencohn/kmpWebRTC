@@ -1,6 +1,7 @@
 package app.trovata.cast.ui.screens.sessions
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,18 +23,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.data.local.StoredOrder
-import app.trovata.cast.data.sample.HistorySession
-import app.trovata.cast.data.sample.HistoryStatus
-import app.trovata.cast.data.sample.LiveWaitingSession
-import app.trovata.cast.data.sample.SessionTag
-import app.trovata.cast.data.sample.UpcomingSession
+import app.trovata.cast.data.local.StoredSessionRecord
 import app.trovata.cast.feature.sessions.SessionsViewModel
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -54,13 +50,13 @@ import app.trovata.cast.ui.icons.TrovataIcons
 fun SellerHomeScreen(
     viewModel: SessionsViewModel,
     modifier: Modifier = Modifier,
-    onOpenIncoming: (LiveWaitingSession) -> Unit = {},
-    onOpenPrep: (UpcomingSession) -> Unit = {},
     onInviteClient: () -> Unit = {},
+    onOpenSession: (StoredSessionRecord) -> Unit = {},
     onOpenAccount: () -> Unit = {},
 ) {
     val state by viewModel.home.collectAsState()
     val colors = TrovataTokens.colors
+    val isEmpty = state.recentSessions.isEmpty() && state.closedToday.isEmpty()
 
     Box(modifier = modifier.fillMaxSize().background(colors.bg)) {
         LazyColumn(
@@ -70,9 +66,9 @@ fun SellerHomeScreen(
         ) {
             item {
                 TabHeader(
-                    eyebrow = state.data.collectionEyebrow,
-                    title = state.data.greetingTitle,
-                    subtitle = state.data.greetingSubtitle,
+                    eyebrow = state.eyebrow,
+                    title = state.title,
+                    subtitle = state.subtitle,
                     onOpenAccount = onOpenAccount,
                     secondaryIcon = TrovataIcons.bell,
                 )
@@ -80,22 +76,16 @@ fun SellerHomeScreen(
 
             item { PrimaryAction(onClick = onInviteClient) }
 
-            state.data.nowWaiting?.let { live ->
-                item { NowSection(live, onOpen = { onOpenIncoming(live) }) }
-            }
-
-            item { UpcomingSection(title = "Próximas", sessions = state.data.today, onOpen = onOpenPrep) }
-
-            if (state.data.thisWeek.isNotEmpty()) {
-                item { UpcomingSection(title = "Esta semana", sessions = state.data.thisWeek, onOpen = onOpenPrep) }
-            }
-
             if (state.closedToday.isNotEmpty()) {
                 item { ClosedTodaySection(state.closedToday) }
             }
 
-            if (state.data.history.isNotEmpty()) {
-                item { HistorySection(state.data.history) }
+            if (state.recentSessions.isNotEmpty()) {
+                item { RecentSessionsSection(sessions = state.recentSessions, onOpen = onOpenSession) }
+            }
+
+            if (isEmpty) {
+                item { EmptyState() }
             }
         }
     }
@@ -116,78 +106,17 @@ private fun PrimaryAction(onClick: () -> Unit) {
 }
 
 @Composable
-private fun NowSection(live: LiveWaitingSession, onOpen: () -> Unit) {
-    val colors = TrovataTokens.colors
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        SectionLabel(
-            text = "Agora",
-            action = { Pill(text = "Aguardando você", tone = PillTone.Live, icon = TrovataIcons.bell) },
-        )
-        TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Avatar(name = live.client.name, hue = live.client.hue, size = 42.dp)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "${live.client.name.split(' ').first()} — ${live.client.shop}",
-                            color = colors.ink,
-                            fontSize = 14.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = (-0.01).em,
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Loja em ${live.client.city} · ${live.client.previousSessions} sessões anteriores",
-                            color = colors.ink3,
-                            fontSize = 12.sp,
-                        )
-                    }
-                    Btn(text = "Atender", onClick = onOpen, kind = BtnKind.Jade, size = BtnSize.Sm)
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(colors.line),
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(colors.live, CircleShape),
-                    )
-                    Text(
-                        text = "${live.openedFor} · ${live.viewingHint}",
-                        color = colors.ink3,
-                        fontSize = 11.5.sp,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun UpcomingSection(
-    title: String,
-    sessions: List<UpcomingSession>,
-    onOpen: (UpcomingSession) -> Unit,
+private fun RecentSessionsSection(
+    sessions: List<StoredSessionRecord>,
+    onOpen: (StoredSessionRecord) -> Unit,
 ) {
     val colors = TrovataTokens.colors
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        SectionLabel(text = title)
+        SectionLabel(text = "Sessões recentes")
         TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
             Column {
                 sessions.forEachIndexed { index, session ->
-                    UpcomingRow(session = session)
+                    RecentSessionRow(session = session, onOpen = { onOpen(session) })
                     if (index < sessions.lastIndex) {
                         Box(
                             modifier = Modifier
@@ -203,22 +132,24 @@ private fun UpcomingSection(
 }
 
 @Composable
-private fun UpcomingRow(session: UpcomingSession) {
+private fun RecentSessionRow(session: StoredSessionRecord, onOpen: () -> Unit) {
     val colors = TrovataTokens.colors
+    val clientLabel = session.clientName ?: session.clientShop ?: "Sessão sem cliente"
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onOpen)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(name = session.client.name, hue = session.client.hue, size = 36.dp)
+        Avatar(name = clientLabel, hue = hueFor(clientLabel), size = 36.dp)
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = session.client.name,
+                text = clientLabel,
                 color = colors.ink,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
@@ -226,36 +157,26 @@ private fun UpcomingRow(session: UpcomingSession) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${session.client.shop} · ${session.itemsHint}",
+                text = listOfNotNull(session.clientShop.takeIf { session.clientName != null }, session.collectionLabel)
+                    .joinToString(" · ")
+                    .ifBlank { session.collectionLabel },
                 color = colors.ink3,
                 fontSize = 11.5.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            session.tag?.let { tag ->
-                val (tone, icon) = tagStyle(tag)
-                Pill(
-                    text = tag.label,
-                    tone = tone,
-                    icon = icon,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
         }
-        Column(
-            horizontalAlignment = Alignment.End,
-            modifier = Modifier.padding(top = 2.dp),
-        ) {
+        Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(top = 2.dp)) {
             Text(
-                text = session.time,
+                text = formatTime(session.createdAtMs),
                 style = TrovataTokens.type.mono.copy(
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     color = colors.ink,
                     fontWeight = FontWeight.SemiBold,
                 ),
             )
             Text(
-                text = session.day,
+                text = "Token ${session.token}",
                 color = colors.ink4,
                 fontSize = 10.5.sp,
             )
@@ -264,99 +185,41 @@ private fun UpcomingRow(session: UpcomingSession) {
 }
 
 @Composable
-private fun HistorySection(items: List<HistorySession>) {
+private fun EmptyState() {
     val colors = TrovataTokens.colors
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        SectionLabel(
-            text = "Histórico",
-            action = {
-                Text(
-                    text = "Ver todas",
-                    color = colors.brand,
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            },
-        )
-        TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
-            Column {
-                items.forEachIndexed { index, entry ->
-                    HistoryRow(entry)
-                    if (index < items.lastIndex) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(colors.line),
-                        )
-                    }
+        TrovataCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier.size(52.dp).background(colors.surface2, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = TrovataIcons.video,
+                        contentDescription = null,
+                        tint = colors.ink3,
+                        modifier = Modifier.size(24.dp),
+                    )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HistoryRow(entry: HistorySession) {
-    val colors = TrovataTokens.colors
-    val isClosed = entry.status == HistoryStatus.Fechado
-    val statusBg = if (isClosed) colors.jadeTint else colors.surface2
-    val statusFg = if (isClosed) colors.jade2 else colors.ink3
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .background(statusBg, RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = TrovataIcons.check,
-                contentDescription = null,
-                tint = statusFg,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = entry.client.name,
+                    text = "Nenhuma sessão ainda",
                     color = colors.ink,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = " · ${entry.client.shop}",
-                    color = colors.ink4,
-                    fontSize = 13.5.sp,
+                    text = "Inicie uma sessão para mostrar o catálogo ao cliente em tempo real. Ela aparece aqui depois.",
+                    color = colors.ink3,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-            Text(
-                text = "${entry.items} itens · ${entry.status.label}",
-                color = colors.ink3,
-                fontSize = 11.5.sp,
-            )
         }
-        Text(
-            text = entry.total,
-            style = TrovataTokens.type.mono.copy(
-                fontSize = 13.5.sp,
-                color = colors.ink,
-                fontWeight = FontWeight.SemiBold,
-            ),
-        )
     }
-}
-
-private fun tagStyle(tag: SessionTag): Pair<PillTone, ImageVector> = when (tag) {
-    SessionTag.PrimeiraSessao -> PillTone.Brand to TrovataIcons.zap
-    SessionTag.Reposicao -> PillTone.Jade to TrovataIcons.trend
-    SessionTag.TopVenda -> PillTone.Warn to TrovataIcons.flame
 }
 
 @Composable
@@ -492,6 +355,11 @@ private fun ClosedOrderRow(order: StoredOrder) {
             ),
         )
     }
+}
+
+private fun hueFor(seed: String): Double {
+    val hash = seed.fold(0) { acc, c -> acc * 31 + c.code }
+    return (((hash % 360) + 360) % 360).toDouble()
 }
 
 private fun formatBrl(totalCents: Long): String {

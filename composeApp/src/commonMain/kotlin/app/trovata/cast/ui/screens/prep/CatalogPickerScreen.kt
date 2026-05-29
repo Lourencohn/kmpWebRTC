@@ -83,6 +83,8 @@ data class CatalogPickerScreen(
             )
         }
         val state by screenModel.state.collectAsState()
+        val user by container.authRepository.user.collectAsState()
+        val company by container.authRepository.activeCompany.collectAsState()
 
         LaunchedEffect(state.createdSession?.sessionId) {
             val record = state.createdSession ?: return@LaunchedEffect
@@ -95,7 +97,13 @@ data class CatalogPickerScreen(
             onBack = { navigator.pop() },
             onToggle = screenModel::toggle,
             onFilter = screenModel::setFilter,
-            onGenerate = { screenModel.generateLink() },
+            onGenerate = {
+                screenModel.generateLink(
+                    sellerId = (company?.id ?: user?.id)?.toString() ?: "seller",
+                    sellerName = user?.name?.takeIf { it.isNotBlank() } ?: company?.name ?: "Vendedor",
+                    collectionLabel = company?.name.orEmpty(),
+                )
+            },
             onDismissError = screenModel::clearError,
             onPrevPage = screenModel::prevPage,
             onNextPage = screenModel::nextPage,

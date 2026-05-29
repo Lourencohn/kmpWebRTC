@@ -64,6 +64,14 @@ class CatalogRepository(
         assemble(catalog.selectAllProducts().executeAsList(), priceTableId)
     }
 
+    suspend fun snapshotForRefs(refs: List<String>, priceTableId: Long? = null): List<CatalogProduct> = withContext(Dispatchers.Default) {
+        if (refs.isEmpty()) return@withContext emptyList()
+        val order = refs.withIndex().associate { (index, ref) -> ref to index }
+        val rows = catalog.selectAllProducts().executeAsList()
+            .filter { (it.idErp ?: it.id.toString()) in order }
+        assemble(rows, priceTableId).sortedBy { order[it.ref] ?: Int.MAX_VALUE }
+    }
+
     suspend fun page(limit: Int, offset: Int, priceTableId: Long? = null): List<CatalogProduct> = withContext(Dispatchers.Default) {
         assemble(catalog.selectProductsPaged(limit.toLong(), offset.toLong()).executeAsList(), priceTableId)
     }

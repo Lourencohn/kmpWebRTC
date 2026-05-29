@@ -10,6 +10,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.serialization.json.JsonElement
 
 sealed class SfaApiResult<out T> {
     data class Ok<T>(val value: T) : SfaApiResult<T>()
@@ -17,17 +18,17 @@ sealed class SfaApiResult<out T> {
 }
 
 class SfaApi(
-    @PublishedApi internal val client: HttpClient,
+    private val client: HttpClient,
     private val tokenProvider: suspend () -> String?,
     private val empresaIdProvider: () -> Long = { SfaConfig.empresaId },
-    @PublishedApi internal val baseUrl: String = SfaConfig.baseUrl,
+    private val baseUrl: String = SfaConfig.baseUrl,
 ) {
-    suspend inline fun <reified T> fetchPage(
+    suspend fun fetchPageRaw(
         resource: String,
         page: Int,
         perPage: Int,
         updatedAt: String? = null,
-    ): SfaApiResult<SfaListEnvelope<T>> =
+    ): SfaApiResult<SfaListEnvelope<JsonElement>> =
         try {
             val response = requestWithRetry(resource, page, perPage, updatedAt)
             if (response.status.isSuccess()) {
@@ -41,8 +42,7 @@ class SfaApi(
             SfaApiResult.Fail("network_error", t.message ?: "Sem conexão com o servidor", 0)
         }
 
-    @PublishedApi
-    internal suspend fun requestWithRetry(
+    private suspend fun requestWithRetry(
         resource: String,
         page: Int,
         perPage: Int,

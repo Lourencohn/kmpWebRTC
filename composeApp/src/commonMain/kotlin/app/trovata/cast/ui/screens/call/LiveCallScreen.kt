@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.AppContainerHolder
-import app.trovata.cast.data.sample.SampleCatalog
+import app.trovata.cast.data.sample.Product
 import app.trovata.cast.feature.call.CartLineUi
 import app.trovata.cast.feature.call.CartToast
 import app.trovata.cast.feature.call.LiveCallScreenModel
@@ -72,6 +72,7 @@ data class LiveCallScreen(
     val sessionId: String,
     val sellerName: String,
     val clientName: String?,
+    val collectionLabel: String = "",
 ) : Screen {
 
     @Composable
@@ -86,6 +87,9 @@ data class LiveCallScreen(
                 httpClient = container.httpClient,
                 cartRepository = container.cartRepository,
                 orderRepository = container.orderRepository,
+                catalogRepository = container.catalogRepository,
+                sessionsRepository = container.sessionsRepository,
+                collectionLabel = collectionLabel,
                 sellerName = sellerName,
             )
         }
@@ -133,6 +137,7 @@ private fun LiveCallBody(
     onConfirmOrder: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
+    val productByRef = remember(state.products) { state.products.associateBy { it.ref } }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -144,6 +149,8 @@ private fun LiveCallBody(
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 if (state.isLive) {
                     CatalogPanel(
+                        products = state.products,
+                        collectionLabel = state.collectionLabel,
                         onScroll = onScroll,
                         onPointAt = onPointAt,
                         onOpenDetail = onOpenDetail,
@@ -173,7 +180,7 @@ private fun LiveCallBody(
         }
 
         if (state.showProductSheet && state.focusedProductId != null) {
-            val product = SampleCatalog.products.firstOrNull { it.ref == state.focusedProductId }
+            val product = productByRef[state.focusedProductId]
             if (product != null) {
                 Box(
                     modifier = Modifier
@@ -182,6 +189,7 @@ private fun LiveCallBody(
                 ) {
                     ProductDetailScreen(
                         product = product,
+                        related = state.products.filter { it.ref != product.ref }.take(6),
                         inCallContext = true,
                         customerName = clientName,
                         onBack = onDismissProductSheet,
@@ -194,6 +202,7 @@ private fun LiveCallBody(
         if (state.showCartDrawer) {
             CartDrawer(
                 state = state,
+                productByRef = productByRef,
                 onDismiss = onDismissCart,
                 onConfirmOrder = onConfirmOrder,
             )
@@ -202,6 +211,7 @@ private fun LiveCallBody(
         state.summary?.let { summary ->
             OrderSummaryOverlay(
                 summary = summary,
+                productByRef = productByRef,
                 onClose = onHangup,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -243,6 +253,8 @@ private fun CallTopBar(state: LiveCallUiState, modifier: Modifier = Modifier) {
 
 @Composable
 private fun CatalogPanel(
+    products: List<Product>,
+    collectionLabel: String,
     onScroll: (productId: String, offset: Float) -> Unit,
     onPointAt: (productId: String) -> Unit,
     onOpenDetail: (productId: String) -> Unit,
@@ -259,11 +271,11 @@ private fun CatalogPanel(
         pointedRef = null
     }
 
-    LaunchedEffect(gridState) {
+    LaunchedEffect(gridState, products) {
         snapshotFlow {
             gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
         }.collect { (index, offsetPx) ->
-            val product = SampleCatalog.products.getOrNull(index) ?: return@collect
+            val product = products.getOrNull(index) ?: return@collect
             val normalized = (offsetPx.toFloat() / 320f).coerceIn(0f, 1f)
             onScroll(product.ref, normalized)
         }
@@ -275,13 +287,15 @@ private fun CatalogPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = SampleCatalog.collection.uppercase(),
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 10.5.sp,
-                    letterSpacing = 0.08.em,
-                    fontWeight = FontWeight.Medium,
-                )
+                if (collectionLabel.isNotBlank()) {
+                    Text(
+                        text = collectionLabel.uppercase(),
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 10.5.sp,
+                        letterSpacing = 0.08.em,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
                 Text(
                     text = if (pointing) "Toque num produto para apontar" else "Mostrando para o cliente",
                     color = Color.White,
@@ -311,7 +325,7 @@ private fun CatalogPanel(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(SampleCatalog.products, key = { it.ref }) { product ->
+            items(products, key = { it.ref }) { product ->
                 ProductCard(
                     product = product,
                     size = ProductCardSize.Md,
@@ -459,13 +473,13 @@ private fun CartToastView(toast: CartToast, modifier: Modifier = Modifier) {
 @Composable
 private fun CartDrawer(
     state: LiveCallUiState,
+    productByRef: Map<String, Product>,
     onDismiss: () -> Unit,
     onConfirmOrder: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
     val total = state.cart.sumOf { line ->
-        val unit = priceCentsFor(line.productId) ?: return@sumOf 0
-        unit * line.units
+        (state.priceCentsByRef[line.productId] ?: 0L) * line.units
     }
     Box(
         modifier = Modifier
@@ -512,7 +526,11 @@ private fun CartDrawer(
                     modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
                 ) {
                     items(state.cart, key = { it.productId + "/" + it.size }) { line ->
-                        CartRow(line = line)
+                        CartRow(
+                            line = line,
+                            product = productByRef[line.productId],
+                            unitPriceCents = state.priceCentsByRef[line.productId] ?: 0L,
+                        )
                     }
                 }
                 CartTotalBar(units = state.cart.sumOf { it.units }, totalCents = total)
@@ -531,9 +549,8 @@ private fun CartDrawer(
 }
 
 @Composable
-private fun CartRow(line: CartLineUi) {
+private fun CartRow(line: CartLineUi, product: Product?, unitPriceCents: Long) {
     val colors = TrovataTokens.colors
-    val product = SampleCatalog.products.firstOrNull { it.ref == line.productId }
     if (product == null) {
         Text(text = "${line.productId} · ${line.size} · ${line.units}un", color = colors.ink2)
         return
@@ -551,7 +568,7 @@ private fun CartRow(line: CartLineUi) {
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    text = formatBrl(priceCentsFor(line.productId)?.let { it * line.units } ?: 0),
+                    text = formatBrl(unitPriceCents * line.units),
                     color = colors.ink,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -682,6 +699,7 @@ private fun CallAvatar(state: LiveCallUiState) {
 @Composable
 private fun OrderSummaryOverlay(
     summary: OrderSummaryUi,
+    productByRef: Map<String, Product>,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -726,7 +744,7 @@ private fun OrderSummaryOverlay(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(summary.lines, key = { it.productId + "/" + it.size }) { line ->
-                OrderSummaryRow(line = line)
+                OrderSummaryRow(line = line, product = productByRef[line.productId])
             }
         }
 
@@ -770,9 +788,8 @@ private fun OrderSummaryOverlay(
 }
 
 @Composable
-private fun OrderSummaryRow(line: OrderLine) {
+private fun OrderSummaryRow(line: OrderLine, product: Product?) {
     val colors = TrovataTokens.colors
-    val product = SampleCatalog.products.firstOrNull { it.ref == line.productId }
     if (product == null) {
         Text(
             text = "${line.productId} · ${line.size} · ${line.units}un",
@@ -801,15 +818,6 @@ private fun OrderSummaryRow(line: OrderLine) {
             }
         },
     )
-}
-
-private fun priceCentsFor(productId: String): Long? {
-    val raw = SampleCatalog.products.firstOrNull { it.ref == productId }?.price ?: return null
-    val numeric = raw.filter { it.isDigit() || it == ',' || it == '.' }
-        .replace(".", "")
-        .replace(',', '.')
-    val decimal = numeric.toDoubleOrNull() ?: return null
-    return (decimal * 100).toLong()
 }
 
 private fun formatBrl(cents: Long): String {

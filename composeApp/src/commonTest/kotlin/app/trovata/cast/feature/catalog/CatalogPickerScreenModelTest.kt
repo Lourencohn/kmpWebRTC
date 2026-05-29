@@ -72,10 +72,10 @@ class CatalogPickerScreenModelTest {
     @Test
     fun toggleAddsAndRemoves() = runTest {
         val sm = model()
-        val sku = SampleCatalog.products.first().ref
-        sm.toggle(sku)
-        assertEquals(setOf(sku), sm.state.value.selectedSkus)
-        sm.toggle(sku)
+        val item = SampleCatalog.products.first()
+        sm.toggle(item)
+        assertEquals(setOf(item.ref), sm.state.value.selectedSkus)
+        sm.toggle(item)
         assertEquals(emptySet(), sm.state.value.selectedSkus)
     }
 
@@ -84,7 +84,7 @@ class CatalogPickerScreenModelTest {
         val sm = model()
         sm.generateLink()
         assertNotNull(sm.state.value.error)
-        sm.toggle(SampleCatalog.products.first().ref)
+        sm.toggle(SampleCatalog.products.first())
         assertNull(sm.state.value.error)
     }
 
@@ -101,9 +101,9 @@ class CatalogPickerScreenModelTest {
     @Test
     fun skuCountIsSumOfSizesTimesColors() = runTest {
         val sm = model()
-        val product = SampleCatalog.products.first()
-        sm.toggle(product.ref)
-        assertEquals(product.sizes.size * product.colorCount, sm.state.value.skuCount)
+        val item = SampleCatalog.products.first()
+        sm.toggle(item)
+        assertEquals(item.sizes.size * item.colorCount, sm.state.value.skuCount)
     }
 
     @Test
@@ -134,8 +134,10 @@ class CatalogPickerScreenModelTest {
             nowMs = { 9_999 },
             initialClient = ClientDraft(name = "Diego A", shop = "Trama"),
         )
-        sm.toggle("AN-104")
-        sm.toggle("AN-217")
+        val first = SampleCatalog.products[0]
+        val second = SampleCatalog.products[1]
+        sm.toggle(first)
+        sm.toggle(second)
         sm.generateLink()
         assertTrue(sm.state.value.isSubmitting)
         dispatcher.scheduler.advanceUntilIdle()
@@ -146,7 +148,7 @@ class CatalogPickerScreenModelTest {
         assertEquals(response.token, state.createdSession!!.token)
         assertEquals(9_999L, state.createdSession!!.createdAtMs)
         assertNotNull(capturedRequest)
-        assertEquals(listOf("AN-104", "AN-217").sorted(), capturedRequest!!.productSkus.sorted())
+        assertEquals(listOf(first.ref, second.ref).sorted(), capturedRequest!!.productSkus.sorted())
         assertEquals("Diego A", capturedRequest!!.clientName)
         assertEquals("Trama", capturedRequest!!.clientShop)
     }
@@ -159,7 +161,7 @@ class CatalogPickerScreenModelTest {
             },
             persistSession = { _, _, _ -> error("not called") },
         )
-        sm.toggle("AN-104")
+        sm.toggle(SampleCatalog.products.first())
         sm.generateLink()
         dispatcher.scheduler.advanceUntilIdle()
         val state = sm.state.value
@@ -175,7 +177,7 @@ class CatalogPickerScreenModelTest {
             createSession = { SessionsApiResult.Ok(response) },
             persistSession = { request, resp, createdAt -> sampleRecord(request, resp, createdAt) },
         )
-        sm.toggle("AN-104")
+        sm.toggle(SampleCatalog.products.first())
         sm.generateLink()
         dispatcher.scheduler.advanceUntilIdle()
         assertNotNull(sm.state.value.createdSession)

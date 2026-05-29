@@ -11,17 +11,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import app.trovata.cast.AppContainerHolder
 import app.trovata.cast.navigation.AccountRoute
-import app.trovata.cast.navigation.IncomingCallRoute
 import app.trovata.cast.navigation.ProductDetailRoute
-import app.trovata.cast.navigation.SessionPrepRoute
 import app.trovata.cast.feature.catalog.CatalogScreenModel
 import app.trovata.cast.feature.clients.ClientsScreenModel
+import app.trovata.cast.feature.insights.InsightsScreenModel
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.SellerTab
 import app.trovata.cast.ui.components.TabBar
 import app.trovata.cast.ui.screens.catalog.CatalogScreen
 import app.trovata.cast.ui.screens.clients.ClientsScreen
 import app.trovata.cast.ui.screens.insights.InsightsScreen
+import app.trovata.cast.ui.screens.invite.InviteScreen
 import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
 import app.trovata.cast.ui.screens.sessions.SellerHomeScreen
 import cafe.adriel.voyager.core.model.rememberScreenModel
@@ -49,6 +49,16 @@ object TabsHostRoute : Screen {
         }
         val clientsState by clientsModel.state.collectAsState()
 
+        val insightsModel = rememberScreenModel(tag = "insights") {
+            InsightsScreenModel(
+                orderRepository = container.orderRepository,
+                catalogRepository = container.catalogRepository,
+                sessionsRepository = container.sessionsRepository,
+                authRepository = container.authRepository,
+            )
+        }
+        val insightsState by insightsModel.state.collectAsState()
+
         Column(modifier = Modifier.fillMaxSize().background(colors.bg)) {
             Box(
                 modifier = Modifier
@@ -58,11 +68,8 @@ object TabsHostRoute : Screen {
                 when (homeState.activeTab) {
                     SellerTab.Sessoes -> SellerHomeScreen(
                         viewModel = viewModel,
-                        onOpenIncoming = { navigator.push(IncomingCallRoute) },
-                        onOpenPrep = { upcoming ->
-                            navigator.push(SessionPrepRoute(clientName = upcoming.client.name))
-                        },
                         onInviteClient = { navigator.push(CatalogPickerScreen()) },
+                        onOpenSession = { record -> navigator.push(InviteScreen(record)) },
                         onOpenAccount = openAccount,
                     )
                     SellerTab.Catalogo -> CatalogScreen(
@@ -82,7 +89,10 @@ object TabsHostRoute : Screen {
                             navigator.push(CatalogPickerScreen(clientName = client.name))
                         },
                     )
-                    SellerTab.Insights -> InsightsScreen(onOpenAccount = openAccount)
+                    SellerTab.Insights -> InsightsScreen(
+                        state = insightsState,
+                        onOpenAccount = openAccount,
+                    )
                 }
             }
             TabBar(active = homeState.activeTab, onSelect = viewModel::selectTab)

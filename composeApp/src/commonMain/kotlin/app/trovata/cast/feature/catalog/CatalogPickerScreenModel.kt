@@ -126,7 +126,11 @@ class CatalogPickerScreenModel(
         _state.update { it.copy(createdSession = null) }
     }
 
-    fun generateLink(sellerId: String = "atelier-norte", sellerName: String = "Atelier Norte") {
+    fun generateLink(
+        sellerId: String = "seller",
+        sellerName: String = "Vendedor",
+        collectionLabel: String = "",
+    ) {
         val snapshot = _state.value
         if (snapshot.selectedSkus.isEmpty()) {
             _state.update { it.copy(error = "Escolha ao menos um produto") }
@@ -137,7 +141,7 @@ class CatalogPickerScreenModel(
         val request = SessionCreateRequest(
             sellerId = sellerId,
             sellerName = sellerName,
-            collectionLabel = SampleCatalog.collection,
+            collectionLabel = collectionLabel,
             productSkus = snapshot.selectedSkus.toList(),
             clientName = snapshot.client.name,
             clientShop = snapshot.client.shop,

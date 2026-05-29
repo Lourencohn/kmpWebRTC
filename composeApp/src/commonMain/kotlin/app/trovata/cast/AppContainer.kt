@@ -38,12 +38,17 @@ class AppContainer(
     val cartRepository: CartRepository = CartRepository(database)
     val orderRepository: OrderRepository = OrderRepository(database)
     val sessionsApi: SessionsApi = SessionsApi(httpClient)
-    val sessionsViewModel: SessionsViewModel = SessionsViewModel(orderRepository = orderRepository)
     val shareController: ShareController = ShareController()
 
     private val keycloakAuth = KeycloakAuthService(sfaHttpClient)
     private val accountApi = AccountApi(sfaHttpClient)
     val authRepository: AuthRepository = AuthRepository(authStore, keycloakAuth, accountApi)
+
+    val sessionsViewModel: SessionsViewModel = SessionsViewModel(
+        sessionsRepository = sessionsRepository,
+        orderRepository = orderRepository,
+        authRepository = authRepository,
+    )
 
     val sfaApi: SfaApi = SfaApi(
         client = sfaHttpClient,

@@ -147,7 +147,7 @@ private fun ProfileHeader(state: AccountUiState) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Avatar(name = state.displayName, hue = SampleAccount.avatarHue, size = 86.dp)
+            Avatar(name = state.displayName, hue = avatarHue(state.displayName), size = 86.dp)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -188,15 +188,6 @@ private fun ProfileHeader(state: AccountUiState) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CountInline(value = state.activeClients.toString(), label = " clientes")
-            Text(text = "·", color = colors.ink5, fontSize = 11.sp)
-            CountInline(value = state.monthsOnNetwork.toString(), label = " meses na rede")
-            Text(text = "·", color = colors.ink5, fontSize = 11.sp)
-            Text(
-                text = "★ ${state.tierLabel}",
-                color = colors.jade2,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
         }
     }
 }
@@ -221,7 +212,6 @@ private fun CountInline(value: String, label: String) {
 @Composable
 private fun BrandIdentityCard(state: AccountUiState) {
     val colors = TrovataTokens.colors
-    val brand = SampleAccount.brand
     val shape = RoundedCornerShape(16.dp)
     Column(
         modifier = Modifier
@@ -262,16 +252,6 @@ private fun BrandIdentityCard(state: AccountUiState) {
                         letterSpacing = (-0.03).em,
                         modifier = Modifier.padding(top = 2.dp),
                     )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    brand.colors.forEach { c ->
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .background(c, CircleShape)
-                                .border(1.5.dp, Color.White.copy(alpha = 0.7f), CircleShape),
-                        )
-                    }
                 }
             }
             Text(
@@ -347,14 +327,21 @@ private fun PerformanceCard(stat: AccountStat, modifier: Modifier = Modifier) {
                 ),
                 modifier = Modifier.padding(top = 3.dp),
             )
-            Text(
-                text = stat.delta,
-                color = if (stat.deltaPositive) colors.jade2 else colors.ink3,
-                style = TrovataTokens.type.mono.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
-                modifier = Modifier.padding(top = 1.dp),
-            )
+            if (stat.delta.isNotBlank()) {
+                Text(
+                    text = stat.delta,
+                    color = if (stat.deltaPositive) colors.jade2 else colors.ink3,
+                    style = TrovataTokens.type.mono.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
         }
     }
+}
+
+private fun avatarHue(seed: String): Double {
+    val hash = seed.fold(0) { acc, c -> acc * 31 + c.code }
+    return (((hash % 360) + 360) % 360).toDouble()
 }
 
 @Composable

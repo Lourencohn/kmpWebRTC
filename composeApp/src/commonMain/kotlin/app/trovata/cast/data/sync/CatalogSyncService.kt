@@ -5,7 +5,6 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.trovata.cast.data.remote.HttpClientFactory
 import app.trovata.cast.data.remote.sfa.SfaApi
 import app.trovata.cast.data.remote.sfa.SfaApiResult
-import app.trovata.cast.data.remote.sfa.SfaListEnvelope
 import app.trovata.cast.data.remote.sfa.SfaParse
 import app.trovata.cast.data.remote.sfa.dto.AssetDto
 import app.trovata.cast.data.remote.sfa.dto.ClientDto
@@ -28,6 +27,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 
 data class SyncStatus(
     val entity: String,
@@ -42,6 +42,7 @@ data class SyncEntityResult(
     val processed: Int,
     val success: Boolean,
     val error: String?,
+    val skipped: Int = 0,
 )
 
 data class SyncReport(val results: List<SyncEntityResult>) {
@@ -244,16 +245,21 @@ class CatalogSyncService(
         var page = 1
         var maxUpdated: String? = cursor
         var processed = 0
+        var skipped = 0
         while (true) {
-            val result: SfaApiResult<SfaListEnvelope<T>> = sfaApi.fetchPage(resource, page, perPage, cursor)
+            val result = sfaApi.fetchPageRaw(resource, page, perPage, cursor)
             when (result) {
                 is SfaApiResult.Fail -> {
                     sync.upsertSyncState(resource, cursor, state?.lastSyncAtMs, page.toLong(), 0, "${result.code}: ${result.message}")
-                    return@withContext SyncEntityResult(resource, processed, false, result.message)
+                    return@withContext SyncEntityResult(resource, processed, false, result.message, skipped)
                 }
                 is SfaApiResult.Ok -> {
                     val env = result.value
-                    val rows = env.data.orEmpty()
+                    val rows = ArrayList<T>(env.data?.size ?: 0)
+                    env.data?.forEach { element ->
+                        val parsed = runCatching { json.decodeFromJsonElement<T>(element) }.getOrNull()
+                        if (parsed != null) rows.add(parsed) else skipped++
+                    }
                     val deleted = env.deletedIds.orEmpty()
                     db.transaction {
                         if (rows.isNotEmpty()) upsertAll(rows)
@@ -272,6 +278,6 @@ class CatalogSyncService(
         }
         val now = Clock.System.now().toEpochMilliseconds()
         sync.upsertSyncState(resource, maxUpdated, now, 0, 0, null)
-        SyncEntityResult(resource, processed, true, null)
+        SyncEntityResult(resource, processed, true, null, skipped)
     }
 }

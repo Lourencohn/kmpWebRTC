@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
-import app.trovata.cast.data.sample.SampleAccount
+import app.trovata.cast.AppContainerHolder
 import app.trovata.cast.theme.TrovataTokens
 
 @Composable
@@ -19,6 +21,8 @@ fun AccountChip(
     modifier: Modifier = Modifier,
 ) {
     val colors = TrovataTokens.colors
+    val user by AppContainerHolder.current.authRepository.user.collectAsState()
+    val name = user?.name?.takeIf { it.isNotBlank() } ?: user?.email ?: "Conta"
     Box(
         modifier = modifier
             .shadow(1.dp, CircleShape, clip = false)
@@ -28,9 +32,14 @@ fun AccountChip(
             .clickable(onClick = onClick),
     ) {
         Avatar(
-            name = SampleAccount.displayName,
-            hue = SampleAccount.avatarHue,
+            name = name,
+            hue = avatarHue(name),
             size = 38.dp,
         )
     }
+}
+
+private fun avatarHue(seed: String): Double {
+    val hash = seed.fold(0) { acc, c -> acc * 31 + c.code }
+    return (((hash % 360) + 360) % 360).toDouble()
 }

@@ -44,7 +44,12 @@ Identidade real disponível em `AuthRepository`: `user` = `{ id: 1, name: "TROVA
 | **Catálogo (tab)** (`CatalogScreen` + `CatalogScreenModel`) | ✅ ligada — 979 produtos reais, grade lazy, KPIs derivados (SKUs/marcas/categorias/com preço); `ProductDetailRoute` resolve via repo |
 | **Conta** (`AccountScreen` + `AccountScreenModel`) | ✅ identidade real (nome/email do usuário, empresa ativa); performance/tier ainda mock (sem fonte) |
 | **Clientes** (`ClientsScreen` + `ClientsScreenModel`) | ✅ busca local paginada (`searchClients`/`firstClients`, LIMIT 60); LTV/sparkline/segmentos/"sugestões TC" removidos (sem fonte) |
-| Telas Sessões, Insights, LiveCall | ❌ ainda leem `data/sample/*` |
+| **LiveCall** (`LiveCallScreen` + `LiveCallScreenModel`) | ✅ catálogo da sessão via `CatalogRepository.snapshotForRefs` (produtos selecionados) ou `snapshot`; nome/preço/total resolvidos por `priceCentsByRef`; sem `SampleCatalog` |
+| **Sessões** (`SellerHomeScreen` + `SessionsViewModel`) | ✅ sessões recentes (`SessionsRepository.observeAll`) + pedidos fechados hoje (`OrderRepository`) + header empresa/usuário; agenda/incoming/prep mockados removidos do fluxo (estados vazios honestos) |
+| **Insights** (`InsightsScreen` + `InsightsScreenModel`) | ✅ derivado de `OrderEntity`: faturamento do mês, delta MoM, ticket, itens, pedidos, sessões, top produtos + sparkline diário; funil/foco/"insight da semana" removidos (sem fonte); estado vazio |
+| **Conta** (`AccountScreen` + `AccountScreenModel`) | ✅ performance derivada de pedidos do mês + contagem real de clientes; tier/"meses na rede"/swatches de marca/linhas fake removidos |
+| **ProductDetail** | ✅ "Veja também" recebe produtos reais (`uiPage`/`state.products`); `PerformanceCard` (engajamento fake) removido. ⚠️ estoque-por-tamanho e swatches de cor ainda gerados localmente (sem fonte na API — ver §10) |
+| Onboarding `AuthSetupScreen`/`AuthVerifyScreen` | ⚠️ órfãos (fora do grafo de navegação; login real é Keycloak via `AuthWelcome→AuthLogin→CompanySelection`). Mantidos como dev-only, não apresentados |
 
 ---
 
@@ -116,8 +121,8 @@ network_error: Unexpected JSON token at offset ...: Unexpected symbol '.' in num
 **Causa:** [PricingDto.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/data/remote/sfa/dto/PricingDto.kt) declarava `PrazoDto.prazoMedio: Long?`, mas a API retorna **decimal** (`17.5`). Um único registro inválido derrubava a **página inteira** → `PrazoEntity` ficava com 0 linhas.
 **Correção aplicada:** `prazoMedio` agora é `Double?` no DTO e `PrazoEntity.prazoMedio` é `REAL` ([Pricing.sq](../composeApp/src/commonMain/sqldelight/app/trovata/cast/db/Pricing.sq)). Falta re-sincronizar no device para confirmar a contagem de linhas. Ainda **pendente** a robustez por-registro (§5.2): hoje um registro ruim em outra entidade ainda derruba a página.
 
-### 5.2 ⚠️ Robustez: um registro ruim derruba a página toda
-O decode é por página (`SfaListEnvelope<T>`). Vale tornar o mapeamento resiliente por-registro (decodificar como `JsonElement` e mapear item a item dentro de try/catch), de modo que um campo inesperado não zere a entidade inteira.
+### 5.2 ✅ Robustez: decode resiliente por-registro
+`SfaApi.fetchPageRaw` agora retorna `SfaListEnvelope<JsonElement>` e `CatalogSyncService.syncResource` decodifica **cada registro** via `json.decodeFromJsonElement<T>` dentro de `runCatching` — um registro inválido é contado em `SyncEntityResult.skipped` e **pulado**, sem zerar a página/entidade. `paginação` e `deleted_ids` continuam decodificados normalmente.
 
 ### 5.3 ⚠️ `produtos-comerciais` e `colecoes` vazios para a empresa 2507
 - `CommercialProductEntity = 0` → **MOQ indisponível**; `CatalogRepository` cai em `listaMultiploVenda`/`1`. Confirmar se outras empresas têm comerciais; senão, MOQ via `produtos-pre.lista_multiplo_venda`.
@@ -135,10 +140,10 @@ O decode é por página (`SfaListEnvelope<T>`). Vale tornar o mapeamento resilie
 3. ✅ **Conta** — `AccountScreenModel` lê `AuthRepository.user` + `activeCompany` (remove "Camila Tavares").
 4. ✅ **Clientes** — `ClientsScreenModel` com busca local (`searchClients`, LIMIT 60); campos sem fonte (LTV/sparkline/segmentos/"sugestões TC") **removidos** em vez de mockados.
 5. ✅ **Header/identidade** global — `AuthRepository.activeCompany` persistida e consumida pelo Catálogo e Conta. Coleção fica oculta enquanto `ColecaoEntity` estiver vazia (empresa 2507).
-6. ⏭️ **LiveCall** — preço pela tabela do cliente (`ClientEntity.tabelaPrecoId`). Próximo.
-7. ⏭️ **Sessões / Insights** — dependem de domínio próprio (sessões/pedidos) — tratar quando houver `OrderEntity`/`SessionEntity` reais.
+6. ✅ **LiveCall** — catálogo da sessão (selecionados ou snapshot) + nome/preço/total reais. Preço por `priceTableId` suportado no `LiveCallScreenModel` (hoje passado `null` → cai em `precoFinalCents`; falta propagar a tabela do cliente da sessão — ver §10).
+7. ✅ **Sessões / Insights / Conta / ProductDetail** — ligados a `OrderEntity`/`SessionEntity`/`ClientsRepository` + identidade. Campos sem fonte removidos.
 
-Pendências técnicas ainda abertas: **§5.2** (decode resiliente por-registro), **§5.3** (MOQ/coleção vazios p/ 2507).
+Pendências técnicas ainda abertas: **§5.3** (MOQ/coleção vazios p/ 2507), e os itens de §10.
 
 > **Decisão de design (Clientes):** como `CatalogClient` não tem LTV/atividade/segmento e a API não fornece, a tela foi redesenhada para uma **lista buscável honesta** (nome, razão social/CNPJ, contato, telefone, status ativo) com ação "Convidar" → `CatalogPickerScreen`. O fallback mock pré-sync vira o estado vazio "Nenhum cliente encontrado" (sem clientes fictícios). `SampleClients.kt` permanece no repo, sem uso na tela.
 
@@ -190,3 +195,22 @@ Antes ambas as telas carregavam os 979 produtos numa lista única ("scroll infin
 - **Montar catálogo** ([CatalogPickerScreenModel.kt](../composeApp/src/commonMain/kotlin/app/trovata/cast/feature/catalog/CatalogPickerScreenModel.kt)): `pageSize = 30`, `countProducts()` + `uiPage(limit, offset)`. A seleção persiste entre páginas guardando `selectedProducts: Map<ref, Product>`, então o contador de SKUs soma corretamente itens escolhidos em páginas diferentes.
 - Queries: `selectProductsPaged(LIMIT, OFFSET)` + `countDistinctMarcas/Categorias` + `countPricedProducts` em [Catalog.sq](../composeApp/src/commonMain/sqldelight/app/trovata/cast/db/Catalog.sq).
 - **Nota:** filtros (Novos/Top/Pré-venda) operam só sobre a página atual; com dados reais (sem `tag`) apenas "Todos" tem efeito — comportamento pré-existente.
+
+## 10 — Rodada "telas restantes → dados reais" ✅
+
+Concluída a migração das telas que ainda liam `data/sample/*` para dados reais (build Android + `compileKotlinMetadata` + testes unitários verdes; 25 testes passam). Resumo do que mudou:
+
+- **API resiliente (§5.2)** — `fetchPageRaw` + decode por-registro; um registro ruim é pulado (`SyncEntityResult.skipped`), não zera a página.
+- **LiveCall** — `LiveCallScreenModel` injeta `CatalogRepository` + `SessionsRepository`; mostra os produtos selecionados da sessão (`snapshotForRefs`) ou o catálogo (`snapshot`); `CartLineUi`/total/summary usam `priceCentsByRef` reais. Header usa `collectionLabel` da sessão.
+- **Sessões** — `SellerHomeScreen` reescrita: header (empresa+usuário), "Pedidos fechados hoje" (`OrderRepository`), "Sessões recentes" (`SessionsRepository.observeAll`), estado vazio honesto. `SessionsViewModel` combina sessões+pedidos+identidade. Agenda/`nowWaiting`/`IncomingCall`/`SessionPrep` mockados saíram do fluxo (telas demo permanecem inertes).
+- **Insights** — novo `InsightsScreenModel` deriva tudo de `OrderEntity` (faturamento do mês, delta MoM, ticket, itens, pedidos, sessões, top-5 produtos + sparkline diário). Funil/foco-conversão/"insight da semana"/seletor de período removidos (sem fonte).
+- **Conta** — `AccountScreenModel` recebe `OrderRepository`+`ClientsRepository`: performance (Vendas/Pedidos/Itens) do mês + contagem real de clientes; removidos tier, "meses na rede", swatches de marca e linhas fake.
+- **ProductDetail** — "Veja também" recebe produtos reais; `PerformanceCard` (engajamento fake) removido.
+- **Identidade global** — `AccountChip` (avatar em todo header de aba) e os metadados da sessão (`sellerName`/`collectionLabel` no `CatalogPickerScreen`) agora vêm de `AuthRepository.user`/`activeCompany`, não de `SampleAccount`/`SampleCatalog`.
+
+`Sample*` que **permanecem** (legítimos, não apresentados como dados reais): fallback pré-sync (`CatalogRepository`, `CatalogScreenModel`, `CatalogPickerScreenModel`), `SampleAccount.support`/gradiente (chrome/estilo), `SampleSessions.incoming/prep` (telas demo inertes), `DesignSystemScreen` (preview), `AuthSetup/AuthVerify` (órfãos).
+
+### Pendências desta rodada (sem fonte na API hoje)
+- **Preço por tabela do cliente na LiveCall** — `LiveCallScreenModel` aceita `priceTableId`, mas `StoredSessionRecord` não guarda o `tabelaPrecoId` do cliente; hoje passa `null` (cai em `precoFinalCents`). Para usar a tabela do cliente, persistir `clientId`/`tabelaPrecoId` na sessão (`SessionEntity`) ao criar.
+- **Estoque por tamanho / swatches de cor (ProductDetail)** — ainda gerados localmente (`sampleSizesFor`/`sampleSwatchesFor`); a API expõe `locais-estoques` (não sincronizado) e grade via `itens-tabelas-precos-pre`. Wiring de estoque real é trabalho à parte.
+- **§5.3** — `produtos-comerciais`/`colecoes` vazios p/ empresa 2507 (MOQ/coleção indisponíveis).

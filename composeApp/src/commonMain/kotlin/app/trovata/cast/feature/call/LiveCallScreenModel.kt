@@ -1,8 +1,11 @@
 package app.trovata.cast.feature.call
 
 import app.trovata.cast.data.local.CartRepository
+import app.trovata.cast.data.local.CatalogRepository
 import app.trovata.cast.data.local.OrderRepository
-import app.trovata.cast.data.sample.SampleCatalog
+import app.trovata.cast.data.local.SessionsRepository
+import app.trovata.cast.data.local.toUiProduct
+import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.signaling.KtorSignalingTransport
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.SignalingState
@@ -26,10 +29,7 @@ data class CartLineUi(
     val size: String,
     val units: Int,
     val updatedAtMs: Long,
-) {
-    val name: String get() = SampleCatalog.products.firstOrNull { it.ref == productId }?.name ?: productId
-    val unitPriceLabel: String get() = SampleCatalog.products.firstOrNull { it.ref == productId }?.price ?: ""
-}
+)
 
 data class CartToast(
     val text: String,
@@ -52,6 +52,9 @@ data class LiveCallUiState(
     val localMuted: Boolean = false,
     val remoteMuted: Boolean = false,
     val cart: List<CartLineUi> = emptyList(),
+    val products: List<Product> = emptyList(),
+    val priceCentsByRef: Map<String, Long> = emptyMap(),
+    val collectionLabel: String = "",
     val focusedProductId: String? = null,
     val showProductSheet: Boolean = false,
     val showCartDrawer: Boolean = false,
@@ -77,6 +80,10 @@ class LiveCallScreenModel(
     private val httpClient: HttpClient,
     private val cartRepository: CartRepository,
     private val orderRepository: OrderRepository,
+    private val catalogRepository: CatalogRepository,
+    private val sessionsRepository: SessionsRepository,
+    private val collectionLabel: String = "",
+    private val priceTableId: Long? = null,
     private val sellerPeerId: String = "seller-${randomSuffix()}",
     private val sellerName: String = "Vendedor",
     private val clientShop: String? = null,
@@ -101,11 +108,24 @@ class LiveCallScreenModel(
     )
 
     private val _state = MutableStateFlow(
-        LiveCallUiState(token = token, role = PeerRole.Seller),
+        LiveCallUiState(token = token, role = PeerRole.Seller, collectionLabel = collectionLabel),
     )
     val state: StateFlow<LiveCallUiState> = _state.asStateFlow()
 
     init {
+        screenModelScope.launch {
+            val selected = sessionsRepository.selectedSkus(sessionId)
+            val catalog = if (selected.isNotEmpty()) {
+                catalogRepository.snapshotForRefs(selected, priceTableId)
+            } else {
+                catalogRepository.snapshot(priceTableId)
+            }
+            val ui = catalog.map { it.toUiProduct() }
+            val prices = buildMap {
+                catalog.forEach { product -> product.priceCents?.let { put(product.ref, it) } }
+            }
+            _state.update { it.copy(products = ui, priceCentsByRef = prices) }
+        }
         screenModelScope.launch {
             signaling.state.collect { s -> _state.update { it.copy(signaling = s) } }
         }
@@ -218,7 +238,7 @@ class LiveCallScreenModel(
                 productId = line.productId,
                 size = line.size,
                 units = line.units,
-                unitPriceCents = priceCentsFor(line.productId),
+                unitPriceCents = current.priceCentsByRef[line.productId] ?: 0L,
             )
         }
         val totalCents = lines.sumOf { it.subtotalCents }
@@ -289,7 +309,7 @@ class LiveCallScreenModel(
             it.sku == msg.productId && it.size == msg.size
         }
         cartRepository.apply(sessionId, msg.productId, msg.size, msg.units, msg.ts)
-        val name = SampleCatalog.products.firstOrNull { it.ref == msg.productId }?.name ?: msg.productId
+        val name = _state.value.products.firstOrNull { it.ref == msg.productId }?.name ?: msg.productId
         val who = clientName?.split(' ')?.firstOrNull() ?: "Cliente"
         val previousUnits = previous?.units ?: 0
         val text = when {
@@ -312,15 +332,6 @@ class LiveCallScreenModel(
 
 private fun randomSuffix(): String =
     (1..6).map { ('a'..'z').random() }.joinToString("")
-
-private fun priceCentsFor(productId: String): Long {
-    val raw = SampleCatalog.products.firstOrNull { it.ref == productId }?.price ?: return 0L
-    val numeric = raw.filter { it.isDigit() || it == ',' || it == '.' }
-        .replace(".", "")
-        .replace(',', '.')
-    val decimal = numeric.toDoubleOrNull() ?: return 0L
-    return (decimal * 100).toLong()
-}
 
 private fun newOrderId(ts: Long): String {
     val tsPart = ts.toString(36).takeLast(6)

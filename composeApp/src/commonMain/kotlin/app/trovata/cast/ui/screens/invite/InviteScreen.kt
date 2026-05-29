@@ -70,6 +70,7 @@ data class InviteScreen(val record: StoredSessionRecord) : Screen {
                         sessionId = record.sessionId,
                         sellerName = record.sellerName,
                         clientName = record.clientName,
+                        collectionLabel = record.collectionLabel,
                     ),
                 )
             },

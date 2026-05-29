@@ -44,7 +44,6 @@ import app.trovata.cast.data.sample.FashionPalette
 import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.sample.ProductSwatchPalette
 import app.trovata.cast.data.sample.ProductTag
-import app.trovata.cast.data.sample.SampleCatalog
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind
@@ -76,6 +75,7 @@ fun ProductDetailScreen(
     product: Product,
     modifier: Modifier = Modifier,
     imageUrls: List<String> = emptyList(),
+    related: List<Product> = emptyList(),
     inCallContext: Boolean = false,
     customerName: String? = null,
     onBack: () -> Unit,
@@ -87,9 +87,6 @@ fun ProductDetailScreen(
     val images = remember(product.ref, imageUrls) { imageUrls.ifEmpty { listOfNotNull(product.imageUrl) } }
     val sizes = remember(product.ref) { sampleSizesFor(product) }
     val swatches = remember(product.ref) { sampleSwatchesFor(product) }
-    val related = remember(product.ref) {
-        SampleCatalog.products.filter { it.ref != product.ref }.take(3)
-    }
     var selectedColor by remember(product.ref) { mutableStateOf(swatches.firstOrNull()?.name) }
     var selectedSize by remember(product.ref) { mutableStateOf(sizes.firstOrNull { it.stock > 0 }?.label ?: sizes.first().label) }
     var galleryIndex by remember(product.ref) { mutableIntStateOf(0) }
@@ -136,13 +133,11 @@ fun ProductDetailScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 CompositionCard()
             }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                PerformanceCard()
-            }
-            item {
-                Spacer(modifier = Modifier.height(18.dp))
-                RelatedProducts(products = related)
+            if (related.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(18.dp))
+                    RelatedProducts(products = related)
+                }
             }
         }
 
@@ -579,72 +574,6 @@ private fun CompositionCard() {
                 }
                 if (i < rows.lastIndex) Spacer(modifier = Modifier.height(10.dp))
             }
-        }
-    }
-}
-
-@Composable
-private fun PerformanceCard() {
-    val colors = TrovataTokens.colors
-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        SectionLabel(
-            text = "Performance · últimas 4 semanas",
-            action = { Pill(text = "Subindo", tone = PillTone.Brand, icon = TrovataIcons.trend) },
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(1.dp, RoundedCornerShape(16.dp), clip = false)
-                .background(colors.surface, RoundedCornerShape(16.dp))
-                .border(1.dp, colors.line, RoundedCornerShape(16.dp))
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.line, RoundedCornerShape(10.dp))
-                    .clip(RoundedCornerShape(10.dp)),
-                horizontalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
-                listOf(
-                    "Sessões" to "23",
-                    "Conversão" to "74%",
-                    "Ped. médio" to "14un",
-                ).forEach { (label, value) ->
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(colors.surface)
-                            .padding(vertical = 10.dp, horizontal = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text(
-                            text = label.uppercase(),
-                            color = colors.ink4,
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.06.em,
-                        )
-                        Text(
-                            text = value,
-                            color = colors.ink,
-                            style = TrovataTokens.type.monoBig.copy(
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.02).em,
-                            ),
-                            modifier = Modifier.padding(top = 2.dp),
-                        )
-                    }
-                }
-            }
-            Text(
-                text = "Luciana, Diego e Renata pediram esta peça nas últimas semanas.",
-                color = colors.ink3,
-                fontSize = 11.5.sp,
-                lineHeight = 16.sp,
-            )
         }
     }
 }

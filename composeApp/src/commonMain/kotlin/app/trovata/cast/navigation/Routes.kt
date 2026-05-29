@@ -62,10 +62,14 @@ data class ProductDetailRoute(val productRef: String) : Screen {
         val images by produceState(initialValue = emptyList<String>(), productRef) {
             value = container.catalogRepository.gallery(productRef)
         }
+        val related by produceState(initialValue = emptyList<Product>(), productRef) {
+            value = container.catalogRepository.uiPage(8, 0).filter { it.ref != productRef }.take(6)
+        }
         product?.let {
             ProductDetailScreen(
                 product = it,
                 imageUrls = images,
+                related = related,
                 onBack = { navigator.pop() },
                 onStartSession = { navigator.push(CatalogPickerScreen()) },
             )
@@ -78,7 +82,13 @@ object AccountRoute : Screen {
     override fun Content() {
         val container = AppContainerHolder.current
         val navigator = LocalNavigator.currentOrThrow
-        val model = rememberScreenModel { AccountScreenModel(container.authRepository) }
+        val model = rememberScreenModel {
+            AccountScreenModel(
+                authRepository = container.authRepository,
+                orderRepository = container.orderRepository,
+                clientsRepository = container.clientsRepository,
+            )
+        }
         val state by model.state.collectAsState()
         AccountScreen(
             state = state,
