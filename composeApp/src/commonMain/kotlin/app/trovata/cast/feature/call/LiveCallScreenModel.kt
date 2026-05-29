@@ -6,23 +6,20 @@ import app.trovata.cast.data.local.OrderRepository
 import app.trovata.cast.data.local.SessionsRepository
 import app.trovata.cast.data.local.toUiProduct
 import app.trovata.cast.data.sample.Product
-import app.trovata.cast.data.signaling.KtorSignalingTransport
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.SignalingState
-import app.trovata.cast.data.signaling.signalingUrlFor
-import app.trovata.cast.platform.ServerConfig
 import app.trovata.cast.protocol.DataChannelMessage
 import app.trovata.cast.protocol.OrderLine
 import app.trovata.cast.protocol.PeerRole
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import io.ktor.client.HttpClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import org.koin.core.scope.Scope
 
 data class CartLineUi(
     val productId: String,
@@ -74,38 +71,24 @@ data class LiveCallUiState(
 }
 
 class LiveCallScreenModel(
-    private val token: String,
-    private val sessionId: String,
-    private val clientName: String?,
-    private val httpClient: HttpClient,
+    private val spec: CallSpec,
+    private val signaling: SignalingClient,
+    private val peer: PeerSession,
     private val cartRepository: CartRepository,
     private val orderRepository: OrderRepository,
     private val catalogRepository: CatalogRepository,
     private val sessionsRepository: SessionsRepository,
-    private val collectionLabel: String = "",
-    private val priceTableId: Long? = null,
-    private val sellerPeerId: String = "seller-${randomSuffix()}",
-    private val sellerName: String = "Vendedor",
-    private val clientShop: String? = null,
+    private val callScope: Scope,
 ) : ScreenModel {
 
-    private val transport = KtorSignalingTransport(
-        httpClient = httpClient,
-        wsUrl = signalingUrlFor(ServerConfig.baseUrl, token),
-    )
-    private val signaling = SignalingClient(
-        transport = transport,
-        peerId = sellerPeerId,
-        role = PeerRole.Seller,
-        displayName = sellerName,
-        scope = screenModelScope,
-    )
-    private val peer = PeerSession(
-        signaling = signaling,
-        selfPeerId = sellerPeerId,
-        selfRole = PeerRole.Seller,
-        scope = screenModelScope,
-    )
+    private val token = spec.token
+    private val sessionId = spec.sessionId
+    private val clientName = spec.clientName
+    private val collectionLabel = spec.collectionLabel
+    private val sellerName = spec.sellerName
+    private val clientShop = spec.clientShop
+    private val priceTableId = spec.priceTableId
+    private val sellerPeerId = spec.sellerPeerId
 
     private val _state = MutableStateFlow(
         LiveCallUiState(token = token, role = PeerRole.Seller, collectionLabel = collectionLabel),
@@ -325,13 +308,9 @@ class LiveCallScreenModel(
     }
 
     override fun onDispose() {
-        peer.dispose()
-        signaling.dispose()
+        callScope.close()
     }
 }
-
-private fun randomSuffix(): String =
-    (1..6).map { ('a'..'z').random() }.joinToString("")
 
 private fun newOrderId(ts: Long): String {
     val tsPart = ts.toString(36).takeLast(6)

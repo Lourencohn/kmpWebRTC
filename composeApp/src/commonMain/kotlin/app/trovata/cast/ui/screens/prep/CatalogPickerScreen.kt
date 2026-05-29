@@ -37,7 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import app.trovata.cast.AppContainerHolder
+import app.trovata.cast.data.auth.AuthRepository
 import app.trovata.cast.feature.catalog.CatalogFilter
 import app.trovata.cast.data.sample.Product
 import app.trovata.cast.feature.catalog.CatalogPickerScreenModel
@@ -55,10 +55,12 @@ import app.trovata.cast.ui.components.ProductCard
 import app.trovata.cast.ui.components.ProductCardSize
 import app.trovata.cast.ui.icons.TrovataIcons
 import app.trovata.cast.ui.screens.invite.InviteScreen
-import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import org.koin.compose.koinInject
+import org.koin.core.parameter.parametersOf
 
 data class CatalogPickerScreen(
     val clientName: String? = null,
@@ -68,23 +70,15 @@ data class CatalogPickerScreen(
 
     @Composable
     override fun Content() {
-        val container = AppContainerHolder.current
         val navigator = LocalNavigator.currentOrThrow
+        val authRepository = koinInject<AuthRepository>()
         val initial = remember(clientName, clientShop, scheduledFor) {
             ClientDraft(clientName, clientShop, scheduledFor)
         }
-        val screenModel = rememberScreenModel {
-            CatalogPickerScreenModel(
-                createSession = container.sessionsApi::createSession,
-                persistSession = container.sessionsRepository::persistCreated,
-                initialClient = initial,
-                countProducts = container.catalogRepository::count,
-                loadPage = { limit, offset -> container.catalogRepository.uiPage(limit, offset) },
-            )
-        }
+        val screenModel = koinScreenModel<CatalogPickerScreenModel> { parametersOf(initial) }
         val state by screenModel.state.collectAsState()
-        val user by container.authRepository.user.collectAsState()
-        val company by container.authRepository.activeCompany.collectAsState()
+        val user by authRepository.user.collectAsState()
+        val company by authRepository.activeCompany.collectAsState()
 
         LaunchedEffect(state.createdSession?.sessionId) {
             val record = state.createdSession ?: return@LaunchedEffect

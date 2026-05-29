@@ -5,10 +5,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import app.trovata.cast.AppContainerHolder
+import app.trovata.cast.data.auth.AuthRepository
+import app.trovata.cast.data.local.CatalogRepository
 import app.trovata.cast.data.sample.Product
 import app.trovata.cast.feature.account.AccountScreenModel
 import app.trovata.cast.feature.auth.LoginScreenModel
+import app.trovata.cast.feature.sessions.SessionsViewModel
 import app.trovata.cast.ui.screens.account.AccountScreen
 import app.trovata.cast.ui.screens.auth.AuthLoginScreen
 import app.trovata.cast.ui.screens.auth.CompanySelectionScreen
@@ -17,18 +19,19 @@ import app.trovata.cast.ui.screens.catalog.ProductDetailScreen
 import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
 import app.trovata.cast.ui.screens.sessions.IncomingCallScreen
 import app.trovata.cast.ui.screens.sessions.SessionPrepScreen
-import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import org.koin.compose.koinInject
 
 object IncomingCallRoute : Screen {
     @Composable
     override fun Content() {
-        val container = AppContainerHolder.current
+        val viewModel = koinInject<SessionsViewModel>()
         val navigator = LocalNavigator.currentOrThrow
         IncomingCallScreen(
-            viewModel = container.sessionsViewModel,
+            viewModel = viewModel,
             onAnswered = { navigator.popUntilRoot() },
             onDeclined = { navigator.pop() },
             onRescheduled = { navigator.pop() },
@@ -39,10 +42,10 @@ object IncomingCallRoute : Screen {
 data class SessionPrepRoute(val clientName: String? = null) : Screen {
     @Composable
     override fun Content() {
-        val container = AppContainerHolder.current
+        val viewModel = koinInject<SessionsViewModel>()
         val navigator = LocalNavigator.currentOrThrow
         SessionPrepScreen(
-            viewModel = container.sessionsViewModel,
+            viewModel = viewModel,
             onBack = { navigator.pop() },
             onStartCall = {
                 navigator.push(CatalogPickerScreen(clientName = clientName))
@@ -54,16 +57,16 @@ data class SessionPrepRoute(val clientName: String? = null) : Screen {
 data class ProductDetailRoute(val productRef: String) : Screen {
     @Composable
     override fun Content() {
-        val container = AppContainerHolder.current
+        val catalogRepository = koinInject<CatalogRepository>()
         val navigator = LocalNavigator.currentOrThrow
         val product by produceState<Product?>(initialValue = null, productRef) {
-            value = container.catalogRepository.uiProductByRef(productRef)
+            value = catalogRepository.uiProductByRef(productRef)
         }
         val images by produceState(initialValue = emptyList<String>(), productRef) {
-            value = container.catalogRepository.gallery(productRef)
+            value = catalogRepository.gallery(productRef)
         }
         val related by produceState(initialValue = emptyList<Product>(), productRef) {
-            value = container.catalogRepository.uiPage(8, 0).filter { it.ref != productRef }.take(6)
+            value = catalogRepository.uiPage(8, 0).filter { it.ref != productRef }.take(6)
         }
         product?.let {
             ProductDetailScreen(
@@ -80,20 +83,14 @@ data class ProductDetailRoute(val productRef: String) : Screen {
 object AccountRoute : Screen {
     @Composable
     override fun Content() {
-        val container = AppContainerHolder.current
+        val authRepository = koinInject<AuthRepository>()
         val navigator = LocalNavigator.currentOrThrow
-        val model = rememberScreenModel {
-            AccountScreenModel(
-                authRepository = container.authRepository,
-                orderRepository = container.orderRepository,
-                clientsRepository = container.clientsRepository,
-            )
-        }
+        val model = koinScreenModel<AccountScreenModel>()
         val state by model.state.collectAsState()
         AccountScreen(
             state = state,
             onBack = { navigator.pop() },
-            onSignOut = { container.authRepository.logout() },
+            onSignOut = { authRepository.logout() },
         )
     }
 }
@@ -112,9 +109,8 @@ object AuthWelcomeRoute : Screen {
 object AuthLoginRoute : Screen {
     @Composable
     override fun Content() {
-        val container = AppContainerHolder.current
         val navigator = LocalNavigator.currentOrThrow
-        val model = rememberScreenModel { LoginScreenModel(container.authRepository) }
+        val model = koinScreenModel<LoginScreenModel>()
         val state by model.state.collectAsState()
 
         LaunchedEffect(state.success) {
@@ -135,14 +131,13 @@ object AuthLoginRoute : Screen {
 object CompanySelectionRoute : Screen {
     @Composable
     override fun Content() {
-        val container = AppContainerHolder.current
+        val authRepository = koinInject<AuthRepository>()
         val navigator = LocalNavigator.currentOrThrow
-        val companies by container.authRepository.companies.collectAsState()
+        val companies by authRepository.companies.collectAsState()
         CompanySelectionScreen(
             companies = companies,
             onBack = { navigator.pop() },
-            onSelect = { container.authRepository.selectCompany(it.id) },
+            onSelect = { authRepository.selectCompany(it.id) },
         )
     }
 }
-

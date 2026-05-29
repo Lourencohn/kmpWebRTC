@@ -9,12 +9,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import app.trovata.cast.AppContainerHolder
 import app.trovata.cast.navigation.AccountRoute
 import app.trovata.cast.navigation.ProductDetailRoute
 import app.trovata.cast.feature.catalog.CatalogScreenModel
 import app.trovata.cast.feature.clients.ClientsScreenModel
 import app.trovata.cast.feature.insights.InsightsScreenModel
+import app.trovata.cast.feature.sessions.SessionsViewModel
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.SellerTab
 import app.trovata.cast.ui.components.TabBar
@@ -24,39 +24,28 @@ import app.trovata.cast.ui.screens.insights.InsightsScreen
 import app.trovata.cast.ui.screens.invite.InviteScreen
 import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
 import app.trovata.cast.ui.screens.sessions.SellerHomeScreen
-import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import org.koin.compose.koinInject
 
 object TabsHostRoute : Screen {
     @Composable
     override fun Content() {
-        val container = AppContainerHolder.current
         val navigator = LocalNavigator.currentOrThrow
-        val viewModel = container.sessionsViewModel
+        val viewModel = koinInject<SessionsViewModel>()
         val homeState by viewModel.home.collectAsState()
         val colors = TrovataTokens.colors
         val openAccount: () -> Unit = { navigator.push(AccountRoute) }
 
-        val catalogModel = rememberScreenModel(tag = "catalog") {
-            CatalogScreenModel(container.catalogRepository, container.authRepository)
-        }
+        val catalogModel = koinScreenModel<CatalogScreenModel>()
         val catalogState by catalogModel.state.collectAsState()
 
-        val clientsModel = rememberScreenModel(tag = "clients") {
-            ClientsScreenModel(container.clientsRepository)
-        }
+        val clientsModel = koinScreenModel<ClientsScreenModel>()
         val clientsState by clientsModel.state.collectAsState()
 
-        val insightsModel = rememberScreenModel(tag = "insights") {
-            InsightsScreenModel(
-                orderRepository = container.orderRepository,
-                catalogRepository = container.catalogRepository,
-                sessionsRepository = container.sessionsRepository,
-                authRepository = container.authRepository,
-            )
-        }
+        val insightsModel = koinScreenModel<InsightsScreenModel>()
         val insightsState by insightsModel.state.collectAsState()
 
         Column(modifier = Modifier.fillMaxSize().background(colors.bg)) {

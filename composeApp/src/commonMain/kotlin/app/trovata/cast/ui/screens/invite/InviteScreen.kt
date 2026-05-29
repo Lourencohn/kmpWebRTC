@@ -32,7 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import app.trovata.cast.AppContainerHolder
 import app.trovata.cast.data.local.StoredSessionRecord
 import app.trovata.cast.platform.ShareController
 import app.trovata.cast.theme.TrovataTokens
@@ -51,16 +50,17 @@ import app.trovata.cast.ui.screens.call.LiveCallScreen
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import org.koin.compose.koinInject
 
 data class InviteScreen(val record: StoredSessionRecord) : Screen {
 
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
-        val container = AppContainerHolder.current
+        val share = koinInject<ShareController>()
         InviteBody(
             record = record,
-            share = container.shareController,
+            share = share,
             onBack = { navigator.pop() },
             onClose = { navigator.popUntilRoot() },
             onStartCall = {

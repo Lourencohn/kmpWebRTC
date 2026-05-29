@@ -73,6 +73,10 @@ kotlin {
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.screenmodel)
             implementation(libs.voyager.transitions)
+            implementation(libs.voyager.koin)
+
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
 
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)
@@ -97,6 +101,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.sqldelight.android.driver)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.koin.android)
         }
         iosMain.dependencies {
             implementation(libs.sqldelight.native.driver)
@@ -105,6 +110,7 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.koin.test)
         }
     }
 }

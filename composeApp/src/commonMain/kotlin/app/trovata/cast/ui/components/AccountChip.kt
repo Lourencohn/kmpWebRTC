@@ -12,8 +12,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
-import app.trovata.cast.AppContainerHolder
+import app.trovata.cast.data.auth.AuthRepository
 import app.trovata.cast.theme.TrovataTokens
+import org.koin.compose.koinInject
 
 @Composable
 fun AccountChip(
@@ -21,7 +22,7 @@ fun AccountChip(
     modifier: Modifier = Modifier,
 ) {
     val colors = TrovataTokens.colors
-    val user by AppContainerHolder.current.authRepository.user.collectAsState()
+    val user by koinInject<AuthRepository>().user.collectAsState()
     val name = user?.name?.takeIf { it.isNotBlank() } ?: user?.email ?: "Conta"
     Box(
         modifier = modifier

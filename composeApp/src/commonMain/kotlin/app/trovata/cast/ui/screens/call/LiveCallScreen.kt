@@ -40,13 +40,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import app.trovata.cast.AppContainerHolder
 import app.trovata.cast.data.sample.Product
+import app.trovata.cast.di.CallSession
+import app.trovata.cast.feature.call.CallSpec
 import app.trovata.cast.feature.call.CartLineUi
 import app.trovata.cast.feature.call.CartToast
 import app.trovata.cast.feature.call.LiveCallScreenModel
 import app.trovata.cast.feature.call.LiveCallUiState
 import app.trovata.cast.feature.call.OrderSummaryUi
+import app.trovata.cast.feature.call.newSellerPeerId
 import app.trovata.cast.protocol.OrderLine
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Btn
@@ -66,6 +68,8 @@ import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import org.koin.compose.getKoin
+import org.koin.core.parameter.parametersOf
 
 data class LiveCallScreen(
     val token: String,
@@ -77,21 +81,20 @@ data class LiveCallScreen(
 
     @Composable
     override fun Content() {
-        val container = AppContainerHolder.current
         val navigator = LocalNavigator.currentOrThrow
+        val koin = getKoin()
+        val sellerPeerId = remember(sessionId) { newSellerPeerId() }
         val screenModel = rememberScreenModel {
-            LiveCallScreenModel(
+            val spec = CallSpec(
                 token = token,
                 sessionId = sessionId,
                 clientName = clientName,
-                httpClient = container.httpClient,
-                cartRepository = container.cartRepository,
-                orderRepository = container.orderRepository,
-                catalogRepository = container.catalogRepository,
-                sessionsRepository = container.sessionsRepository,
-                collectionLabel = collectionLabel,
                 sellerName = sellerName,
+                collectionLabel = collectionLabel,
+                sellerPeerId = sellerPeerId,
             )
+            val callScope = koin.createScope<CallSession>(sellerPeerId)
+            callScope.get<LiveCallScreenModel> { parametersOf(spec) }
         }
         LaunchedEffect(token) { screenModel.start() }
 
