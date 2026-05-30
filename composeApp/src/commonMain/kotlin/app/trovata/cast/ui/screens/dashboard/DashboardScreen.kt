@@ -15,9 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,14 +45,16 @@ import app.trovata.cast.feature.dashboard.DashTrend
 import app.trovata.cast.feature.dashboard.DashboardUiState
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.HBar
+import app.trovata.cast.ui.components.PlaceholderBar
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.components.TabHeader
 import app.trovata.cast.ui.components.TrovataCard
+import app.trovata.cast.ui.components.charts.ColumnChartPlaceholder
+import app.trovata.cast.ui.components.charts.LineChartPlaceholder
 import app.trovata.cast.ui.components.charts.TrovataColumnChart
 import app.trovata.cast.ui.components.charts.TrovataLineChart
 import app.trovata.cast.ui.components.charts.compactCurrencyValueFormatter
 import app.trovata.cast.ui.components.charts.integerValueFormatter
-import app.trovata.cast.ui.icons.TrovataIcons
 
 private val HeroAccent = InsightsHeroPalette.accent
 
@@ -83,7 +85,41 @@ fun DashboardScreen(
 
             when {
                 state.isLoading -> item { LoadingCard() }
-                !state.hasData -> item { EmptyState() }
+                !state.hasData -> {
+                    item {
+                        SegmentedSwitch(
+                            options = DashPeriod.entries.map { it.label },
+                            selectedIndex = DashPeriod.entries.indexOf(state.period),
+                            onSelect = { onPeriodChange(DashPeriod.entries[it]) },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
+
+                    item { HeroCardScaffold(state = state, onMetricChange = onMetricChange) }
+
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            SectionLabel(text = "Indicadores do período")
+                            KpiGridScaffold()
+                        }
+                    }
+
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            SectionLabel(text = "Pedidos por dia da semana")
+                            WeekdayChartScaffold()
+                        }
+                    }
+
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            SectionLabel(text = "Mais vendidos")
+                            TopProductsScaffold()
+                        }
+                    }
+
+                    item { EmptyHint() }
+                }
                 else -> {
                     item {
                         SegmentedSwitch(
@@ -430,39 +466,168 @@ private fun LoadingCard() {
 }
 
 @Composable
-private fun EmptyState() {
+private fun HeroCardScaffold(
+    state: DashboardUiState,
+    onMetricChange: (DashMetric) -> Unit,
+) {
     val colors = TrovataTokens.colors
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        TrovataCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 22.dp, horizontal = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+    val shape = RoundedCornerShape(20.dp)
+    val placeholderValue = if (state.metric == DashMetric.Receita) "R$ —" else "—"
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .shadow(10.dp, shape, clip = false)
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(InsightsHeroPalette.gradientTop, InsightsHeroPalette.gradientBottom),
+                ),
+            ),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(colors.brand.copy(alpha = 0.40f), Color.Transparent),
+                        radius = 520f,
+                    ),
+                ),
+        )
+        Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Box(
-                    modifier = Modifier.size(54.dp).background(colors.surface2, RoundedCornerShape(50)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = TrovataIcons.chart,
-                        contentDescription = null,
-                        tint = colors.ink3,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
+                    modifier = Modifier
+                        .size(7.dp)
+                        .background(HeroAccent, RoundedCornerShape(50)),
+                )
                 Text(
-                    text = "Seu painel está pronto pra ganhar vida",
-                    color = colors.ink,
-                    fontSize = 16.sp,
+                    text = state.headlineLabel,
+                    color = Color.White.copy(alpha = 0.66f),
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.12.em,
                 )
-                Text(
-                    text = "Os gráficos aparecem aqui assim que você abrir sessões e fechar pedidos nas chamadas.",
-                    color = colors.ink3,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
+            }
+
+            Text(
+                text = placeholderValue,
+                color = Color.White.copy(alpha = 0.55f),
+                style = TrovataTokens.type.mono.copy(
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.04).em,
+                ),
+                modifier = Modifier.padding(top = 10.dp),
+            )
+
+            SegmentedSwitch(
+                options = DashMetric.entries.map { it.label },
+                selectedIndex = DashMetric.entries.indexOf(state.metric),
+                onSelect = { onMetricChange(DashMetric.entries[it]) },
+                onDark = true,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+
+            LineChartPlaceholder(
+                onDark = true,
+                modifier = Modifier.fillMaxWidth().height(156.dp).padding(top = 14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun KpiGridScaffold() {
+    val labels = listOf("Pedidos", "Ticket médio", "Conversão", "Sessões", "Itens vendidos", "Clientes ativos")
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        labels.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { label -> KpiCardScaffold(label = label, modifier = Modifier.weight(1f)) }
+                if (pair.size == 1) Box(modifier = Modifier.weight(1f))
             }
         }
     }
+}
+
+@Composable
+private fun KpiCardScaffold(label: String, modifier: Modifier = Modifier) {
+    val colors = TrovataTokens.colors
+    TrovataCard(modifier = modifier, padding = 12.dp) {
+        Column {
+            Text(
+                text = label.uppercase(),
+                color = colors.ink4,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.08.em,
+            )
+            Text(
+                text = "—",
+                color = colors.ink4,
+                style = TrovataTokens.type.mono.copy(
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.02).em,
+                ),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeekdayChartScaffold() {
+    TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 14.dp) {
+        ColumnChartPlaceholder(modifier = Modifier.fillMaxWidth().height(168.dp))
+    }
+}
+
+@Composable
+private fun TopProductsScaffold() {
+    val colors = TrovataTokens.colors
+    TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 14.dp) {
+        Column {
+            repeat(3) { index ->
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PlaceholderBar(modifier = Modifier.fillMaxWidth(0.42f))
+                        PlaceholderBar(modifier = Modifier.width(48.dp), height = 10.dp)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        HBar(progress = 0f, color = colors.brand, modifier = Modifier.weight(1f))
+                        PlaceholderBar(modifier = Modifier.width(28.dp), height = 10.dp)
+                    }
+                }
+                if (index < 2) {
+                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyHint() {
+    val colors = TrovataTokens.colors
+    Text(
+        text = "Os números entram aqui assim que você abrir sessões e fechar pedidos nas chamadas.",
+        color = colors.ink4,
+        fontSize = 12.sp,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 4.dp),
+    )
 }

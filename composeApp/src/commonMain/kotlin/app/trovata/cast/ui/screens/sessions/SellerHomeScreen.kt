@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +42,7 @@ import app.trovata.cast.ui.components.BtnKind
 import app.trovata.cast.ui.components.BtnSize
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
+import app.trovata.cast.ui.components.PlaceholderBar
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.components.TabHeader
 import app.trovata.cast.ui.components.TrovataCard
@@ -85,7 +87,9 @@ fun SellerHomeScreen(
             }
 
             if (isEmpty) {
-                item { EmptyState() }
+                item { ClosedTodayScaffold() }
+                item { RecentSessionsScaffold() }
+                item { EmptyHint() }
             }
         }
     }
@@ -185,41 +189,72 @@ private fun RecentSessionRow(session: StoredSessionRecord, onOpen: () -> Unit) {
 }
 
 @Composable
-private fun EmptyState() {
+private fun ClosedTodayScaffold() {
     val colors = TrovataTokens.colors
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        TrovataCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    modifier = Modifier.size(52.dp).background(colors.surface2, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = TrovataIcons.video,
-                        contentDescription = null,
-                        tint = colors.ink3,
-                        modifier = Modifier.size(24.dp),
-                    )
+        SectionLabel(text = "Pedidos fechados hoje")
+        TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
+            Column {
+                repeat(2) { index ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(modifier = Modifier.size(36.dp).background(colors.surface2, RoundedCornerShape(8.dp)))
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            PlaceholderBar(modifier = Modifier.fillMaxWidth(0.5f))
+                            PlaceholderBar(modifier = Modifier.fillMaxWidth(0.7f), height = 9.dp)
+                        }
+                        PlaceholderBar(modifier = Modifier.width(56.dp), height = 11.dp)
+                    }
+                    if (index < 1) {
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
+                    }
                 }
-                Text(
-                    text = "Nenhuma sessão ainda",
-                    color = colors.ink,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "Inicie uma sessão para mostrar o catálogo ao cliente em tempo real. Ela aparece aqui depois.",
-                    color = colors.ink3,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
             }
         }
     }
+}
+
+@Composable
+private fun RecentSessionsScaffold() {
+    val colors = TrovataTokens.colors
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        SectionLabel(text = "Sessões recentes")
+        TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
+            Column {
+                repeat(3) { index ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(modifier = Modifier.size(36.dp).background(colors.surface2, CircleShape))
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            PlaceholderBar(modifier = Modifier.fillMaxWidth(0.45f))
+                            PlaceholderBar(modifier = Modifier.fillMaxWidth(0.65f), height = 9.dp)
+                        }
+                        PlaceholderBar(modifier = Modifier.width(40.dp), height = 11.dp)
+                    }
+                    if (index < 2) {
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyHint() {
+    val colors = TrovataTokens.colors
+    Text(
+        text = "Inicie uma sessão para mostrar o catálogo ao cliente em tempo real. Ela aparece aqui depois.",
+        color = colors.ink4,
+        fontSize = 12.sp,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp),
+    )
 }
 
 @Composable
