@@ -5,6 +5,8 @@ primary_region = "gru"
 
 [env]
   PORT = "8080"
+  STATIC_DIR = "/app/static"
+  PUBLIC_BUYER_URL = "https://trovatacast-signaling.fly.dev"
 
 [http_service]
   internal_port = 8080

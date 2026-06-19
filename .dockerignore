@@ -12,9 +12,10 @@ local.properties
 
 composeApp
 iosApp
-webBuyer
 prototype
 docs
+webBuyer/node_modules
+webBuyer/dist
 
 *.md
 LICENSE

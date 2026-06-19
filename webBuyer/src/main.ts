@@ -23,7 +23,8 @@ if (!root) {
 }
 
 const SERVER_BASE =
-  (import.meta.env.VITE_SIGNALING_BASE as string | undefined) ?? 'http://localhost:8080'
+  (import.meta.env.VITE_SIGNALING_BASE as string | undefined) ??
+  (import.meta.env.PROD ? window.location.origin : 'http://localhost:8080')
 
 function tokenFromUrl(): string | null {
   const params = new URLSearchParams(window.location.search)

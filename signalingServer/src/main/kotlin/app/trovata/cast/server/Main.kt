@@ -4,6 +4,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.http.content.staticFiles
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -13,6 +14,7 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
+import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -60,6 +62,15 @@ fun Application.module() {
     sessionRoutes(store, baseUrl)
     signalingRoutes(rooms, store)
     orderRoutes(orders, store)
+
+    val staticRoot = File(System.getenv("STATIC_DIR")?.takeIf { it.isNotBlank() } ?: "static")
+    if (staticRoot.isDirectory) {
+        routing {
+            staticFiles("/", staticRoot) {
+                default("index.html")
+            }
+        }
+    }
 }
 
 @Serializable
