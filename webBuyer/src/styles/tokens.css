@@ -12,14 +12,17 @@
   --ink-4:  #8A93A0;
   --ink-5:  #B6BCC4;
 
-  --brand:      #0057B8;
-  --brand-2:    #003F87;
-  --brand-tint: #E6EFF9;
-  --brand-ring: rgba(0,87,184,.22);
+  --brand:      #0065AD;
+  --brand-2:    #00538C;
+  --brand-tint: #E5F0F9;
+  --brand-ring: rgba(0,101,173,.22);
 
   --jade:      #1B4332;
   --jade-2:    #0F2D20;
   --jade-tint: #E2ECE6;
+
+  --send:   #2E7D32;
+  --send-2: #246627;
 
   --live: #D62828;
   --warn: #C7711D;
