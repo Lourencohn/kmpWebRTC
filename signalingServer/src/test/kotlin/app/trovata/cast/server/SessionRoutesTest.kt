@@ -4,11 +4,14 @@ import app.trovata.cast.protocol.ErrorResponse
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
 import app.trovata.cast.protocol.SessionInfo
+import app.trovata.cast.protocol.SessionProduct
+import app.trovata.cast.protocol.SessionProductSize
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -65,6 +68,43 @@ class SessionRoutesTest {
         assertEquals("Atelier Norte", info.sellerName)
         assertEquals(2, info.productCount)
         assertNotNull(info.clientName)
+    }
+
+    @Test
+    fun fetchReturnsEmbeddedProductsInBuyerShape() = testApplication {
+        application { module() }
+        val client = createClient {
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+        val request = sampleRequest().copy(
+            products = listOf(
+                SessionProduct(
+                    productId = 1,
+                    ref = "CH-3485059",
+                    name = "Bolsa Contemporâneo Couro",
+                    brand = "CH",
+                    imageUrl = "https://cdn.example/img.jpg",
+                    priceCents = 18990,
+                    sizes = listOf(SessionProductSize(sizeId = 100, label = "Único")),
+                ),
+            ),
+        )
+        val created: SessionCreateResponse = client.post("/session") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+        val raw = client.get("/session/${created.token}").bodyAsText()
+        listOf("\"productId\"", "\"ref\"", "\"priceCents\"", "\"imageUrl\"", "\"sizes\"", "\"sizeId\"", "\"label\"")
+            .forEach { field -> assertTrue(raw.contains(field), "JSON do buyer sem $field: $raw") }
+
+        val info: SessionInfo = client.get("/session/${created.token}").body()
+        assertEquals(1, info.products.size)
+        val product = info.products.first()
+        assertEquals("CH-3485059", product.ref)
+        assertEquals(18990, product.priceCents)
+        assertEquals("https://cdn.example/img.jpg", product.imageUrl)
+        assertEquals("Único", product.sizes.first().label)
     }
 
     @Test
