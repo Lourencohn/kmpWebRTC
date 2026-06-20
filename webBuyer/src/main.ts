@@ -16,7 +16,7 @@ import { mountProductDetail, type DetailView } from './ui/vitrineProductDetail'
 import { mountSendSheet, type SendView } from './ui/vitrineSend'
 import { renderLoading } from './views/arrival'
 import { renderVitrine, type VitrineView } from './views/vitrine'
-import { startLiveSession } from './webrtc/live'
+import { startLiveSession, type LiveSession } from './webrtc/live'
 
 const root = document.getElementById('app')
 if (!root) {
@@ -120,30 +120,58 @@ function start(snapshot: Snapshot, liveToken: string | null): void {
     onOpenCart: openCart,
   })
 
+  let liveSession: LiveSession | null = null
+  let lastCart = new Map<string, number>()
+  const refByProductId = new Map<number, string>()
+  const productByRef = new Map<string, SnapshotProduct>()
+  products.forEach((product) => {
+    refByProductId.set(product.productId, product.ref)
+    productByRef.set(product.ref, product)
+  })
+
   cart.subscribe((snap) => {
     view.setCart(snap)
     sheets.cart?.update(snap)
+    if (!liveSession) return
+    const next = new Map<string, number>()
+    snap.lines.forEach((line) => next.set(`${line.productId}|${line.sizeLabel}`, line.qty))
+    const keys = new Set([...lastCart.keys(), ...next.keys()])
+    keys.forEach((key) => {
+      const before = lastCart.get(key) ?? 0
+      const after = next.get(key) ?? 0
+      if (before === after) return
+      const [productId, sizeLabel] = key.split('|')
+      const ref = refByProductId.get(Number(productId))
+      if (ref) liveSession!.sendCartUpdate(ref, sizeLabel ?? '', after)
+    })
+    lastCart = next
   })
 
   if (liveToken) {
-    const scrollToProduct = (productId: string): void => {
-      const card = root!.querySelector<HTMLElement>(`[data-product-id="${productId}"]`)
+    let lastFocusRef: string | null = null
+    const scrollToRef = (ref: string): void => {
+      const card = root!.querySelector<HTMLElement>(`[data-ref="${CSS.escape(ref)}"]`)
       card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
     void startLiveSession(SERVER_BASE, liveToken, snapshot.customerName ?? 'Cliente')
       .then((live) => {
+        liveSession = live
         live.onStatus((status) => {
           if (status === 'connected') {
             saveLastSession({ token: snapshot.token, openedAtMs: Date.now(), joined: true })
           }
         })
         live.onMessage((message) => {
-          if (
-            message.type === 'navigate' ||
-            message.type === 'scroll' ||
-            message.type === 'pointAt'
-          ) {
-            scrollToProduct(message.productId)
+          if (message.type === 'navigate') {
+            const product = productByRef.get(message.productId)
+            if (product) openDetail(product)
+            else scrollToRef(message.productId)
+            lastFocusRef = message.productId
+          } else if (message.type === 'scroll' || message.type === 'pointAt') {
+            if (message.productId !== lastFocusRef) {
+              scrollToRef(message.productId)
+              lastFocusRef = message.productId
+            }
           }
         })
       })

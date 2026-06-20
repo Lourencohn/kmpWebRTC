@@ -1,4 +1,8 @@
-import { decodeDataChannelMessage, type DataChannelMessage } from '../protocol/dataChannel'
+import {
+  decodeDataChannelMessage,
+  encodeDataChannelMessage,
+  type DataChannelMessage,
+} from '../protocol/dataChannel'
 import { SignalingClient } from '../signaling/client'
 import { PeerSession, type PeerStatus } from './peer'
 
@@ -6,6 +10,7 @@ export type LiveSession = {
   peerId: string
   onMessage(handler: (message: DataChannelMessage) => void): void
   onStatus(handler: (status: PeerStatus) => void): void
+  sendCartUpdate(ref: string, size: string, units: number): void
   close(): void
 }
 
@@ -92,6 +97,18 @@ export async function startLiveSession(
     },
     onStatus: (handler) => {
       statusHandlers.push(handler)
+    },
+    sendCartUpdate: (ref, size, units) => {
+      peer.send(
+        encodeDataChannelMessage({
+          type: 'cartUpdate',
+          productId: ref,
+          size,
+          units,
+          ts: Date.now(),
+          from: peerId,
+        }),
+      )
     },
     close: () => {
       peer.close()

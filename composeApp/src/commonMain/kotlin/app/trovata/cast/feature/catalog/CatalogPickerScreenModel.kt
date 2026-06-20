@@ -7,6 +7,8 @@ import app.trovata.cast.data.sample.ProductTag
 import app.trovata.cast.data.sample.SampleCatalog
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
+import app.trovata.cast.protocol.SessionProduct
+import app.trovata.cast.protocol.SessionProductSize
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -138,11 +140,13 @@ class CatalogPickerScreenModel(
         }
         if (snapshot.isSubmitting) return
         _state.update { it.copy(isSubmitting = true, error = null) }
+        val selected = snapshot.selectedSkus.toList()
         val request = SessionCreateRequest(
             sellerId = sellerId,
             sellerName = sellerName,
             collectionLabel = collectionLabel,
-            productSkus = snapshot.selectedSkus.toList(),
+            productSkus = selected,
+            products = sessionProductsFrom(selected, snapshot.selectedProducts),
             clientName = snapshot.client.name,
             clientShop = snapshot.client.shop,
             scheduledFor = snapshot.client.scheduledFor,
@@ -158,5 +162,34 @@ class CatalogPickerScreenModel(
                 }
             }
         }
+    }
+
+    private fun sessionProductsFrom(
+        refs: List<String>,
+        byRef: Map<String, Product>,
+    ): List<SessionProduct> = refs.mapIndexedNotNull { index, ref ->
+        val product = byRef[ref] ?: return@mapIndexedNotNull null
+        val productId = (index + 1).toLong()
+        SessionProduct(
+            productId = productId,
+            ref = product.ref,
+            name = product.name,
+            brand = product.ref.substringBefore('-').takeIf { it.isNotBlank() && it != product.ref },
+            imageUrl = product.imageUrl,
+            priceCents = parsePriceCents(product.price),
+            available = null,
+            sizes = product.sizes.mapIndexed { sizeIndex, label ->
+                SessionProductSize(sizeId = productId * 100 + sizeIndex, label = label)
+            },
+        )
+    }
+
+    private fun parsePriceCents(price: String): Long {
+        val normalized = price
+            .filter { it.isDigit() || it == ',' || it == '.' }
+            .replace(".", "")
+            .replace(",", ".")
+        val value = normalized.toDoubleOrNull() ?: return 0
+        return (value * 100).toLong()
     }
 }

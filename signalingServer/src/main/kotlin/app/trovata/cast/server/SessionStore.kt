@@ -24,6 +24,7 @@ data class StoredSession(
         clientShop = request.clientShop,
         scheduledFor = request.scheduledFor,
         productCount = request.productSkus.size,
+        products = request.products,
         createdAtMs = createdAtMs,
         expiresAtMs = expiresAtMs,
     )

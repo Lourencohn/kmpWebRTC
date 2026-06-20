@@ -85,6 +85,7 @@ function renderCard(product: SnapshotProduct): HTMLElement {
   const card = document.createElement('article')
   card.className = 'vc-card'
   card.dataset.productId = String(product.productId)
+  card.dataset.ref = product.ref
   card.setAttribute('role', 'button')
   card.setAttribute('tabindex', '0')
   card.setAttribute('aria-label', `${product.name}, ${formatBrl(product.priceCents)}`)
