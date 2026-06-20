@@ -173,8 +173,8 @@ class LiveCallScreenModel(
 
     fun start() {
         screenModelScope.launch {
-            signaling.start()
             peer.start()
+            signaling.start()
         }
     }
 

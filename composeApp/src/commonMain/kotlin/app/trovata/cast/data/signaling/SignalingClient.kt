@@ -4,6 +4,7 @@ import app.trovata.cast.protocol.PeerRole
 import app.trovata.cast.protocol.SignalingMessage
 import app.trovata.cast.protocol.decodeSignaling
 import app.trovata.cast.protocol.encode
+import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,8 @@ class SignalingClient(
     private val displayName: String?,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
+    private val log = Logger.withTag("SignalingClient")
+
     private val _state = MutableStateFlow<SignalingState>(SignalingState.Disconnected)
     val state: StateFlow<SignalingState> = _state.asStateFlow()
 
@@ -50,13 +53,16 @@ class SignalingClient(
     suspend fun start() {
         if (_state.value !is SignalingState.Disconnected && _state.value !is SignalingState.Failed) return
         _state.value = SignalingState.Connecting
+        log.i { "connecting peerId=$peerId role=$role" }
         runCatching {
             transport.connect()
             transport.send(SignalingMessage.Hello(role = role, peerId = peerId, displayName = displayName).encode())
         }.onFailure { err ->
+            log.e(err) { "transport connect failed" }
             _state.value = SignalingState.Failed("transport_failed", err.message ?: "unknown")
             return
         }
+        log.i { "connected, hello sent" }
         listenerJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             transport.listen { raw ->
                 val parsed = runCatching { decodeSignaling(raw) }.getOrNull() ?: return@listen
@@ -66,6 +72,7 @@ class SignalingClient(
     }
 
     private suspend fun handleIncoming(message: SignalingMessage) {
+        log.i { "recv ${message::class.simpleName}" }
         when (message) {
             is SignalingMessage.RoomState -> {
                 _state.value = SignalingState.Connected(

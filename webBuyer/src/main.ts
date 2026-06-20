@@ -16,6 +16,7 @@ import { mountProductDetail, type DetailView } from './ui/vitrineProductDetail'
 import { mountSendSheet, type SendView } from './ui/vitrineSend'
 import { renderLoading } from './views/arrival'
 import { renderVitrine, type VitrineView } from './views/vitrine'
+import { startLiveSession } from './webrtc/live'
 
 const root = document.getElementById('app')
 if (!root) {
@@ -50,7 +51,7 @@ type Sheets = {
   send: SendView | null
 }
 
-function start(snapshot: Snapshot): void {
+function start(snapshot: Snapshot, liveToken: string | null): void {
   const products = productIndex(snapshot)
   const cart = new VitrineCart(products)
 
@@ -123,6 +124,33 @@ function start(snapshot: Snapshot): void {
     view.setCart(snap)
     sheets.cart?.update(snap)
   })
+
+  if (liveToken) {
+    const scrollToProduct = (productId: string): void => {
+      const card = root!.querySelector<HTMLElement>(`[data-product-id="${productId}"]`)
+      card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    void startLiveSession(SERVER_BASE, liveToken, snapshot.customerName ?? 'Cliente')
+      .then((live) => {
+        live.onStatus((status) => {
+          if (status === 'connected') {
+            saveLastSession({ token: snapshot.token, openedAtMs: Date.now(), joined: true })
+          }
+        })
+        live.onMessage((message) => {
+          if (
+            message.type === 'navigate' ||
+            message.type === 'scroll' ||
+            message.type === 'pointAt'
+          ) {
+            scrollToProduct(message.productId)
+          }
+        })
+      })
+      .catch((err) => {
+        console.warn('[trovata/web] sessão ao vivo indisponível', err)
+      })
+  }
 }
 
 function buildDraft(snapshot: Snapshot, lines: CartDraft['lines']): CartDraft {
@@ -167,7 +195,7 @@ async function boot(): Promise<void> {
   try {
     const snapshot = await loadSnapshot(token)
     saveLastSession({ token: snapshot.token, openedAtMs: Date.now(), joined: false })
-    start(snapshot)
+    start(snapshot, token)
   } catch (err) {
     clearLastSession()
     if (import.meta.env.DEV) console.error('[trovata/web] boot failed', err)

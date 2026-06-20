@@ -6,6 +6,7 @@ import app.trovata.cast.protocol.PeerRole
 import app.trovata.cast.protocol.SignalingMessage
 import app.trovata.cast.protocol.decodeDataChannel
 import app.trovata.cast.protocol.encode
+import co.touchlab.kermit.Logger
 import com.shepeliev.webrtckmp.DataChannel
 import com.shepeliev.webrtckmp.DataChannelState
 import com.shepeliev.webrtckmp.IceCandidate
@@ -16,14 +17,17 @@ import com.shepeliev.webrtckmp.MediaStream
 import com.shepeliev.webrtckmp.MediaStreamTrackKind
 import com.shepeliev.webrtckmp.OfferAnswerOptions
 import com.shepeliev.webrtckmp.PeerConnection
+import com.shepeliev.webrtckmp.PeerConnectionState
 import com.shepeliev.webrtckmp.RtcConfiguration
 import com.shepeliev.webrtckmp.SessionDescription
 import com.shepeliev.webrtckmp.SessionDescriptionType
+import com.shepeliev.webrtckmp.onConnectionStateChange
 import com.shepeliev.webrtckmp.onDataChannel
 import com.shepeliev.webrtckmp.onIceCandidate
 import com.shepeliev.webrtckmp.onIceConnectionStateChange
 import com.shepeliev.webrtckmp.onTrack
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -61,6 +65,8 @@ class PeerSession(
     private val presenceIntervalMs: Long = 5_000,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
+    private val log = Logger.withTag("PeerSession")
+
     private val _state = MutableStateFlow<PeerSessionState>(PeerSessionState.Idle)
     val state: StateFlow<PeerSessionState> = _state.asStateFlow()
 
@@ -99,11 +105,15 @@ class PeerSession(
 
     suspend fun start() {
         if (pc != null) return
+        log.i { "start role=$selfRole peerId=$selfPeerId" }
         _state.value = PeerSessionState.Negotiating
         val connection = PeerConnection(RtcConfiguration(iceServers = iceServers))
         pc = connection
 
-        localStream = runCatching { MediaDevices.getUserMedia(audio = true) }.getOrNull()
+        localStream = runCatching { MediaDevices.getUserMedia(audio = true) }
+            .onFailure { log.w(it) { "getUserMedia failed" } }
+            .getOrNull()
+        log.i { "localStream tracks=${localStream?.tracks?.size ?: 0}" }
         localStream?.tracks?.forEach { track -> connection.addTrack(track, localStream!!) }
 
         collectorJobs += scope.launch {
@@ -122,11 +132,20 @@ class PeerSession(
         }
         collectorJobs += scope.launch {
             connection.onIceConnectionStateChange.collect { iceState ->
+                log.i { "iceConnectionState=$iceState" }
                 when (iceState) {
-                    IceConnectionState.Connected, IceConnectionState.Completed ->
-                        _state.value = PeerSessionState.Connected
+                    IceConnectionState.Connected, IceConnectionState.Completed -> markConnected()
                     IceConnectionState.Failed -> _state.value = PeerSessionState.Failed("ice_failed")
-                    IceConnectionState.Disconnected -> _state.value = PeerSessionState.Negotiating
+                    else -> Unit
+                }
+            }
+        }
+        collectorJobs += scope.launch {
+            connection.onConnectionStateChange.collect { connState ->
+                log.i { "connectionState=$connState" }
+                when (connState) {
+                    PeerConnectionState.Connected -> markConnected()
+                    PeerConnectionState.Failed -> _state.value = PeerSessionState.Failed("connection_failed")
                     else -> Unit
                 }
             }
@@ -139,7 +158,7 @@ class PeerSession(
         collectorJobs += scope.launch {
             connection.onDataChannel.collect { incoming -> bindDataChannel(incoming) }
         }
-        collectorJobs += scope.launch {
+        collectorJobs += scope.launch(start = CoroutineStart.UNDISPATCHED) {
             signaling.incoming.collect { handleSignal(it) }
         }
         collectorJobs += scope.launch {
@@ -153,6 +172,12 @@ class PeerSession(
         if (selfRole == PeerRole.Buyer) {
             createOffer()
         }
+    }
+
+    private fun markConnected() {
+        if (_state.value is PeerSessionState.Connected) return
+        log.i { "session live" }
+        _state.value = PeerSessionState.Connected
     }
 
     private suspend fun createOffer() {
@@ -176,9 +201,11 @@ class PeerSession(
             is SignalingMessage.RoomState -> {
                 val other = message.peers.firstOrNull { it.peerId != selfPeerId }
                 remotePeerId = other?.peerId
+                log.i { "roomState remotePeer=$remotePeerId" }
             }
             is SignalingMessage.PeerJoined -> {
                 remotePeerId = message.peer.peerId
+                log.i { "peerJoined remotePeer=$remotePeerId" }
             }
             is SignalingMessage.PeerLeft -> {
                 if (message.peerId == remotePeerId) {
@@ -186,10 +213,12 @@ class PeerSession(
                 }
             }
             is SignalingMessage.Offer -> {
+                log.i { "offer from=${message.from}" }
                 remotePeerId = message.from
                 connection.setRemoteDescription(SessionDescription(SessionDescriptionType.Offer, message.sdp))
                 val answer = connection.createAnswer(OfferAnswerOptions())
                 connection.setLocalDescription(answer)
+                log.i { "answer sent to=${message.from}" }
                 signaling.send(
                     SignalingMessage.Answer(
                         sdp = answer.sdp,
@@ -199,6 +228,7 @@ class PeerSession(
                 )
             }
             is SignalingMessage.Answer -> {
+                log.i { "answer from=${message.from}" }
                 connection.setRemoteDescription(SessionDescription(SessionDescriptionType.Answer, message.sdp))
             }
             is SignalingMessage.IceCandidate -> {
@@ -210,7 +240,7 @@ class PeerSession(
                             candidate = message.candidate,
                         ),
                     )
-                }
+                }.onFailure { log.w { "addIceCandidate failed: ${it.message}" } }
             }
             else -> Unit
         }
@@ -220,6 +250,8 @@ class PeerSession(
         dc = channel
         collectorJobs += scope.launch {
             channel.onOpen.collect {
+                log.i { "dataChannel open=${channel.label}" }
+                markConnected()
                 startPresenceLoop()
                 if (_localMuted.value) sendMuteState(_localMuted.value)
             }
