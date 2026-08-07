@@ -21,6 +21,8 @@
 | M8 — Carrinho ao vivo | ✅ concluído | (sem commit ainda) | DC `Navigate` + `CartUpdate` + `BuyerProductDetail` (sheet) + carrinho dock no cliente + gaveta no vendedor + `CartRepository` (SQLDelight) + toast |
 | M9 — Encerrar com pedido pronto | 🟡 fase 2 parcial | (sem commit ainda) | Fase 2: `OrderRepository` (SQLDelight) + "Pedidos fechados hoje" na Home + `POST /order` (mem) + buyer envia + PDF via `window.print()`. Push fica pra M11 |
 | M10 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
+| Integração Catálogo Link — Fase 1 (catálogos reais) | ✅ concluído | (sem commit ainda) | `CatalogLinksApi` + `CatalogLinkPickerScreen` sobre `GET /empresa/{slug}/catalogos-links`; picker de produtos aposentado; `Company.slug` |
+| Integração Catálogo Link — Fase 2 (convite) | ✅ concluído | (sem commit ainda) | `POST /session` validando contra o Laravel real, Bearer do vendedor repassado, convite apontando para o `sfa_front` |
 | Integração Catálogo Link — Fase 0 (contrato) | ✅ concluído | (sem commit ainda) | `SessionCreateRequest` por identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`/`OrderPlaced`, URL de convite no `sfa_front`. Ver `prompt.md` e `docs/10-integracao-catalogo-link.md` |
 
 ---
@@ -684,6 +686,50 @@ O parâmetro é `live` e **não pode** ser `token`: o interceptor em `sfa_front/
 
 ---
 
+## Integração Catálogo Link — Fases 1 e 2
+
+**Fase 1 — o vendedor vê os catálogos que são dele.** Nenhum endpoint novo foi preciso: `GET /empresa/{slug}/catalogos-links` já existe sob `auth:keycloak` e o `ListCatalogoLinkUseCase` já filtra por `usuario_id` + roles.
+
+- `CatalogLinksApi` consome a listagem paginada e mapeia para `SellerCatalogLink`.
+- `CatalogLinkPickerScreen` substitui o antigo `CatalogPickerScreen` (que selecionava produtos soltos do catálogo de amostra). O picker de produtos foi removido.
+- `Company` ganhou `slug` — é ele que vira `empresaSlug` no contrato e na URL de convite.
+- Catálogo expirado ou inativo aparece sob o filtro "Todos", não é selecionável, e a tela explica o motivo em vez de falhar na criação da sessão.
+
+**Fase 2 — o convite aponta para a vitrine real.** `POST /session` valida contra o Laravel antes de emitir o token, e o app manda o Bearer do vendedor junto.
+
+### Duas correções de rota descobertas na integração real
+
+**As rotas do catálogo link não estão em `api-int`.** O `api-int.trovata.app.br` é um gateway Go que serve `/empresas` e `/v2/usuarios/logado` — o que o app já usava para conta e sync. As rotas de catálogo link, vitrine e carrinho são do Laravel e vivem em **`https://api.trovata.app.br/api`**, com o prefixo `/api`. Daí o `SfaConfig.laravelApiUrl`, separado do `baseUrl`.
+
+**Catálogo expirado devolve HTTP 500, não 400.** O `ValidateUUIDMiddleware` faz `throw new Exception('Catalogo expirado', 400)`, mas o segundo argumento de `Exception` é o *code*, não o status HTTP — e o `Handler` do projeto só mapeia 404. Com `app.debug=false` em produção o corpo ainda vem mascarado como `{"message":"Server Error"}`, então não há como distinguir "catálogo expirado" de "SFA instável".
+
+Consequência: o validador rejeita 404 (catálogo inexistente na empresa) e trata 500 como indisponibilidade — segue sem bloquear, e loga. A defesa real contra catálogo expirado é a Fase 1, onde a listagem já traz `expirado` calculado e a tela não deixa escolher.
+
+**Vale um PR no `sfa_back`** trocando essas duas `Exception(..., 400)` por uma `HttpException` com status próprio. É mudança de duas linhas e faz a rejeição virar contrato de verdade para qualquer cliente da vitrine.
+
+### Verificação ponta a ponta (signaling local → Laravel de produção)
+
+Com `SFA_API_URL=https://api.trovata.app.br/api`:
+
+| Cenário | Resultado |
+|---|---|
+| uuid inexistente em `buba-teste` | Laravel devolveu 404 → signaling respondeu `422 catalogo_not_found` |
+| catálogo real `0234d934…` (validade 2026-04-18, expirado) | Laravel devolveu 500 mascarado → sessão criada com log de aviso |
+| payload sem `catalogoUuid` | `400 missing_catalogo`, sem sair para a rede |
+| `GET /session/{token}` | devolve identidade do catálogo link, sem nenhum produto |
+| URL do convite no front de produção | `https://trovata.app.br/catalogo-link-view/buba-teste/{uuid}?live={token}` → HTTP 200 |
+
+### O que falta para o fluxo completo do vendedor
+
+- **Catálogo link vigente no `buba-teste`.** O tenant 99 tem um único catálogo e ele expirou em 18/04/2026. Sem isso não dá para exercitar o caminho feliz da Fase 1 ponta a ponta.
+- **Credencial Keycloak de um vendedor** de teste: a listagem exige `auth:keycloak`, então a Fase 1 foi verificada com testes de contrato sobre o payload real do `CatalogoLinkListResource`, não contra a API autenticada.
+
+### Verificação
+- `./gradlew :protocol:jvmTest :signalingServer:test :composeApp:testDebugUnitTest` ✅ (29 + 30 + 37 = 96)
+- `./gradlew :composeApp:assembleDebug :signalingServer:build` ✅
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -701,5 +747,6 @@ O parâmetro é `live` e **não pode** ser `token`: o interceptor em `sfa_front/
 | 2026-05-22 | Infra: webBuyer no Cloudflare Pages (`trovatacast-buyer.pages.dev`) via GH Actions + Wrangler; Fly `PUBLIC_BUYER_URL` setado; Mac do vendedor não é mais necessário para nenhum componente |
 | 2026-05-23 | M8 fechado: DC `Navigate` + `CartUpdate`, `BuyerProductDetail` sheet, cart dock no cliente, gaveta + toast no vendedor, `CartRepository` (SQLDelight) · 78 testes totais (9 protocol + 15 composeApp + 12 signaling + 54 webBuyer) |
 | 2026-05-23 | M9 fase 1 fechado: DC `OrderConfirm`, botão Confirmar pedido na gaveta, `OrderSummaryOverlay` (vendedor) + `mountOrderSummary` (cliente). PDF, persistência server-side e push ficam pra fase 2 · 83 testes totais (11 protocol + 15 composeApp + 12 signaling + 57 webBuyer) |
+| 2026-08-06 | Integração Catálogo Link — Fases 1 e 2 fechadas: app lista catálogos link reais do vendedor (`CatalogLinksApi`, `CatalogLinkPickerScreen`, `Company.slug`), picker de produtos removido, `POST /session` validando contra o Laravel de produção e convite apontando para o `sfa_front`. Descobertos o prefixo `/api` da API Laravel e o 500 mascarado em catálogo expirado · 163 testes totais (29 protocol + 30 signaling + 37 composeApp + 67 webBuyer) |
 | 2026-08-06 | Integração Catálogo Link — Fase 0 fechada: contrato redesenhado no `protocol/` (identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`, `OrderPlaced`), URL de convite apontando para o `sfa_front` com `?live=`, `SessionEvent`/`Codec` removidos · 142 testes totais (29 protocol + 20 signaling + 26 composeApp + 67 webBuyer) |
 | 2026-05-23 | M9 fase 2 (parcial) fechada: `OrderRepository` + `Orders.sq`, "Pedidos fechados hoje" na Home, `POST /order` em memória + buyer envia, PDF via `window.print()` + `@media print`. `SummaryScreen` (métricas) movido pra M12 e push pra M19 · 121 testes totais (24 protocol + 17 signaling + 15 composeApp + 65 webBuyer) |

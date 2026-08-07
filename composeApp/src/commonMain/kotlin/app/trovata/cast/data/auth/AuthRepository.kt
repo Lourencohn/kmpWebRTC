@@ -157,6 +157,7 @@ class AuthRepository(
     }
 
     private fun persistActiveCompany(company: Company?) {
+        store.put(KEY_COMPANY_SLUG, company?.slug)
         store.put(KEY_COMPANY_NAME, company?.name)
         store.put(KEY_COMPANY_LEGAL, company?.legalName)
         store.put(KEY_COMPANY_CNPJ, company?.cnpj)
@@ -168,6 +169,7 @@ class AuthRepository(
         val name = store.get(KEY_COMPANY_NAME) ?: return null
         return Company(
             id = id,
+            slug = store.get(KEY_COMPANY_SLUG).orEmpty(),
             name = name,
             legalName = store.get(KEY_COMPANY_LEGAL),
             cnpj = store.get(KEY_COMPANY_CNPJ),
@@ -186,6 +188,7 @@ class AuthRepository(
         const val KEY_USER_NAME = "user_name"
         const val KEY_USER_EMAIL = "user_email"
         const val KEY_USER_AVATAR = "user_avatar"
+        const val KEY_COMPANY_SLUG = "company_slug"
         const val KEY_COMPANY_NAME = "company_name"
         const val KEY_COMPANY_LEGAL = "company_legal"
         const val KEY_COMPANY_CNPJ = "company_cnpj"
@@ -193,7 +196,7 @@ class AuthRepository(
         val ALL_KEYS = listOf(
             KEY_ACCESS, KEY_REFRESH, KEY_ACCESS_EXP, KEY_REFRESH_EXP, KEY_EMPRESA,
             KEY_USER_ID, KEY_USER_NAME, KEY_USER_EMAIL, KEY_USER_AVATAR,
-            KEY_COMPANY_NAME, KEY_COMPANY_LEGAL, KEY_COMPANY_CNPJ, KEY_COMPANY_LOGO,
+            KEY_COMPANY_SLUG, KEY_COMPANY_NAME, KEY_COMPANY_LEGAL, KEY_COMPANY_CNPJ, KEY_COMPANY_LOGO,
         )
     }
 }

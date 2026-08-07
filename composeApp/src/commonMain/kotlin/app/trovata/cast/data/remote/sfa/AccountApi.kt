@@ -75,6 +75,7 @@ class AccountApi(
                 companies.add(
                     Company(
                         id = dto.id,
+                        slug = dto.slug.orEmpty(),
                         name = dto.nomeFantasia ?: dto.razaoSocial ?: "Empresa ${dto.id}",
                         legalName = dto.razaoSocial,
                         cnpj = dto.cnpj,

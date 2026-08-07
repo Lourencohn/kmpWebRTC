@@ -14,18 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -37,13 +32,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import app.trovata.cast.data.auth.AuthRepository
-import app.trovata.cast.feature.catalog.CatalogFilter
-import app.trovata.cast.data.sample.Product
-import app.trovata.cast.feature.catalog.CatalogPickerScreenModel
-import app.trovata.cast.feature.catalog.CatalogPickerUiState
+import app.trovata.cast.feature.catalog.CatalogLinkFilter
+import app.trovata.cast.feature.catalog.CatalogLinkPickerScreenModel
+import app.trovata.cast.feature.catalog.CatalogLinkPickerUiState
 import app.trovata.cast.feature.catalog.ClientDraft
-import app.trovata.cast.theme.TrovataTokens
+import app.trovata.cast.feature.catalog.SellerCatalogLink
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind
 import app.trovata.cast.ui.components.BtnSize
@@ -51,8 +47,7 @@ import app.trovata.cast.ui.components.IconBtn
 import app.trovata.cast.ui.components.IconBtnKind
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
-import app.trovata.cast.ui.components.ProductCard
-import app.trovata.cast.ui.components.ProductCardSize
+import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.icons.TrovataIcons
 import app.trovata.cast.ui.screens.invite.InviteScreen
 import cafe.adriel.voyager.core.screen.Screen
@@ -62,7 +57,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 
-data class CatalogPickerScreen(
+data class CatalogLinkPickerScreen(
     val clientName: String? = null,
     val clientShop: String? = null,
     val scheduledFor: String? = null,
@@ -75,7 +70,7 @@ data class CatalogPickerScreen(
         val initial = remember(clientName, clientShop, scheduledFor) {
             ClientDraft(clientName, clientShop, scheduledFor)
         }
-        val screenModel = koinScreenModel<CatalogPickerScreenModel> { parametersOf(initial) }
+        val screenModel = koinScreenModel<CatalogLinkPickerScreenModel> { parametersOf(initial) }
         val state by screenModel.state.collectAsState()
         val user by authRepository.user.collectAsState()
         val company by authRepository.activeCompany.collectAsState()
@@ -86,38 +81,35 @@ data class CatalogPickerScreen(
             navigator.push(InviteScreen(record))
         }
 
-        CatalogPickerBody(
+        CatalogLinkPickerBody(
             state = state,
             onBack = { navigator.pop() },
-            onToggle = screenModel::toggle,
+            onSelect = screenModel::select,
             onFilter = screenModel::setFilter,
+            onRetry = screenModel::refresh,
             onGenerate = {
                 screenModel.generateLink(
-                    sellerId = (company?.id ?: user?.id)?.toString() ?: "seller",
+                    sellerId = (user?.id ?: company?.id)?.toString() ?: "seller",
                     sellerName = user?.name?.takeIf { it.isNotBlank() } ?: company?.name ?: "Vendedor",
                 )
             },
             onDismissError = screenModel::clearError,
-            onPrevPage = screenModel::prevPage,
-            onNextPage = screenModel::nextPage,
         )
     }
 }
 
 @Composable
-private fun CatalogPickerBody(
-    state: CatalogPickerUiState,
+private fun CatalogLinkPickerBody(
+    state: CatalogLinkPickerUiState,
     onBack: () -> Unit,
-    onToggle: (Product) -> Unit,
-    onFilter: (CatalogFilter) -> Unit,
+    onSelect: (SellerCatalogLink) -> Unit,
+    onFilter: (CatalogLinkFilter) -> Unit,
+    onRetry: () -> Unit,
     onGenerate: () -> Unit,
     onDismissError: () -> Unit,
-    onPrevPage: () -> Unit,
-    onNextPage: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
-    val visible = state.visibleProducts
-    val selectedCount = state.selectedSkus.size
+    val visible = state.visibleLinks
 
     Box(modifier = Modifier.fillMaxSize().background(colors.bg)) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -131,21 +123,23 @@ private fun CatalogPickerBody(
                 IconBtn(icon = TrovataIcons.back, onClick = onBack, kind = IconBtnKind.Line)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Montar catálogo",
+                        text = "Escolher catálogo",
                         color = colors.ink4,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
-                        text = state.client.name?.let { "Para ${it.split(' ').first()}" } ?: "Nova sessão",
+                        text = state.client.name?.let { "Para ${it.split(' ').first()}" }
+                            ?: state.companyName.takeIf { it.isNotBlank() }
+                            ?: "Nova sessão",
                         color = colors.ink,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
                 Pill(
-                    text = "$selectedCount sel.",
-                    tone = if (selectedCount > 0) PillTone.Brand else PillTone.Neutral,
+                    text = "${visible.size}",
+                    tone = if (state.selectedUuid != null) PillTone.Brand else PillTone.Neutral,
                 )
             }
 
@@ -156,8 +150,8 @@ private fun CatalogPickerBody(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 4.dp),
             ) {
-                items(CatalogFilter.entries.toList()) { filter ->
-                    FilterChip(
+                items(CatalogLinkFilter.entries.toList()) { filter ->
+                    LinkFilterChip(
                         label = filter.label,
                         active = state.filter == filter,
                         onClick = { onFilter(filter) },
@@ -165,44 +159,34 @@ private fun CatalogPickerBody(
                 }
             }
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 140.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                items(visible) { product ->
-                    val selected = product.ref in state.selectedSkus
-                    ProductCard(
-                        product = product,
-                        size = ProductCardSize.Sm,
-                        highlight = selected,
-                        inCart = if (selected) 1 else 0,
-                        onClick = { onToggle(product) },
-                    )
-                }
-
-                if (state.totalPages > 1) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        PickerPager(
-                            page = state.page,
-                            totalPages = state.totalPages,
-                            onPrev = onPrevPage,
-                            onNext = onNextPage,
+            when {
+                state.isLoading -> CenteredMessage("Buscando seus catálogos...")
+                visible.isEmpty() && state.error == null -> EmptyLinks(
+                    unavailableCount = state.unavailableCount,
+                    filter = state.filter,
+                    onRetry = onRetry,
+                )
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 140.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(visible, key = { it.uuid }) { link ->
+                        CatalogLinkRow(
+                            link = link,
+                            selected = link.uuid == state.selectedUuid,
+                            onClick = { onSelect(link) },
                         )
                     }
                 }
             }
         }
 
-        BottomGenerateBar(
+        BottomGenerateLinkBar(
             modifier = Modifier.align(Alignment.BottomCenter),
-            selectedCount = selectedCount,
-            skuCount = state.skuCount,
+            selected = state.selected,
             submitting = state.isSubmitting,
+            enabled = state.canGenerate,
             onGenerate = onGenerate,
         )
 
@@ -212,47 +196,106 @@ private fun CatalogPickerBody(
                     .align(Alignment.TopCenter)
                     .padding(top = 100.dp, start = 16.dp, end = 16.dp),
             ) {
-                ErrorBanner(text = error, onDismiss = onDismissError)
+                LinkErrorBanner(text = error, onDismiss = onDismissError)
             }
         }
     }
 }
 
 @Composable
-private fun PickerPager(page: Int, totalPages: Int, onPrev: () -> Unit, onNext: () -> Unit) {
+private fun CatalogLinkRow(link: SellerCatalogLink, selected: Boolean, onClick: () -> Unit) {
     val colors = TrovataTokens.colors
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    val shape = RoundedCornerShape(14.dp)
+    val borderColor = if (selected) colors.brand else colors.line
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.surface, shape)
+            .border(if (selected) 2.dp else 1.dp, borderColor, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Btn(
-            text = "Anterior",
-            onClick = onPrev,
-            kind = BtnKind.Surface,
-            size = BtnSize.Sm,
-            enabled = page > 1,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Text(
+                text = link.nome,
+                color = if (link.disponivel) colors.ink else colors.ink4,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            when {
+                link.expirado -> Pill(text = "Expirado", tone = PillTone.Neutral)
+                !link.ativo -> Pill(text = "Inativo", tone = PillTone.Neutral)
+                selected -> Pill(text = "Selecionado", tone = PillTone.Brand)
+                else -> Unit
+            }
+        }
+        link.clienteNome?.takeIf { it != link.nome }?.let { cliente ->
+            Text(text = cliente, color = colors.ink3, fontSize = 12.sp)
+        }
         Text(
-            text = "Página $page de $totalPages",
-            color = colors.ink3,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f),
-        )
-        Btn(
-            text = "Próxima",
-            onClick = onNext,
-            kind = BtnKind.Surface,
-            size = BtnSize.Sm,
-            enabled = page < totalPages,
+            text = listOfNotNull(
+                link.validadeLabel?.let { "Vale até $it" },
+                "${link.totalCarrinhos} carrinhos",
+                "${link.totalVisualizacoes} visitas",
+            ).joinToString(" · "),
+            color = colors.ink4,
+            fontSize = 11.5.sp,
         )
     }
 }
 
 @Composable
-private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
+private fun CenteredMessage(text: String) {
+    val colors = TrovataTokens.colors
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(top = 60.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = text, color = colors.ink3, fontSize = 13.sp, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun EmptyLinks(unavailableCount: Int, filter: CatalogLinkFilter, onRetry: () -> Unit) {
+    val colors = TrovataTokens.colors
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 60.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = if (filter == CatalogLinkFilter.Disponiveis && unavailableCount > 0) {
+                "Nenhum catálogo disponível agora"
+            } else {
+                "Você ainda não tem catálogos link"
+            },
+            color = colors.ink,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = if (filter == CatalogLinkFilter.Disponiveis && unavailableCount > 0) {
+                "$unavailableCount catálogo(s) estão expirados ou inativos. Veja em \"Todos\" ou renove a validade no Catálogo Link."
+            } else {
+                "Crie um catálogo link no sistema e ele aparece aqui."
+            },
+            color = colors.ink3,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+        )
+        Btn(text = "Atualizar", onClick = onRetry, kind = BtnKind.Surface, size = BtnSize.Sm)
+    }
+}
+
+@Composable
+private fun LinkFilterChip(label: String, active: Boolean, onClick: () -> Unit) {
     val colors = TrovataTokens.colors
     val shape = RoundedCornerShape(999.dp)
     val bg = if (active) colors.ink else colors.surface
@@ -276,15 +319,14 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun BottomGenerateBar(
+private fun BottomGenerateLinkBar(
     modifier: Modifier = Modifier,
-    selectedCount: Int,
-    skuCount: Int,
+    selected: SellerCatalogLink?,
     submitting: Boolean,
+    enabled: Boolean,
     onGenerate: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
-    val canGenerate = selectedCount > 0 && !submitting
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -299,7 +341,7 @@ private fun BottomGenerateBar(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (selectedCount == 0) "Escolha produtos" else "$selectedCount produtos · $skuCount SKUs",
+                    text = selected?.nome ?: "Escolha um catálogo",
                     color = colors.ink4,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -314,17 +356,17 @@ private fun BottomGenerateBar(
             Btn(
                 text = if (submitting) "Gerando..." else "Gerar link",
                 onClick = onGenerate,
-                kind = if (canGenerate) BtnKind.Primary else BtnKind.Soft,
+                kind = if (enabled) BtnKind.Primary else BtnKind.Soft,
                 size = BtnSize.Md,
                 icon = TrovataIcons.share,
-                enabled = canGenerate,
+                enabled = enabled,
             )
         }
     }
 }
 
 @Composable
-private fun ErrorBanner(text: String, onDismiss: () -> Unit) {
+private fun LinkErrorBanner(text: String, onDismiss: () -> Unit) {
     val colors = TrovataTokens.colors
     Row(
         modifier = Modifier

@@ -24,7 +24,7 @@ import app.trovata.cast.ui.screens.clients.ClientsScreen
 import app.trovata.cast.ui.screens.dashboard.DashboardScreen
 import app.trovata.cast.ui.screens.insights.InsightsScreen
 import app.trovata.cast.ui.screens.invite.InviteScreen
-import app.trovata.cast.ui.screens.prep.CatalogPickerScreen
+import app.trovata.cast.ui.screens.prep.CatalogLinkPickerScreen
 import app.trovata.cast.ui.screens.sessions.SellerHomeScreen
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
@@ -68,7 +68,7 @@ object TabsHostRoute : Screen {
                     )
                     SellerTab.Sessoes -> SellerHomeScreen(
                         viewModel = viewModel,
-                        onInviteClient = { navigator.push(CatalogPickerScreen()) },
+                        onInviteClient = { navigator.push(CatalogLinkPickerScreen()) },
                         onOpenSession = { record -> navigator.push(InviteScreen(record)) },
                         onOpenAccount = openAccount,
                     )
@@ -86,7 +86,7 @@ object TabsHostRoute : Screen {
                         onQueryChange = clientsModel::setQuery,
                         onOpenAccount = openAccount,
                         onInviteClient = { client ->
-                            navigator.push(CatalogPickerScreen(clientName = client.name))
+                            navigator.push(CatalogLinkPickerScreen(clientName = client.name))
                         },
                     )
                     SellerTab.Insights -> InsightsScreen(

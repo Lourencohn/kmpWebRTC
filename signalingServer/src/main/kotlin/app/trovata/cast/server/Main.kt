@@ -1,5 +1,7 @@
 package app.trovata.cast.server
 
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -49,9 +51,13 @@ fun Application.module() {
 
     val catalogBaseUrl = System.getenv("PUBLIC_CATALOG_URL")?.takeIf { it.isNotBlank() }
         ?: "http://localhost:5173"
+    val sfaApiUrl = System.getenv("SFA_API_URL")?.takeIf { it.isNotBlank() }
     val store = SessionStore()
     val rooms = RoomManager()
     val orders = OrderStore()
+    val catalogValidator = sfaApiUrl
+        ?.let { SfaCatalogLinkValidator(HttpClient(OkHttp), it) }
+        ?: DisabledCatalogLinkValidator
 
     routing {
         get("/health") { call.respondText("ok") }
@@ -59,7 +65,7 @@ fun Application.module() {
             call.respond(Version(name = "trovatacast-signaling", version = "0.1.0"))
         }
     }
-    sessionRoutes(store, catalogBaseUrl)
+    sessionRoutes(store, catalogBaseUrl, catalogValidator)
     signalingRoutes(rooms, store)
     orderRoutes(orders, store)
 

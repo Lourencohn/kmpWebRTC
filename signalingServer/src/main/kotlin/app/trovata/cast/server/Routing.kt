@@ -4,6 +4,7 @@ import app.trovata.cast.protocol.ErrorResponse
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
 import app.trovata.cast.protocol.buildLiveInviteUrl
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
@@ -14,16 +15,24 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 
-fun Application.sessionRoutes(store: SessionStore, catalogBaseUrl: String) {
+fun Application.sessionRoutes(
+    store: SessionStore,
+    catalogBaseUrl: String,
+    validator: CatalogLinkValidator = DisabledCatalogLinkValidator,
+) {
     routing {
         route("/session") {
-            post { call.createSession(store, catalogBaseUrl) }
+            post { call.createSession(store, catalogBaseUrl, validator) }
             get("/{token}") { call.fetchSession(store) }
         }
     }
 }
 
-private suspend fun ApplicationCall.createSession(store: SessionStore, catalogBaseUrl: String) {
+private suspend fun ApplicationCall.createSession(
+    store: SessionStore,
+    catalogBaseUrl: String,
+    validator: CatalogLinkValidator,
+) {
     val request = try {
         receive<SessionCreateRequest>()
     } catch (_: Throwable) {
@@ -35,6 +44,17 @@ private suspend fun ApplicationCall.createSession(store: SessionStore, catalogBa
         respond(HttpStatusCode.BadRequest, invalid)
         return
     }
+
+    val check = validator.check(
+        empresaSlug = request.empresaSlug,
+        catalogoUuid = request.catalogoUuid,
+        bearerToken = bearerToken(),
+    )
+    if (check is CatalogLinkCheck.Rejected) {
+        respond(HttpStatusCode.UnprocessableEntity, ErrorResponse(check.code, check.message))
+        return
+    }
+
     val stored = store.create(request)
     respond(
         HttpStatusCode.Created,
@@ -51,6 +71,12 @@ private suspend fun ApplicationCall.createSession(store: SessionStore, catalogBa
         ),
     )
 }
+
+private fun ApplicationCall.bearerToken(): String? =
+    request.headers[HttpHeaders.Authorization]
+        ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
+        ?.substring(7)
+        ?.takeIf { it.isNotBlank() }
 
 private fun SessionCreateRequest.validationError(): ErrorResponse? = when {
     empresaSlug.isBlank() -> ErrorResponse("missing_empresa", "Informe a empresa do catálogo")

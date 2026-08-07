@@ -8,9 +8,11 @@ import app.trovata.cast.protocol.SessionInfo
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
@@ -24,11 +26,14 @@ sealed class SessionsApiResult<out T> {
 class SessionsApi(
     private val client: HttpClient,
     private val baseUrl: String = ServerConfig.baseUrl,
+    private val tokenProvider: suspend () -> String? = { null },
 ) {
     suspend fun createSession(request: SessionCreateRequest): SessionsApiResult<SessionCreateResponse> =
         safeCall {
+            val token = tokenProvider()
             val response = client.post("$baseUrl/session") {
                 contentType(ContentType.Application.Json)
+                token?.let { header(HttpHeaders.Authorization, "Bearer $it") }
                 setBody(request)
             }
             if (response.status.isSuccess()) {

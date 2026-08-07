@@ -7,13 +7,17 @@ import app.trovata.cast.protocol.SessionInfo
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.install
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -127,6 +131,70 @@ class SessionRoutesTest {
         assertEquals(HttpStatusCode.BadRequest, response.status)
         val body: ErrorResponse = response.body()
         assertEquals("missing_catalogo", body.code)
+    }
+
+    @Test
+    fun catalogoRejeitadoPeloLaravelBloqueiaACriacao() = testApplication {
+        application {
+            install(ServerContentNegotiation) { json(Json { ignoreUnknownKeys = true; explicitNulls = false }) }
+            sessionRoutes(
+                store = SessionStore(),
+                catalogBaseUrl = "https://trovata.app.br",
+                validator = object : CatalogLinkValidator {
+                    override suspend fun check(
+                        empresaSlug: String,
+                        catalogoUuid: String,
+                        bearerToken: String?,
+                    ) = CatalogLinkCheck.Rejected(
+                        "catalogo_indisponivel",
+                        "Catálogo expirado. Renove a validade no Catálogo Link.",
+                    )
+                },
+            )
+        }
+        val client = createClient {
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+        val response = client.post("/session") {
+            contentType(ContentType.Application.Json)
+            setBody(sampleRequest())
+        }
+        assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        val body: ErrorResponse = response.body()
+        assertEquals("catalogo_indisponivel", body.code)
+        assertTrue(body.message.contains("Renove"))
+    }
+
+    @Test
+    fun tokenDoVendedorChegaNoValidador() = testApplication {
+        var recebido: String? = null
+        application {
+            install(ServerContentNegotiation) { json(Json { ignoreUnknownKeys = true; explicitNulls = false }) }
+            sessionRoutes(
+                store = SessionStore(),
+                catalogBaseUrl = "https://trovata.app.br",
+                validator = object : CatalogLinkValidator {
+                    override suspend fun check(
+                        empresaSlug: String,
+                        catalogoUuid: String,
+                        bearerToken: String?,
+                    ): CatalogLinkCheck {
+                        recebido = bearerToken
+                        return CatalogLinkCheck.Valid
+                    }
+                },
+            )
+        }
+        val client = createClient {
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+        val response = client.post("/session") {
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Authorization, "Bearer jwt-do-vendedor")
+            setBody(sampleRequest())
+        }
+        assertEquals(HttpStatusCode.Created, response.status)
+        assertEquals("jwt-do-vendedor", recebido)
     }
 
     @Test

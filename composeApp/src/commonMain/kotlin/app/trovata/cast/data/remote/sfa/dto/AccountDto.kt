@@ -23,6 +23,7 @@ data class EmpresaUsuarioDto(
 @Serializable
 data class CompanyDto(
     val id: Long,
+    val slug: String? = null,
     @SerialName("nome_fantasia") val nomeFantasia: String? = null,
     @SerialName("razao_social") val razaoSocial: String? = null,
     val cnpj: String? = null,

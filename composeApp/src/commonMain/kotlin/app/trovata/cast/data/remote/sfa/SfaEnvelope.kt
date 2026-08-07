@@ -22,3 +22,17 @@ data class SfaPagination(
 data class SfaObjectEnvelope<T>(
     val data: T? = null,
 )
+
+@Serializable
+data class SfaPaginatedEnvelope<T>(
+    val data: List<T>? = null,
+    val pagination: SfaPagination? = null,
+    val meta: SfaPagination? = null,
+) {
+    val page: SfaPagination? get() = pagination ?: meta
+
+    fun hasNextPage(): Boolean {
+        val current = page ?: return false
+        return current.currentPage < current.lastPage
+    }
+}

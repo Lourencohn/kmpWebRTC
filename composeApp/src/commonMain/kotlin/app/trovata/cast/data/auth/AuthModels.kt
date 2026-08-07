@@ -17,6 +17,7 @@ data class AuthUser(
 
 data class Company(
     val id: Long,
+    val slug: String,
     val name: String,
     val legalName: String?,
     val cnpj: String?,

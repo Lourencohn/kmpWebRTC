@@ -1,13 +1,12 @@
 package app.trovata.cast.di
 
-import app.trovata.cast.data.local.CatalogRepository
+import app.trovata.cast.data.auth.AuthRepository
 import app.trovata.cast.data.local.SessionsRepository
 import app.trovata.cast.data.remote.SessionsApi
-import app.trovata.cast.data.remote.sfa.SfaConfig
+import app.trovata.cast.data.remote.sfa.CatalogLinksApi
 import app.trovata.cast.feature.account.AccountScreenModel
 import app.trovata.cast.feature.auth.LoginScreenModel
-import app.trovata.cast.feature.catalog.CatalogLinkIdentity
-import app.trovata.cast.feature.catalog.CatalogPickerScreenModel
+import app.trovata.cast.feature.catalog.CatalogLinkPickerScreenModel
 import app.trovata.cast.feature.catalog.CatalogScreenModel
 import app.trovata.cast.feature.catalog.ClientDraft
 import app.trovata.cast.feature.clients.ClientsScreenModel
@@ -28,17 +27,15 @@ val screenModelModule = module {
     factory { (initial: ClientDraft) ->
         val sessionsApi = get<SessionsApi>()
         val sessionsRepository = get<SessionsRepository>()
-        val catalog = get<CatalogRepository>()
-        CatalogPickerScreenModel(
+        val catalogLinks = get<CatalogLinksApi>()
+        val auth = get<AuthRepository>()
+        CatalogLinkPickerScreenModel(
+            loadCatalogLinks = { slug -> catalogLinks.listForSeller(slug) },
             createSession = sessionsApi::createSession,
             persistSession = sessionsRepository::persistCreated,
-            catalogLink = CatalogLinkIdentity(
-                empresaSlug = SfaConfig.empresaSlug,
-                catalogoUuid = SfaConfig.catalogoLinkUuid,
-            ),
+            empresaSlugProvider = { auth.activeCompany.value?.slug.orEmpty() },
+            companyNameProvider = { auth.activeCompany.value?.name.orEmpty() },
             initialClient = initial,
-            countProducts = catalog::count,
-            loadPage = { limit, offset -> catalog.uiPage(limit, offset) },
         )
     }
 }
