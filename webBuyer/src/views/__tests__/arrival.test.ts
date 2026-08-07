@@ -11,12 +11,11 @@ function root(): HTMLElement {
 function info(overrides: Partial<SessionInfo> = {}): SessionInfo {
   return {
     token: 'abc123XY',
-    sellerName: 'Atelier Norte',
-    collectionLabel: 'Outono 26',
+    empresaSlug: 'atelier-norte',
+    catalogoUuid: '5f6c1d2e-8a41-4f0b-9c3d-77b2a0e14c9f',
+    sellerName: 'Marina Prado',
+    catalogoNome: 'Outono 26',
     clientName: 'Diego Albuquerque',
-    clientShop: 'Trama Multimarcas',
-    scheduledFor: 'Hoje · 14:00',
-    productCount: 5,
     createdAtMs: 0,
     expiresAtMs: 0,
     ...overrides,
@@ -90,18 +89,18 @@ describe('renderError', () => {
 })
 
 describe('renderArrival', () => {
-  it('renderiza nome do vendedor, contagem e token', () => {
+  it('renderiza nome do vendedor, catálogo e token', () => {
     const el = root()
     renderArrival(el, info())
     expect(el.textContent).toContain('Oi, Diego')
-    expect(el.textContent).toContain('Atelier Norte')
-    expect(el.textContent).toContain('5 produtos')
+    expect(el.textContent).toContain('Marina Prado')
+    expect(el.textContent).toContain('Outono 26')
     expect(el.textContent).toContain('abc123XY')
   })
 
   it('usa fallback de saudação quando sem clientName', () => {
     const el = root()
-    renderArrival(el, info({ clientName: null }))
+    renderArrival(el, info({ clientName: undefined }))
     expect(el.textContent).toContain('Tudo pronto')
   })
 
@@ -130,9 +129,9 @@ describe('renderArrival', () => {
     expect(cta.textContent).toBe('Tentar de novo')
   })
 
-  it('escapa scheduledFor', () => {
+  it('escapa o nome do catálogo', () => {
     const el = root()
-    renderArrival(el, info({ scheduledFor: '<b>14:00</b>' }))
-    expect(el.innerHTML).toContain('&lt;b&gt;14:00&lt;/b&gt;')
+    renderArrival(el, info({ catalogoNome: '<b>Outono 26</b>' }))
+    expect(el.innerHTML).toContain('&lt;b&gt;Outono 26&lt;/b&gt;')
   })
 })

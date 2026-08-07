@@ -1,47 +1,125 @@
 import { describe, expect, it } from 'vitest'
 import {
+  actionAnchor,
   decodeDataChannelMessage,
   encodeDataChannelMessage,
+  productAnchor,
+  produtoPreIdOfAnchor,
+  retainSyncedQuery,
   type DataChannelMessage,
 } from '../dataChannel'
 
 describe('dataChannel codec', () => {
   it('roundtrips mute', () => {
-    const original: DataChannelMessage = { type: 'mute', muted: true, from: 'seller-1' }
+    const original: DataChannelMessage = { type: 'mute', muted: true, ts: 1, from: 'seller-1' }
     expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
   })
 
-  it('roundtrips scroll', () => {
+  it('roundtrips scroll anchored on a product', () => {
     const original: DataChannelMessage = {
       type: 'scroll',
-      productId: 'p-1',
-      offset: 0.42,
+      anchor: { page: 2, produtoPreId: 8813, itemOffsetRatio: 0.42, viewportRatio: 0.31 },
       ts: 1700000000000,
       from: 'seller-1',
     }
     expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
   })
 
-  it('roundtrips pointAt with explicit durationMs', () => {
+  it('decodes scroll without product as viewport ratio only', () => {
+    const raw = '{"type":"scroll","anchor":{"viewportRatio":0.75},"ts":1,"from":"buyer"}'
+    expect(decodeDataChannelMessage(raw)).toEqual({
+      type: 'scroll',
+      anchor: {
+        page: undefined,
+        produtoPreId: undefined,
+        itemOffsetRatio: undefined,
+        viewportRatio: 0.75,
+      },
+      ts: 1,
+      from: 'buyer',
+    })
+  })
+
+  it('roundtrips pointAt targeting a product', () => {
     const original: DataChannelMessage = {
       type: 'pointAt',
-      productId: 'p-2',
+      target: productAnchor(8813, 44),
+      xRatio: 0.2,
+      yRatio: 0.8,
       ts: 1700000000000,
       from: 'seller-1',
       durationMs: 4000,
     }
+    const decoded = decodeDataChannelMessage(encodeDataChannelMessage(original))
+    expect(decoded).toEqual(original)
+    expect(produtoPreIdOfAnchor(productAnchor(8813, 44))).toBe(8813)
+    expect(produtoPreIdOfAnchor(actionAnchor('finalizar'))).toBeNull()
+  })
+
+  it('rejects pointAt without target', () => {
+    expect(decodeDataChannelMessage('{"type":"pointAt","ts":1,"from":"x"}')).toBeNull()
+  })
+
+  it('roundtrips navigate with route, query and focus', () => {
+    const original: DataChannelMessage = {
+      type: 'navigate',
+      view: {
+        route: { type: 'secao', tabela: 'grupo_produto', tabelaId: '17' },
+        query: { search: 'camisa', page: '2' },
+        focus: { produtoPreId: 8813, produtoPre1Id: 4410, complemento1Id: 44 },
+      },
+      ts: 1_700_000_000_500,
+      from: 'buyer-xyz',
+    }
     expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
   })
 
-  it('decodes pointAt without durationMs as undefined', () => {
-    const raw = '{"type":"pointAt","productId":"p","ts":1,"from":"x"}'
+  it('roundtrips navigate to a plain route', () => {
+    const raw = '{"type":"navigate","view":{"route":{"type":"carrinho"}},"ts":1,"from":"seller"}'
     expect(decodeDataChannelMessage(raw)).toEqual({
-      type: 'pointAt',
-      productId: 'p',
+      type: 'navigate',
+      view: { route: { type: 'carrinho' }, query: undefined, focus: undefined },
       ts: 1,
-      from: 'x',
-      durationMs: undefined,
+      from: 'seller',
     })
+  })
+
+  it('rejects navigate with unknown route', () => {
+    const raw = '{"type":"navigate","view":{"route":{"type":"checkout"}},"ts":1,"from":"x"}'
+    expect(decodeDataChannelMessage(raw)).toBeNull()
+  })
+
+  it('roundtrips cartInvalidated', () => {
+    const original: DataChannelMessage = {
+      type: 'cartInvalidated',
+      carrinhoId: 90112,
+      reason: 'itemAdded',
+      ts: 1_700_000_000_750,
+      from: 'buyer-xyz',
+      hint: { produtoPreId: 8813, unitsDelta: 12, label: 'Camisa Linho' },
+    }
+    expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
+  })
+
+  it('rejects cartInvalidated with unknown reason', () => {
+    const raw = '{"type":"cartInvalidated","carrinhoId":1,"reason":"explodiu","ts":1,"from":"x"}'
+    expect(decodeDataChannelMessage(raw)).toBeNull()
+  })
+
+  it('rejects cartInvalidated without carrinhoId', () => {
+    const raw = '{"type":"cartInvalidated","reason":"cleared","ts":1,"from":"x"}'
+    expect(decodeDataChannelMessage(raw)).toBeNull()
+  })
+
+  it('roundtrips orderPlaced', () => {
+    const original: DataChannelMessage = {
+      type: 'orderPlaced',
+      carrinhoId: 90112,
+      ts: 1_700_000_000_900,
+      from: 'seller-1',
+      pedidoId: 'PED-2026-4471',
+    }
+    expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
   })
 
   it('rejects malformed json', () => {
@@ -49,81 +127,23 @@ describe('dataChannel codec', () => {
   })
 
   it('rejects unknown discriminator', () => {
-    expect(decodeDataChannelMessage('{"type":"ghost"}')).toBeNull()
+    expect(decodeDataChannelMessage('{"type":"ghost","ts":1,"from":"x"}')).toBeNull()
   })
 
-  it('rejects scroll with wrong field types', () => {
-    expect(
-      decodeDataChannelMessage('{"type":"scroll","productId":1,"offset":"x","ts":0,"from":"y"}'),
-    ).toBeNull()
-  })
-
-  it('roundtrips navigate', () => {
-    const original: DataChannelMessage = {
-      type: 'navigate',
-      productId: 'AN-088',
-      ts: 1_700_000_000_500,
-      from: 'buyer-xyz',
-    }
-    expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
-  })
-
-  it('roundtrips cartUpdate', () => {
-    const original: DataChannelMessage = {
-      type: 'cartUpdate',
-      productId: 'AN-104',
-      size: 'M',
-      units: 12,
-      ts: 1_700_000_000_750,
-      from: 'buyer-xyz',
-    }
-    expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
-  })
-
-  it('cartUpdate with zero units decodes', () => {
+  it('rejects the retired cartUpdate shape', () => {
     const raw =
-      '{"type":"cartUpdate","productId":"AN-104","size":"G","units":0,"ts":1,"from":"buyer"}'
-    const decoded = decodeDataChannelMessage(raw)
-    expect(decoded).toEqual({
-      type: 'cartUpdate',
-      productId: 'AN-104',
-      size: 'G',
-      units: 0,
-      ts: 1,
-      from: 'buyer',
+      '{"type":"cartUpdate","productId":"AN-104","size":"M","units":12,"ts":1,"from":"buyer"}'
+    expect(decodeDataChannelMessage(raw)).toBeNull()
+  })
+
+  it('never syncs the live token through the query', () => {
+    const synced = retainSyncedQuery({
+      search: 'camisa',
+      page: '3',
+      live: 'kP3xq9Trz',
+      token: 'jwt-legado',
+      utm_source: 'whatsapp',
     })
-  })
-
-  it('rejects cartUpdate without size', () => {
-    const raw = '{"type":"cartUpdate","productId":"p","units":1,"ts":1,"from":"x"}'
-    expect(decodeDataChannelMessage(raw)).toBeNull()
-  })
-
-  it('roundtrips orderConfirm with multiple lines', () => {
-    const original: DataChannelMessage = {
-      type: 'orderConfirm',
-      orderId: 'ORD-abc-XYZ',
-      ts: 1_700_000_000_900,
-      from: 'seller-1',
-      lines: [
-        { productId: 'AN-104', size: 'M', units: 12, unitPriceCents: 8990 },
-        { productId: 'AN-088', size: 'G', units: 4, unitPriceCents: 15900 },
-      ],
-      totalCents: 12 * 8990 + 4 * 15900,
-    }
-    expect(decodeDataChannelMessage(encodeDataChannelMessage(original))).toEqual(original)
-  })
-
-  it('orderConfirm with empty lines decodes', () => {
-    const raw =
-      '{"type":"orderConfirm","orderId":"ORD-empty","ts":1,"from":"seller","lines":[],"totalCents":0}'
-    const decoded = decodeDataChannelMessage(raw)
-    expect(decoded).toMatchObject({ type: 'orderConfirm', lines: [], totalCents: 0 })
-  })
-
-  it('rejects orderConfirm with malformed line', () => {
-    const raw =
-      '{"type":"orderConfirm","orderId":"X","ts":1,"from":"s","totalCents":0,"lines":[{"productId":"p","size":"M","units":"abc","unitPriceCents":1}]}'
-    expect(decodeDataChannelMessage(raw)).toBeNull()
+    expect(synced).toEqual({ search: 'camisa', page: '3' })
   })
 })

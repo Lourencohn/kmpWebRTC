@@ -11,14 +11,13 @@ function jsonResponse(status: number, body: unknown): Response {
 function sampleInfo(overrides: Partial<SessionInfo> = {}): SessionInfo {
   return {
     token: 'abc123XY',
-    sellerName: 'Atelier Norte',
-    collectionLabel: 'Outono 26',
+    empresaSlug: 'atelier-norte',
+    catalogoUuid: '5f6c1d2e-8a41-4f0b-9c3d-77b2a0e14c9f',
+    sellerName: 'Marina Prado',
+    catalogoNome: 'Outono 26',
     clientName: 'Diego Albuquerque',
-    clientShop: 'Trama Multimarcas',
-    scheduledFor: 'Hoje · 14:00',
-    productCount: 5,
     createdAtMs: 1_700_000_000_000,
-    expiresAtMs: 1_700_086_400_000,
+    expiresAtMs: 1_700_014_400_000,
     ...overrides,
   }
 }

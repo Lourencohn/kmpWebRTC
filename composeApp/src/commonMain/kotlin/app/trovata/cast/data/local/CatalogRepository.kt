@@ -159,6 +159,7 @@ class CatalogRepository(
 
 fun CatalogProduct.toUiProduct(): Product = Product(
     ref = ref,
+    produtoPreId = id,
     name = name,
     garment = GarmentKind.Shirt,
     tintIndex = (id % 8).toInt(),

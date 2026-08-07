@@ -1,6 +1,8 @@
 import {
   decodeDataChannelMessage,
   encodeDataChannelMessage,
+  type CartChangeHint,
+  type CartChangeReason,
   type DataChannelMessage,
 } from '../protocol/dataChannel'
 import { SignalingClient } from '../signaling/client'
@@ -10,7 +12,7 @@ export type LiveSession = {
   peerId: string
   onMessage(handler: (message: DataChannelMessage) => void): void
   onStatus(handler: (status: PeerStatus) => void): void
-  sendCartUpdate(ref: string, size: string, units: number): void
+  sendCartInvalidated(carrinhoId: number, reason: CartChangeReason, hint?: CartChangeHint): void
   close(): void
 }
 
@@ -98,15 +100,15 @@ export async function startLiveSession(
     onStatus: (handler) => {
       statusHandlers.push(handler)
     },
-    sendCartUpdate: (ref, size, units) => {
+    sendCartInvalidated: (carrinhoId, reason, hint) => {
       peer.send(
         encodeDataChannelMessage({
-          type: 'cartUpdate',
-          productId: ref,
-          size,
-          units,
+          type: 'cartInvalidated',
+          carrinhoId,
+          reason,
           ts: Date.now(),
           from: peerId,
+          hint,
         }),
       )
     },

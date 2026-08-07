@@ -1,11 +1,12 @@
 export type SessionInfo = {
   token: string
+  empresaSlug: string
+  catalogoUuid: string
   sellerName: string
-  collectionLabel: string
-  clientName: string | null
-  clientShop: string | null
-  scheduledFor: string | null
-  productCount: number
+  catalogoNome?: string
+  carrinhoId?: number
+  clientName?: string
+  clientEmail?: string
   createdAtMs: number
   expiresAtMs: number
 }
@@ -88,9 +89,9 @@ function isSessionInfo(value: unknown): value is SessionInfo {
   const v = value as Record<string, unknown>
   return (
     typeof v.token === 'string' &&
+    typeof v.empresaSlug === 'string' &&
+    typeof v.catalogoUuid === 'string' &&
     typeof v.sellerName === 'string' &&
-    typeof v.collectionLabel === 'string' &&
-    typeof v.productCount === 'number' &&
     typeof v.createdAtMs === 'number' &&
     typeof v.expiresAtMs === 'number'
   )

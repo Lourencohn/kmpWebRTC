@@ -34,6 +34,7 @@ enum class ProductTag { Novo, TopVenda, PreVenda }
 
 data class Product(
     val ref: String,
+    val produtoPreId: Long? = null,
     val name: String,
     val garment: GarmentKind,
     val tintIndex: Int,

@@ -1,9 +1,13 @@
 package app.trovata.cast.feature.call
 
 import app.trovata.cast.data.signaling.SignalingClient
+import app.trovata.cast.protocol.CartChangeHint
+import app.trovata.cast.protocol.CartChangeReason
 import app.trovata.cast.protocol.DataChannelMessage
 import app.trovata.cast.protocol.PeerRole
+import app.trovata.cast.protocol.ScrollAnchor
 import app.trovata.cast.protocol.SignalingMessage
+import app.trovata.cast.protocol.ViewState
 import app.trovata.cast.protocol.decodeDataChannel
 import app.trovata.cast.protocol.encode
 import co.touchlab.kermit.Logger
@@ -88,11 +92,11 @@ class PeerSession(
     private val _remoteNavigate = MutableSharedFlow<DataChannelMessage.Navigate>(extraBufferCapacity = 4)
     val remoteNavigate: SharedFlow<DataChannelMessage.Navigate> = _remoteNavigate.asSharedFlow()
 
-    private val _remoteCartUpdate = MutableSharedFlow<DataChannelMessage.CartUpdate>(extraBufferCapacity = 16)
-    val remoteCartUpdate: SharedFlow<DataChannelMessage.CartUpdate> = _remoteCartUpdate.asSharedFlow()
+    private val _remoteCartInvalidated = MutableSharedFlow<DataChannelMessage.CartInvalidated>(extraBufferCapacity = 16)
+    val remoteCartInvalidated: SharedFlow<DataChannelMessage.CartInvalidated> = _remoteCartInvalidated.asSharedFlow()
 
-    private val _remoteOrderConfirm = MutableSharedFlow<DataChannelMessage.OrderConfirm>(extraBufferCapacity = 4)
-    val remoteOrderConfirm: SharedFlow<DataChannelMessage.OrderConfirm> = _remoteOrderConfirm.asSharedFlow()
+    private val _remoteOrderPlaced = MutableSharedFlow<DataChannelMessage.OrderPlaced>(extraBufferCapacity = 4)
+    val remoteOrderPlaced: SharedFlow<DataChannelMessage.OrderPlaced> = _remoteOrderPlaced.asSharedFlow()
 
     private val _outgoingScroll = MutableStateFlow<DataChannelMessage.Scroll?>(null)
 
@@ -270,8 +274,8 @@ class PeerSession(
                     is DataChannelMessage.Scroll -> _remoteScroll.tryEmit(parsed)
                     is DataChannelMessage.PointAt -> _remotePointAt.tryEmit(parsed)
                     is DataChannelMessage.Navigate -> _remoteNavigate.tryEmit(parsed)
-                    is DataChannelMessage.CartUpdate -> _remoteCartUpdate.tryEmit(parsed)
-                    is DataChannelMessage.OrderConfirm -> _remoteOrderConfirm.tryEmit(parsed)
+                    is DataChannelMessage.CartInvalidated -> _remoteCartInvalidated.tryEmit(parsed)
+                    is DataChannelMessage.OrderPlaced -> _remoteOrderPlaced.tryEmit(parsed)
                     null -> Unit
                 }
             }
@@ -290,56 +294,70 @@ class PeerSession(
     private fun sendMuteState(muted: Boolean) {
         val channel = dc ?: return
         if (channel.readyState != DataChannelState.Open) return
-        val payload = DataChannelMessage.Mute(muted = muted, from = selfPeerId).encode()
+        val payload = DataChannelMessage.Mute(
+            muted = muted,
+            ts = Clock.System.now().toEpochMilliseconds(),
+            from = selfPeerId,
+        ).encode()
         channel.send(payload.encodeToByteArray())
     }
 
-    fun publishScroll(productId: String, offset: Float) {
+    fun publishScroll(anchor: ScrollAnchor) {
         _outgoingScroll.value = DataChannelMessage.Scroll(
-            productId = productId,
-            offset = offset,
+            anchor = anchor,
             ts = Clock.System.now().toEpochMilliseconds(),
             from = selfPeerId,
         )
     }
 
-    fun publishPointAt(productId: String, durationMs: Long = 3_000) {
-        val channel = dc ?: return
-        if (channel.readyState != DataChannelState.Open) return
-        val payload = DataChannelMessage.PointAt(
-            productId = productId,
+    fun publishPointAt(
+        target: String,
+        xRatio: Float = 0.5f,
+        yRatio: Float = 0.5f,
+        durationMs: Long = 3_000,
+    ) = send(
+        DataChannelMessage.PointAt(
+            target = target,
+            xRatio = xRatio,
+            yRatio = yRatio,
             ts = Clock.System.now().toEpochMilliseconds(),
             from = selfPeerId,
             durationMs = durationMs,
-        ).encode()
-        channel.send(payload.encodeToByteArray())
-    }
+        ),
+    )
 
-    fun publishNavigate(productId: String) {
-        val channel = dc ?: return
-        if (channel.readyState != DataChannelState.Open) return
-        val payload = DataChannelMessage.Navigate(
-            productId = productId,
+    fun publishNavigate(view: ViewState) = send(
+        DataChannelMessage.Navigate(
+            view = view,
             ts = Clock.System.now().toEpochMilliseconds(),
             from = selfPeerId,
-        ).encode()
-        channel.send(payload.encodeToByteArray())
-    }
+        ),
+    )
 
-    fun publishCartUpdate(productId: String, size: String, units: Int) {
-        val channel = dc ?: return
-        if (channel.readyState != DataChannelState.Open) return
-        val payload = DataChannelMessage.CartUpdate(
-            productId = productId,
-            size = size,
-            units = units,
+    fun publishCartInvalidated(
+        carrinhoId: Long,
+        reason: CartChangeReason,
+        hint: CartChangeHint? = null,
+    ) = send(
+        DataChannelMessage.CartInvalidated(
+            carrinhoId = carrinhoId,
+            reason = reason,
             ts = Clock.System.now().toEpochMilliseconds(),
             from = selfPeerId,
-        ).encode()
-        channel.send(payload.encodeToByteArray())
-    }
+            hint = hint,
+        ),
+    )
 
-    fun publishOrderConfirm(message: DataChannelMessage.OrderConfirm): Boolean {
+    fun publishOrderPlaced(carrinhoId: Long, pedidoId: String? = null) = send(
+        DataChannelMessage.OrderPlaced(
+            carrinhoId = carrinhoId,
+            ts = Clock.System.now().toEpochMilliseconds(),
+            from = selfPeerId,
+            pedidoId = pedidoId,
+        ),
+    )
+
+    private fun send(message: DataChannelMessage): Boolean {
         val channel = dc ?: return false
         if (channel.readyState != DataChannelState.Open) return false
         channel.send(message.encode().encodeToByteArray())

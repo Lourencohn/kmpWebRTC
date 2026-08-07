@@ -70,7 +70,7 @@ data class InviteScreen(val record: StoredSessionRecord) : Screen {
                         sessionId = record.sessionId,
                         sellerName = record.sellerName,
                         clientName = record.clientName,
-                        collectionLabel = record.collectionLabel,
+                        collectionLabel = record.catalogLabel,
                     ),
                 )
             },
@@ -98,7 +98,7 @@ private fun InviteBody(
         append(greeting)
         append(' ')
         append("Acabei de preparar uma sessão pra você: ")
-        append(record.collectionLabel)
+        append(record.catalogLabel)
         append(". Abre o link no celular, sem precisar instalar nada: ")
         append(record.url)
     }
@@ -295,7 +295,7 @@ private fun SuccessHero(record: StoredSessionRecord, sellerLine: String) {
                     letterSpacing = (-0.01).em,
                 )
                 Text(
-                    text = "$sellerLine · ${record.collectionLabel}",
+                    text = "$sellerLine · ${record.catalogLabel}",
                     color = colors.ink3,
                     fontSize = 12.5.sp,
                 )

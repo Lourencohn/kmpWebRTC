@@ -8,9 +8,15 @@ import app.trovata.cast.data.local.toUiProduct
 import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.SignalingState
+import app.trovata.cast.protocol.CartChangeReason
+import app.trovata.cast.protocol.CatalogRoute
 import app.trovata.cast.protocol.DataChannelMessage
+import app.trovata.cast.protocol.LiveAnchor
 import app.trovata.cast.protocol.OrderLine
 import app.trovata.cast.protocol.PeerRole
+import app.trovata.cast.protocol.ProductFocus
+import app.trovata.cast.protocol.ScrollAnchor
+import app.trovata.cast.protocol.ViewState
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,7 +94,7 @@ class LiveCallScreenModel(
     private val sellerName = spec.sellerName
     private val clientShop = spec.clientShop
     private val priceTableId = spec.priceTableId
-    private val sellerPeerId = spec.sellerPeerId
+    private val carrinhoId = spec.carrinhoId
 
     private val _state = MutableStateFlow(
         LiveCallUiState(token = token, role = PeerRole.Seller, collectionLabel = collectionLabel),
@@ -123,34 +129,16 @@ class LiveCallScreenModel(
         }
         screenModelScope.launch {
             peer.remoteNavigate.collect { msg ->
-                _state.update { it.copy(focusedProductId = msg.productId, showProductSheet = true) }
+                val ref = refOf(msg.view.focus?.produtoPreId) ?: return@collect
+                _state.update { it.copy(focusedProductId = ref, showProductSheet = true) }
             }
         }
         screenModelScope.launch {
-            peer.remoteCartUpdate.collect { msg -> handleRemoteCartUpdate(msg) }
+            peer.remoteCartInvalidated.collect { msg -> handleRemoteCartInvalidated(msg) }
         }
         screenModelScope.launch {
-            peer.remoteOrderConfirm.collect { msg ->
-                persistOrder(
-                    orderId = msg.orderId,
-                    ts = msg.ts,
-                    lines = msg.lines,
-                    totalCents = msg.totalCents,
-                    confirmedByMe = false,
-                )
-                _state.update {
-                    it.copy(
-                        summary = OrderSummaryUi(
-                            orderId = msg.orderId,
-                            ts = msg.ts,
-                            lines = msg.lines,
-                            totalCents = msg.totalCents,
-                            confirmedByMe = false,
-                        ),
-                        showProductSheet = false,
-                        showCartDrawer = false,
-                    )
-                }
+            peer.remoteOrderPlaced.collect {
+                _state.update { it.copy(showProductSheet = false, showCartDrawer = false) }
             }
         }
         screenModelScope.launch {
@@ -183,16 +171,36 @@ class LiveCallScreenModel(
     }
 
     fun publishScroll(productId: String, offset: Float) {
-        peer.publishScroll(productId, offset)
+        peer.publishScroll(
+            ScrollAnchor(
+                produtoPreId = produtoPreIdOf(productId),
+                itemOffsetRatio = offset,
+            ),
+        )
     }
 
     fun publishPointAt(productId: String) {
-        peer.publishPointAt(productId)
+        val id = produtoPreIdOf(productId) ?: return
+        peer.publishPointAt(LiveAnchor.product(id))
     }
 
     fun openProductDetail(productId: String) {
         _state.update { it.copy(focusedProductId = productId, showProductSheet = true) }
-        peer.publishNavigate(productId)
+        val id = produtoPreIdOf(productId) ?: return
+        peer.publishNavigate(
+            ViewState(
+                route = CatalogRoute.Todos,
+                focus = ProductFocus(produtoPreId = id),
+            ),
+        )
+    }
+
+    private fun produtoPreIdOf(ref: String): Long? =
+        _state.value.products.firstOrNull { it.ref == ref }?.produtoPreId
+
+    private fun refOf(produtoPreId: Long?): String? {
+        if (produtoPreId == null) return null
+        return _state.value.products.firstOrNull { it.produtoPreId == produtoPreId }?.ref
     }
 
     fun openCartDrawer() {
@@ -225,18 +233,11 @@ class LiveCallScreenModel(
             )
         }
         val totalCents = lines.sumOf { it.subtotalCents }
-        val message = DataChannelMessage.OrderConfirm(
-            orderId = newOrderId(ts),
-            ts = ts,
-            from = sellerPeerId,
-            lines = lines,
-            totalCents = totalCents,
-        )
-        val sent = peer.publishOrderConfirm(message)
-        if (!sent) return
+        val orderId = newOrderId(ts)
+        carrinhoId?.let { peer.publishOrderPlaced(carrinhoId = it, pedidoId = orderId) }
         screenModelScope.launch {
             persistOrder(
-                orderId = message.orderId,
+                orderId = orderId,
                 ts = ts,
                 lines = lines,
                 totalCents = totalCents,
@@ -246,7 +247,7 @@ class LiveCallScreenModel(
         _state.update {
             it.copy(
                 summary = OrderSummaryUi(
-                    orderId = message.orderId,
+                    orderId = orderId,
                     ts = ts,
                     lines = lines,
                     totalCents = totalCents,
@@ -287,20 +288,19 @@ class LiveCallScreenModel(
         }
     }
 
-    private suspend fun handleRemoteCartUpdate(msg: DataChannelMessage.CartUpdate) {
-        val previous = cartRepository.snapshot(sessionId).firstOrNull {
-            it.sku == msg.productId && it.size == msg.size
-        }
-        cartRepository.apply(sessionId, msg.productId, msg.size, msg.units, msg.ts)
-        val name = _state.value.products.firstOrNull { it.ref == msg.productId }?.name ?: msg.productId
+    private fun handleRemoteCartInvalidated(msg: DataChannelMessage.CartInvalidated) {
         val who = clientName?.split(' ')?.firstOrNull() ?: "Cliente"
-        val previousUnits = previous?.units ?: 0
-        val text = when {
-            msg.units == 0 -> "$who removeu $name (${msg.size})"
-            previousUnits == 0 -> "$who adicionou ${msg.units}un de $name (${msg.size})"
-            msg.units > previousUnits ->
-                "$who subiu $name (${msg.size}) para ${msg.units}un"
-            else -> "$who reduziu $name (${msg.size}) para ${msg.units}un"
+        val name = msg.hint?.label
+            ?: msg.hint?.produtoPreId?.let { refOf(it) }
+            ?: "o carrinho"
+        val units = msg.hint?.unitsDelta ?: 0
+        val text = when (msg.reason) {
+            CartChangeReason.ItemAdded -> "$who adicionou ${units}un de $name"
+            CartChangeReason.ItemRemoved -> "$who removeu $name"
+            CartChangeReason.QuantityChanged -> "$who ajustou $name"
+            CartChangeReason.PrazoChanged -> "$who mudou o prazo"
+            CartChangeReason.Cleared -> "$who esvaziou o carrinho"
+            CartChangeReason.Finalized -> "$who finalizou o carrinho"
         }
         _state.update {
             it.copy(toast = CartToast(text = text, createdAtMs = Clock.System.now().toEpochMilliseconds()))

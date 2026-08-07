@@ -11,4 +11,6 @@ object SfaConfig {
     const val realm: String = "Base"
     const val clientId: String = "front-client"
     const val empresaId: Long = 97L
+    const val empresaSlug: String = ""
+    const val catalogoLinkUuid: String = ""
 }

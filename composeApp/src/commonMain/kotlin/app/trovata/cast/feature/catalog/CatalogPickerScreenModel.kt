@@ -1,5 +1,6 @@
 package app.trovata.cast.feature.catalog
 
+import app.trovata.cast.data.local.SessionClientNotes
 import app.trovata.cast.data.local.StoredSessionRecord
 import app.trovata.cast.data.remote.SessionsApiResult
 import app.trovata.cast.data.sample.Product
@@ -7,8 +8,6 @@ import app.trovata.cast.data.sample.ProductTag
 import app.trovata.cast.data.sample.SampleCatalog
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
-import app.trovata.cast.protocol.SessionProduct
-import app.trovata.cast.protocol.SessionProductSize
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,11 +56,17 @@ data class CatalogPickerUiState(
 }
 
 typealias CreateSessionFn = suspend (SessionCreateRequest) -> SessionsApiResult<SessionCreateResponse>
-typealias PersistSessionFn = suspend (SessionCreateRequest, SessionCreateResponse, Long) -> StoredSessionRecord
+typealias PersistSessionFn = suspend (
+    SessionCreateRequest,
+    SessionCreateResponse,
+    Long,
+    SessionClientNotes,
+) -> StoredSessionRecord
 
 class CatalogPickerScreenModel(
     private val createSession: CreateSessionFn,
     private val persistSession: PersistSessionFn,
+    private val catalogLink: CatalogLinkIdentity,
     private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     initialClient: ClientDraft = ClientDraft(),
     private val pageSize: Int = 30,
@@ -131,30 +136,30 @@ class CatalogPickerScreenModel(
     fun generateLink(
         sellerId: String = "seller",
         sellerName: String = "Vendedor",
-        collectionLabel: String = "",
     ) {
         val snapshot = _state.value
-        if (snapshot.selectedSkus.isEmpty()) {
-            _state.update { it.copy(error = "Escolha ao menos um produto") }
+        if (!catalogLink.isResolved) {
+            _state.update { it.copy(error = "Escolha um catálogo link para convidar o cliente") }
             return
         }
         if (snapshot.isSubmitting) return
         _state.update { it.copy(isSubmitting = true, error = null) }
-        val selected = snapshot.selectedSkus.toList()
         val request = SessionCreateRequest(
+            empresaSlug = catalogLink.empresaSlug,
+            catalogoUuid = catalogLink.catalogoUuid,
             sellerId = sellerId,
             sellerName = sellerName,
-            collectionLabel = collectionLabel,
-            productSkus = selected,
-            products = sessionProductsFrom(selected, snapshot.selectedProducts),
+            catalogoNome = catalogLink.nome,
             clientName = snapshot.client.name,
-            clientShop = snapshot.client.shop,
+        )
+        val notes = SessionClientNotes(
+            shop = snapshot.client.shop,
             scheduledFor = snapshot.client.scheduledFor,
         )
         screenModelScope.launch {
             when (val result = createSession(request)) {
                 is SessionsApiResult.Ok -> {
-                    val record = persistSession(request, result.value, nowMs())
+                    val record = persistSession(request, result.value, nowMs(), notes)
                     _state.update { it.copy(isSubmitting = false, createdSession = record) }
                 }
                 is SessionsApiResult.Fail -> {
@@ -162,34 +167,5 @@ class CatalogPickerScreenModel(
                 }
             }
         }
-    }
-
-    private fun sessionProductsFrom(
-        refs: List<String>,
-        byRef: Map<String, Product>,
-    ): List<SessionProduct> = refs.mapIndexedNotNull { index, ref ->
-        val product = byRef[ref] ?: return@mapIndexedNotNull null
-        val productId = (index + 1).toLong()
-        SessionProduct(
-            productId = productId,
-            ref = product.ref,
-            name = product.name,
-            brand = product.ref.substringBefore('-').takeIf { it.isNotBlank() && it != product.ref },
-            imageUrl = product.imageUrl,
-            priceCents = parsePriceCents(product.price),
-            available = null,
-            sizes = product.sizes.mapIndexed { sizeIndex, label ->
-                SessionProductSize(sizeId = productId * 100 + sizeIndex, label = label)
-            },
-        )
-    }
-
-    private fun parsePriceCents(price: String): Long {
-        val normalized = price
-            .filter { it.isDigit() || it == ',' || it == '.' }
-            .replace(".", "")
-            .replace(",", ".")
-        val value = normalized.toDoubleOrNull() ?: return 0
-        return (value * 100).toLong()
     }
 }

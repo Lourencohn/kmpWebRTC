@@ -7,7 +7,7 @@ import kotlin.random.Random
 
 private const val TOKEN_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 private const val TOKEN_LENGTH = 9
-private const val SESSION_TTL_MS = 24L * 60 * 60 * 1000
+private const val SESSION_TTL_MS = 4L * 60 * 60 * 1000
 
 data class StoredSession(
     val sessionId: String,
@@ -18,13 +18,13 @@ data class StoredSession(
 ) {
     fun toInfo(): SessionInfo = SessionInfo(
         token = token,
+        empresaSlug = request.empresaSlug,
+        catalogoUuid = request.catalogoUuid,
         sellerName = request.sellerName,
-        collectionLabel = request.collectionLabel,
+        catalogoNome = request.catalogoNome,
+        carrinhoId = request.carrinhoId,
         clientName = request.clientName,
-        clientShop = request.clientShop,
-        scheduledFor = request.scheduledFor,
-        productCount = request.productSkus.size,
-        products = request.products,
+        clientEmail = request.clientEmail,
         createdAtMs = createdAtMs,
         expiresAtMs = expiresAtMs,
     )

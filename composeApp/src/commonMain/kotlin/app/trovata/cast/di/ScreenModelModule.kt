@@ -3,8 +3,10 @@ package app.trovata.cast.di
 import app.trovata.cast.data.local.CatalogRepository
 import app.trovata.cast.data.local.SessionsRepository
 import app.trovata.cast.data.remote.SessionsApi
+import app.trovata.cast.data.remote.sfa.SfaConfig
 import app.trovata.cast.feature.account.AccountScreenModel
 import app.trovata.cast.feature.auth.LoginScreenModel
+import app.trovata.cast.feature.catalog.CatalogLinkIdentity
 import app.trovata.cast.feature.catalog.CatalogPickerScreenModel
 import app.trovata.cast.feature.catalog.CatalogScreenModel
 import app.trovata.cast.feature.catalog.ClientDraft
@@ -30,6 +32,10 @@ val screenModelModule = module {
         CatalogPickerScreenModel(
             createSession = sessionsApi::createSession,
             persistSession = sessionsRepository::persistCreated,
+            catalogLink = CatalogLinkIdentity(
+                empresaSlug = SfaConfig.empresaSlug,
+                catalogoUuid = SfaConfig.catalogoLinkUuid,
+            ),
             initialClient = initial,
             countProducts = catalog::count,
             loadPage = { limit, offset -> catalog.uiPage(limit, offset) },

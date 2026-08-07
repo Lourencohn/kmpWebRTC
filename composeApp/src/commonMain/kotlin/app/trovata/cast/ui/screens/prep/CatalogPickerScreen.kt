@@ -95,7 +95,6 @@ data class CatalogPickerScreen(
                 screenModel.generateLink(
                     sellerId = (company?.id ?: user?.id)?.toString() ?: "seller",
                     sellerName = user?.name?.takeIf { it.isNotBlank() } ?: company?.name ?: "Vendedor",
-                    collectionLabel = company?.name.orEmpty(),
                 )
             },
             onDismissError = screenModel::clearError,

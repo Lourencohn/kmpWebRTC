@@ -26,13 +26,12 @@ import kotlin.test.assertTrue
 class OrderRoutesTest {
 
     private fun sampleSession() = SessionCreateRequest(
-        sellerId = "atelier-norte",
-        sellerName = "Atelier Norte",
-        collectionLabel = "Outono 26",
-        productSkus = listOf("AN-104"),
+        empresaSlug = "atelier-norte",
+        catalogoUuid = "5f6c1d2e-8a41-4f0b-9c3d-77b2a0e14c9f",
+        sellerId = "vend-31",
+        sellerName = "Marina Prado",
+        catalogoNome = "Outono 26",
         clientName = "Diego",
-        clientShop = "Trama",
-        scheduledFor = null,
     )
 
     private fun sampleOrder(token: String) = OrderSubmissionRequest(

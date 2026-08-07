@@ -10,13 +10,14 @@ import {
   type Snapshot,
   type SnapshotProduct,
 } from './data/snapshot'
+import { produtoPreIdOfAnchor } from './protocol/dataChannel'
 import { clearLastSession, loadLastSession, saveLastSession } from './storage/lastSession'
 import { mountCartSheet, type CartSheetView } from './ui/vitrineCartSheet'
 import { mountProductDetail, type DetailView } from './ui/vitrineProductDetail'
 import { mountSendSheet, type SendView } from './ui/vitrineSend'
 import { renderLoading } from './views/arrival'
 import { renderVitrine, type VitrineView } from './views/vitrine'
-import { startLiveSession, type LiveSession } from './webrtc/live'
+import { startLiveSession } from './webrtc/live'
 
 const root = document.getElementById('app')
 if (!root) {
@@ -120,42 +121,26 @@ function start(snapshot: Snapshot, liveToken: string | null): void {
     onOpenCart: openCart,
   })
 
-  let liveSession: LiveSession | null = null
-  let lastCart = new Map<string, number>()
-  const refByProductId = new Map<number, string>()
-  const productByRef = new Map<string, SnapshotProduct>()
+  const productById = new Map<number, SnapshotProduct>()
   products.forEach((product) => {
-    refByProductId.set(product.productId, product.ref)
-    productByRef.set(product.ref, product)
+    productById.set(product.productId, product)
   })
 
   cart.subscribe((snap) => {
     view.setCart(snap)
     sheets.cart?.update(snap)
-    if (!liveSession) return
-    const next = new Map<string, number>()
-    snap.lines.forEach((line) => next.set(`${line.productId}|${line.sizeLabel}`, line.qty))
-    const keys = new Set([...lastCart.keys(), ...next.keys()])
-    keys.forEach((key) => {
-      const before = lastCart.get(key) ?? 0
-      const after = next.get(key) ?? 0
-      if (before === after) return
-      const [productId, sizeLabel] = key.split('|')
-      const ref = refByProductId.get(Number(productId))
-      if (ref) liveSession!.sendCartUpdate(ref, sizeLabel ?? '', after)
-    })
-    lastCart = next
   })
 
   if (liveToken) {
-    let lastFocusRef: string | null = null
-    const scrollToRef = (ref: string): void => {
-      const card = root!.querySelector<HTMLElement>(`[data-ref="${CSS.escape(ref)}"]`)
+    let lastFocusId: number | null = null
+    const scrollToProduct = (produtoPreId: number): void => {
+      const product = productById.get(produtoPreId)
+      if (!product) return
+      const card = root!.querySelector<HTMLElement>(`[data-ref="${CSS.escape(product.ref)}"]`)
       card?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
     void startLiveSession(SERVER_BASE, liveToken, snapshot.customerName ?? 'Cliente')
       .then((live) => {
-        liveSession = live
         live.onStatus((status) => {
           if (status === 'connected') {
             saveLastSession({ token: snapshot.token, openedAtMs: Date.now(), joined: true })
@@ -163,16 +148,23 @@ function start(snapshot: Snapshot, liveToken: string | null): void {
         })
         live.onMessage((message) => {
           if (message.type === 'navigate') {
-            const product = productByRef.get(message.productId)
+            const produtoPreId = message.view.focus?.produtoPreId
+            if (produtoPreId == null) return
+            const product = productById.get(produtoPreId)
             if (product) openDetail(product)
-            else scrollToRef(message.productId)
-            lastFocusRef = message.productId
-          } else if (message.type === 'scroll' || message.type === 'pointAt') {
-            if (message.productId !== lastFocusRef) {
-              scrollToRef(message.productId)
-              lastFocusRef = message.productId
-            }
+            else scrollToProduct(produtoPreId)
+            lastFocusId = produtoPreId
+            return
           }
+          const produtoPreId =
+            message.type === 'scroll'
+              ? (message.anchor.produtoPreId ?? null)
+              : message.type === 'pointAt'
+                ? produtoPreIdOfAnchor(message.target)
+                : null
+          if (produtoPreId == null || produtoPreId === lastFocusId) return
+          scrollToProduct(produtoPreId)
+          lastFocusId = produtoPreId
         })
       })
       .catch((err) => {

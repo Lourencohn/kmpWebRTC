@@ -1,5 +1,6 @@
 package app.trovata.cast.feature.catalog
 
+import app.trovata.cast.data.local.SessionClientNotes
 import app.trovata.cast.data.local.StoredSessionRecord
 import app.trovata.cast.data.remote.SessionsApiResult
 import app.trovata.cast.data.sample.SampleCatalog
@@ -25,6 +26,12 @@ class CatalogPickerScreenModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
+    private val catalogLink = CatalogLinkIdentity(
+        empresaSlug = "atelier-norte",
+        catalogoUuid = "5f6c1d2e-8a41-4f0b-9c3d-77b2a0e14c9f",
+        nome = "Outono 26",
+    )
+
     @BeforeTest
     fun setup() {
         Dispatchers.setMain(dispatcher)
@@ -37,12 +44,14 @@ class CatalogPickerScreenModelTest {
 
     private fun model(
         createSession: CreateSessionFn = { error("not called") },
-        persistSession: PersistSessionFn = { _, _, _ -> error("not called") },
+        persistSession: PersistSessionFn = { _, _, _, _ -> error("not called") },
+        catalogLink: CatalogLinkIdentity = this.catalogLink,
         nowMs: () -> Long = { 1_700_000_000_000 },
         initialClient: ClientDraft = ClientDraft(),
     ) = CatalogPickerScreenModel(
         createSession = createSession,
         persistSession = persistSession,
+        catalogLink = catalogLink,
         nowMs = nowMs,
         initialClient = initialClient,
     )
@@ -51,23 +60,29 @@ class CatalogPickerScreenModelTest {
         SessionCreateResponse(
             sessionId = "ses_$token",
             token = token,
-            url = "http://localhost:5173/?t=$token",
-            expiresAtMs = 1_700_086_400_000,
+            url = "http://localhost:5173/catalogo-link-view/atelier-norte/uuid?live=$token",
+            expiresAtMs = 1_700_014_400_000,
         )
 
-    private fun sampleRecord(request: SessionCreateRequest, response: SessionCreateResponse, createdAtMs: Long) =
-        StoredSessionRecord(
-            sessionId = response.sessionId,
-            token = response.token,
-            url = response.url,
-            sellerName = request.sellerName,
-            collectionLabel = request.collectionLabel,
-            clientName = request.clientName,
-            clientShop = request.clientShop,
-            scheduledFor = request.scheduledFor,
-            createdAtMs = createdAtMs,
-            expiresAtMs = response.expiresAtMs,
-        )
+    private fun sampleRecord(
+        request: SessionCreateRequest,
+        response: SessionCreateResponse,
+        createdAtMs: Long,
+        notes: SessionClientNotes,
+    ) = StoredSessionRecord(
+        sessionId = response.sessionId,
+        token = response.token,
+        url = response.url,
+        sellerName = request.sellerName,
+        empresaSlug = request.empresaSlug,
+        catalogoUuid = request.catalogoUuid,
+        catalogoNome = request.catalogoNome,
+        clientName = request.clientName,
+        clientShop = notes.shop,
+        scheduledFor = notes.scheduledFor,
+        createdAtMs = createdAtMs,
+        expiresAtMs = response.expiresAtMs,
+    )
 
     @Test
     fun toggleAddsAndRemoves() = runTest {
@@ -77,15 +92,6 @@ class CatalogPickerScreenModelTest {
         assertEquals(setOf(item.ref), sm.state.value.selectedSkus)
         sm.toggle(item)
         assertEquals(emptySet(), sm.state.value.selectedSkus)
-    }
-
-    @Test
-    fun toggleClearsExistingError() = runTest {
-        val sm = model()
-        sm.generateLink()
-        assertNotNull(sm.state.value.error)
-        sm.toggle(SampleCatalog.products.first())
-        assertNull(sm.state.value.error)
     }
 
     @Test
@@ -107,20 +113,21 @@ class CatalogPickerScreenModelTest {
     }
 
     @Test
-    fun generateLinkWithEmptySelectionShowsError() = runTest {
+    fun generateLinkWithoutCatalogLinkShowsError() = runTest {
         val sm = model(
             createSession = { error("não deveria ter sido chamado") },
-            persistSession = { _, _, _ -> error("não deveria ter sido chamado") },
+            persistSession = { _, _, _, _ -> error("não deveria ter sido chamado") },
+            catalogLink = CatalogLinkIdentity(empresaSlug = "", catalogoUuid = ""),
         )
         sm.generateLink()
         val state = sm.state.value
-        assertEquals("Escolha ao menos um produto", state.error)
+        assertEquals("Escolha um catálogo link para convidar o cliente", state.error)
         assertFalse(state.isSubmitting)
         assertNull(state.createdSession)
     }
 
     @Test
-    fun generateLinkHappyPathPersistsAndPublishes() = runTest(dispatcher) {
+    fun generateLinkSendsCatalogIdentityWithoutProducts() = runTest(dispatcher) {
         var capturedRequest: SessionCreateRequest? = null
         val response = sampleResponse()
         val sm = model(
@@ -128,40 +135,41 @@ class CatalogPickerScreenModelTest {
                 capturedRequest = request
                 SessionsApiResult.Ok(response)
             },
-            persistSession = { request, resp, createdAt ->
-                sampleRecord(request, resp, createdAt)
+            persistSession = { request, resp, createdAt, notes ->
+                sampleRecord(request, resp, createdAt, notes)
             },
             nowMs = { 9_999 },
             initialClient = ClientDraft(name = "Diego A", shop = "Trama"),
         )
-        val first = SampleCatalog.products[0]
-        val second = SampleCatalog.products[1]
-        sm.toggle(first)
-        sm.toggle(second)
-        sm.generateLink()
+        sm.toggle(SampleCatalog.products[0])
+        sm.generateLink(sellerId = "vend-31", sellerName = "Marina Prado")
         assertTrue(sm.state.value.isSubmitting)
         dispatcher.scheduler.advanceUntilIdle()
+
         val state = sm.state.value
         assertFalse(state.isSubmitting)
         assertNull(state.error)
         assertNotNull(state.createdSession)
         assertEquals(response.token, state.createdSession!!.token)
         assertEquals(9_999L, state.createdSession!!.createdAtMs)
-        assertNotNull(capturedRequest)
-        assertEquals(listOf(first.ref, second.ref).sorted(), capturedRequest!!.productSkus.sorted())
-        assertEquals("Diego A", capturedRequest!!.clientName)
-        assertEquals("Trama", capturedRequest!!.clientShop)
+        assertEquals("Trama", state.createdSession!!.clientShop)
+
+        val request = assertNotNull(capturedRequest)
+        assertEquals("atelier-norte", request.empresaSlug)
+        assertEquals(catalogLink.catalogoUuid, request.catalogoUuid)
+        assertEquals("Outono 26", request.catalogoNome)
+        assertEquals("vend-31", request.sellerId)
+        assertEquals("Diego A", request.clientName)
     }
 
     @Test
     fun generateLinkServerFailurePublishesError() = runTest(dispatcher) {
         val sm = model(
             createSession = {
-                SessionsApiResult.Fail(code = "empty_selection", message = "Bad", status = 400)
+                SessionsApiResult.Fail(code = "missing_catalogo", message = "Bad", status = 400)
             },
-            persistSession = { _, _, _ -> error("not called") },
+            persistSession = { _, _, _, _ -> error("not called") },
         )
-        sm.toggle(SampleCatalog.products.first())
         sm.generateLink()
         dispatcher.scheduler.advanceUntilIdle()
         val state = sm.state.value
@@ -175,9 +183,10 @@ class CatalogPickerScreenModelTest {
         val response = sampleResponse()
         val sm = model(
             createSession = { SessionsApiResult.Ok(response) },
-            persistSession = { request, resp, createdAt -> sampleRecord(request, resp, createdAt) },
+            persistSession = { request, resp, createdAt, notes ->
+                sampleRecord(request, resp, createdAt, notes)
+            },
         )
-        sm.toggle(SampleCatalog.products.first())
         sm.generateLink()
         dispatcher.scheduler.advanceUntilIdle()
         assertNotNull(sm.state.value.createdSession)

@@ -3,34 +3,15 @@ package app.trovata.cast.protocol
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class SessionProductSize(
-    val sizeId: Long,
-    val label: String,
-    val available: Int? = null,
-)
-
-@Serializable
-data class SessionProduct(
-    val productId: Long,
-    val ref: String,
-    val name: String,
-    val brand: String? = null,
-    val imageUrl: String? = null,
-    val priceCents: Long,
-    val available: Int? = null,
-    val sizes: List<SessionProductSize> = emptyList(),
-)
-
-@Serializable
 data class SessionCreateRequest(
+    val empresaSlug: String,
+    val catalogoUuid: String,
     val sellerId: String,
     val sellerName: String,
-    val collectionLabel: String,
-    val productSkus: List<String>,
-    val products: List<SessionProduct> = emptyList(),
+    val catalogoNome: String? = null,
+    val carrinhoId: Long? = null,
     val clientName: String? = null,
-    val clientShop: String? = null,
-    val scheduledFor: String? = null,
+    val clientEmail: String? = null,
 )
 
 @Serializable
@@ -44,16 +25,28 @@ data class SessionCreateResponse(
 @Serializable
 data class SessionInfo(
     val token: String,
+    val empresaSlug: String,
+    val catalogoUuid: String,
     val sellerName: String,
-    val collectionLabel: String,
-    val clientName: String?,
-    val clientShop: String?,
-    val scheduledFor: String?,
-    val productCount: Int,
-    val products: List<SessionProduct> = emptyList(),
+    val catalogoNome: String? = null,
+    val carrinhoId: Long? = null,
+    val clientName: String? = null,
+    val clientEmail: String? = null,
     val createdAtMs: Long,
     val expiresAtMs: Long,
 )
 
 @Serializable
 data class ErrorResponse(val code: String, val message: String)
+
+const val LiveSessionQueryParam = "live"
+
+fun buildLiveInviteUrl(
+    catalogBaseUrl: String,
+    empresaSlug: String,
+    catalogoUuid: String,
+    token: String,
+): String {
+    val base = catalogBaseUrl.trimEnd('/')
+    return "$base/catalogo-link-view/$empresaSlug/$catalogoUuid?$LiveSessionQueryParam=$token"
+}

@@ -1,4 +1,4 @@
-import type { OrderLine } from '../protocol/dataChannel'
+import type { OrderLine } from '../protocol/order'
 
 export type OrderSource = 'Buyer' | 'Seller'
 

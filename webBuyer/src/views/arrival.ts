@@ -93,19 +93,16 @@ export function renderArrival(
 ): void {
   const firstName = info.clientName?.split(' ')[0]
   const greeting = firstName ? `Oi, ${firstName}` : 'Tudo pronto'
-  const sellerLine = info.clientShop
-    ? `${info.sellerName} chamou você de <strong>${escapeHtml(info.clientShop)}</strong>`
-    : `${info.sellerName} está te esperando`
+  const sellerLine = `${info.sellerName} está te esperando`
   root.innerHTML = `
     <section class="arrival" data-view="arrival" data-token="${escapeHtml(info.token)}">
       ${wordmark()}
-      <span class="arrival-eyebrow">${escapeHtml(info.collectionLabel)}</span>
+      <span class="arrival-eyebrow">${escapeHtml(info.catalogoNome ?? '')}</span>
       <h1 class="arrival-title">${escapeHtml(greeting)}</h1>
       <p class="arrival-text">${sellerLine}.</p>
       <ul class="arrival-meta">
         <li><span>Sessão</span><code>${escapeHtml(info.token)}</code></li>
-        <li><span>Catálogo</span>${info.productCount} produtos</li>
-        ${info.scheduledFor ? `<li><span>Horário</span>${escapeHtml(info.scheduledFor)}</li>` : ''}
+        <li><span>Catálogo</span>${escapeHtml(info.catalogoUuid)}</li>
       </ul>
       <button class="arrival-cta" type="button" data-action="join">Entrar com áudio</button>
       <p class="arrival-hint">Você vai precisar liberar o microfone. Nada é gravado.</p>

@@ -3,7 +3,9 @@ CREATE TABLE IF NOT EXISTS SessionEntity (
     token TEXT NOT NULL UNIQUE,
     url TEXT NOT NULL,
     sellerName TEXT NOT NULL,
-    collectionLabel TEXT NOT NULL,
+    empresaSlug TEXT NOT NULL,
+    catalogoUuid TEXT NOT NULL,
+    catalogoNome TEXT,
     clientName TEXT,
     clientShop TEXT,
     scheduledFor TEXT,
@@ -33,8 +35,8 @@ CREATE TABLE IF NOT EXISTS CartLineEntity (
 CREATE INDEX IF NOT EXISTS idx_cart_session ON CartLineEntity(sessionId);
 
 insertSession:
-INSERT INTO SessionEntity(sessionId, token, url, sellerName, collectionLabel, clientName, clientShop, scheduledFor, createdAtMs, expiresAtMs)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO SessionEntity(sessionId, token, url, sellerName, empresaSlug, catalogoUuid, catalogoNome, clientName, clientShop, scheduledFor, createdAtMs, expiresAtMs)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertSelectedProduct:
 INSERT OR IGNORE INTO SelectedProductEntity(sessionId, sku) VALUES (?, ?);

@@ -150,7 +150,7 @@ Pegue o PID na 2ª coluna e mate com `kill -9 <PID>`.
 Da raiz do projeto:
 
 ```bash
-PUBLIC_BUYER_URL=https://192.168.1.101:5173 \
+PUBLIC_CATALOG_URL=https://192.168.1.101:5173 \
   nohup ./gradlew :signalingServer:run \
   < /dev/null > /tmp/trovata-signaling.log 2>&1 &
 disown
@@ -195,7 +195,7 @@ lsof -ti :5174 | xargs kill -9 2>/dev/null
 
 - O webBuyer **precisa** ser HTTPS para o navegador liberar `getUserMedia` num device diferente do Mac (só `localhost` é exceção). O `@vitejs/plugin-basic-ssl` gera um cert self-signed; aceite o aviso na primeira vez em cada device.
 - Na primeira vez que o cliente entrar pelo celular, ele provavelmente vai precisar abrir `https://192.168.1.101:5173/` direto pra aceitar o cert, antes de seguir o link real.
-- O `PUBLIC_BUYER_URL` é o que o `signalingServer` injeta no `SessionCreateResponse.url` — é o link que aparece no QR/share do app vendedor.
+- O `PUBLIC_CATALOG_URL` é a base do `sfa_front` que o `signalingServer` usa para montar o `SessionCreateResponse.url` — o convite é `{base}/catalogo-link-view/{empresaSlug}/{catalogoUuid}?live={token}`, o link que aparece no QR/share do app vendedor.
 
 ---
 

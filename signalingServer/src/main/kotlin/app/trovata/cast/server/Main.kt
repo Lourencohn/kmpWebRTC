@@ -47,7 +47,7 @@ fun Application.module() {
         masking = false
     }
 
-    val baseUrl = System.getenv("PUBLIC_BUYER_URL")?.takeIf { it.isNotBlank() }
+    val catalogBaseUrl = System.getenv("PUBLIC_CATALOG_URL")?.takeIf { it.isNotBlank() }
         ?: "http://localhost:5173"
     val store = SessionStore()
     val rooms = RoomManager()
@@ -59,7 +59,7 @@ fun Application.module() {
             call.respond(Version(name = "trovatacast-signaling", version = "0.1.0"))
         }
     }
-    sessionRoutes(store, baseUrl)
+    sessionRoutes(store, catalogBaseUrl)
     signalingRoutes(rooms, store)
     orderRoutes(orders, store)
 

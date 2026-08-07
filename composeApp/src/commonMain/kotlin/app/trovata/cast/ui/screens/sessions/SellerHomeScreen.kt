@@ -161,9 +161,9 @@ private fun RecentSessionRow(session: StoredSessionRecord, onOpen: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = listOfNotNull(session.clientShop.takeIf { session.clientName != null }, session.collectionLabel)
+                text = listOfNotNull(session.clientShop.takeIf { session.clientName != null }, session.catalogLabel)
                     .joinToString(" · ")
-                    .ifBlank { session.collectionLabel },
+                    .ifBlank { session.catalogLabel },
                 color = colors.ink3,
                 fontSize = 11.5.sp,
                 maxLines = 1,

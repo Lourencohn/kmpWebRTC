@@ -8,6 +8,7 @@ data class CallSpec(
     val collectionLabel: String,
     val clientShop: String? = null,
     val priceTableId: Long? = null,
+    val carrinhoId: Long? = null,
     val sellerPeerId: String,
 )
 

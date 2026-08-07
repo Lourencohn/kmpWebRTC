@@ -15,13 +15,17 @@ data class StoredSessionRecord(
     val token: String,
     val url: String,
     val sellerName: String,
-    val collectionLabel: String,
+    val empresaSlug: String,
+    val catalogoUuid: String,
+    val catalogoNome: String?,
     val clientName: String?,
     val clientShop: String?,
     val scheduledFor: String?,
     val createdAtMs: Long,
     val expiresAtMs: Long,
-)
+) {
+    val catalogLabel: String get() = catalogoNome.orEmpty()
+}
 
 class SessionsRepository(private val db: TrovataDatabase) {
 
@@ -36,7 +40,9 @@ class SessionsRepository(private val db: TrovataDatabase) {
                         token = it.token,
                         url = it.url,
                         sellerName = it.sellerName,
-                        collectionLabel = it.collectionLabel,
+                        empresaSlug = it.empresaSlug,
+                        catalogoUuid = it.catalogoUuid,
+                        catalogoNome = it.catalogoNome,
                         clientName = it.clientName,
                         clientShop = it.clientShop,
                         scheduledFor = it.scheduledFor,
@@ -50,6 +56,7 @@ class SessionsRepository(private val db: TrovataDatabase) {
         request: SessionCreateRequest,
         response: SessionCreateResponse,
         createdAtMs: Long,
+        client: SessionClientNotes,
     ): StoredSessionRecord = withContext(Dispatchers.Default) {
         db.transactionWithResult {
             db.sessionsQueries.insertSession(
@@ -57,25 +64,26 @@ class SessionsRepository(private val db: TrovataDatabase) {
                 token = response.token,
                 url = response.url,
                 sellerName = request.sellerName,
-                collectionLabel = request.collectionLabel,
+                empresaSlug = request.empresaSlug,
+                catalogoUuid = request.catalogoUuid,
+                catalogoNome = request.catalogoNome,
                 clientName = request.clientName,
-                clientShop = request.clientShop,
-                scheduledFor = request.scheduledFor,
+                clientShop = client.shop,
+                scheduledFor = client.scheduledFor,
                 createdAtMs = createdAtMs,
                 expiresAtMs = response.expiresAtMs,
             )
-            request.productSkus.forEach { sku ->
-                db.sessionsQueries.insertSelectedProduct(response.sessionId, sku)
-            }
             StoredSessionRecord(
                 sessionId = response.sessionId,
                 token = response.token,
                 url = response.url,
                 sellerName = request.sellerName,
-                collectionLabel = request.collectionLabel,
+                empresaSlug = request.empresaSlug,
+                catalogoUuid = request.catalogoUuid,
+                catalogoNome = request.catalogoNome,
                 clientName = request.clientName,
-                clientShop = request.clientShop,
-                scheduledFor = request.scheduledFor,
+                clientShop = client.shop,
+                scheduledFor = client.scheduledFor,
                 createdAtMs = createdAtMs,
                 expiresAtMs = response.expiresAtMs,
             )
@@ -86,3 +94,8 @@ class SessionsRepository(private val db: TrovataDatabase) {
         db.sessionsQueries.selectSelectedProducts(sessionId).executeAsList()
     }
 }
+
+data class SessionClientNotes(
+    val shop: String? = null,
+    val scheduledFor: String? = null,
+)

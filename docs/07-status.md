@@ -21,6 +21,7 @@
 | M8 — Carrinho ao vivo | ✅ concluído | (sem commit ainda) | DC `Navigate` + `CartUpdate` + `BuyerProductDetail` (sheet) + carrinho dock no cliente + gaveta no vendedor + `CartRepository` (SQLDelight) + toast |
 | M9 — Encerrar com pedido pronto | 🟡 fase 2 parcial | (sem commit ainda) | Fase 2: `OrderRepository` (SQLDelight) + "Pedidos fechados hoje" na Home + `POST /order` (mem) + buyer envia + PDF via `window.print()`. Push fica pra M11 |
 | M10 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
+| Integração Catálogo Link — Fase 0 (contrato) | ✅ concluído | (sem commit ainda) | `SessionCreateRequest` por identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`/`OrderPlaced`, URL de convite no `sfa_front`. Ver `prompt.md` e `docs/10-integracao-catalogo-link.md` |
 
 ---
 
@@ -634,6 +635,55 @@ trovatacast/
 
 ---
 
+## Integração Catálogo Link — Fase 0 (contrato)
+
+O TrovataCast deixa de ter catálogo próprio: a sessão ao vivo passa a ser uma camada sobre um catálogo link que já existe no SFA. Esta fase mexe só no contrato — as telas e o carrinho real vêm nas fases seguintes.
+
+### O que mudou no `protocol/`
+
+| Antes | Agora |
+|---|---|
+| `SessionCreateRequest(productSkus, products, collectionLabel)` | `SessionCreateRequest(empresaSlug, catalogoUuid, sellerId, sellerName, catalogoNome?, carrinhoId?, clientName?, clientEmail?)` |
+| `SessionInfo` com snapshot de produtos | `SessionInfo` com identidade do catálogo link |
+| `Route.Catalog/Product` | `CatalogRoute` (`inicio`, `menu`, `todos`, `secao(tabela, tabelaId)`, `carrinho`, `favoritos`) + `ViewState(route, query, focus)` |
+| `Scroll(productId, offset)` | `Scroll(ScrollAnchor(page, produtoPreId, itemOffsetRatio, viewportRatio))` |
+| `PointAt(productId)` | `PointAt(target, xRatio, yRatio)` com âncora DOM (`LiveAnchor`) |
+| `CartUpdate(productId, size, units)` | `CartInvalidated(carrinhoId, reason, hint?)` — sinal de invalidação, nunca estado |
+| `OrderConfirm(lines, totalCents)` | `OrderPlaced(carrinhoId, pedidoId?)` — total é sempre o que o Laravel disse |
+| `SessionEvent` + `Codec.kt` (contrato paralelo, nunca usado) | removidos |
+
+`ViewState.query` viaja filtrada por `SyncedQueryKeys` (`categoria`, `grupo_produto`, `subgrupo_produto`, `marca`, `search`, `page`, `total`, `sort`, `direction`). O token da sessão nunca entra nessa lista.
+
+### URL de convite
+
+```
+https://{PUBLIC_CATALOG_URL}/catalogo-link-view/{empresaSlug}/{catalogoUuid}?live={token}
+```
+
+O parâmetro é `live` e **não pode** ser `token`: o interceptor em `sfa_front/src/api/axios.ts` trata `?token=` como JWT legado e troca todo o esquema de prefixo das chamadas.
+
+### Decisões tomadas nesta fase
+
+- **TTL da sessão ao vivo: 4h** (era 24h). Um link que dá acesso ao áudio do vendedor não vale um dia inteiro.
+- **`Secao.tabela`/`tabelaId`** em vez de `type`/`typeId`: `type` colide com o discriminador JSON do protocolo. `tabela` é o nome do campo no backend (`CategoriaVitrine.tabela`) e mapeia para `params.type` do vue-router.
+- **Produto é overlay, não rota**: no `sfa_front` o detalhe abre em modal (`abrirDetalhesProduto`), então `ProductFocus` acompanha a rota em vez de substituí-la.
+- **`ProductFocus` composto** (`produtoPreId` + `produtoPre1Id` + `complemento1Id`): a vitrine identifica produto+cor, não só produto.
+
+### Dívidas abertas por esta fase
+
+- **`SfaConfig.empresaSlug` / `catalogoLinkUuid` vazios.** Sem catálogo link escolhido, `generateLink` responde "Escolha um catálogo link para convidar o cliente". Some na Fase 1, junto com o `empresaId = 97`.
+- **`SessionEntity` mudou de colunas sem migration.** SQLDelight aqui só faz `CREATE TABLE IF NOT EXISTS`; bancos locais anteriores precisam de reinstalação do app.
+- **`OrderStore` / `POST /order` continuam de pé.** Saem na Fase 6, quando `finalizar`/`gerarPedido` do Laravel assumirem.
+- **`webBuyer` não é mais superfície do cliente.** `protocol/dataChannel.ts` foi atualizado como material de porte para o Vue; a vitrine mock cai no fixture porque `/session/{token}` não devolve mais produtos.
+- **`PUBLIC_CATALOG_URL` = `https://trovata.app.br`** no `fly.toml` — precisa ser confirmado (Vercel ou cluster ainda está em aberto).
+
+### Verificação
+- `./gradlew :protocol:jvmTest :signalingServer:test :composeApp:testDebugUnitTest --rerun-tasks` ✅ (29 + 20 + 26)
+- `./gradlew :composeApp:assembleDebug :signalingServer:build` ✅
+- `(cd webBuyer && npm run typecheck && npm test && npm run build)` ✅ (67 testes)
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -651,4 +701,5 @@ trovatacast/
 | 2026-05-22 | Infra: webBuyer no Cloudflare Pages (`trovatacast-buyer.pages.dev`) via GH Actions + Wrangler; Fly `PUBLIC_BUYER_URL` setado; Mac do vendedor não é mais necessário para nenhum componente |
 | 2026-05-23 | M8 fechado: DC `Navigate` + `CartUpdate`, `BuyerProductDetail` sheet, cart dock no cliente, gaveta + toast no vendedor, `CartRepository` (SQLDelight) · 78 testes totais (9 protocol + 15 composeApp + 12 signaling + 54 webBuyer) |
 | 2026-05-23 | M9 fase 1 fechado: DC `OrderConfirm`, botão Confirmar pedido na gaveta, `OrderSummaryOverlay` (vendedor) + `mountOrderSummary` (cliente). PDF, persistência server-side e push ficam pra fase 2 · 83 testes totais (11 protocol + 15 composeApp + 12 signaling + 57 webBuyer) |
+| 2026-08-06 | Integração Catálogo Link — Fase 0 fechada: contrato redesenhado no `protocol/` (identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`, `OrderPlaced`), URL de convite apontando para o `sfa_front` com `?live=`, `SessionEvent`/`Codec` removidos · 142 testes totais (29 protocol + 20 signaling + 26 composeApp + 67 webBuyer) |
 | 2026-05-23 | M9 fase 2 (parcial) fechada: `OrderRepository` + `Orders.sq`, "Pedidos fechados hoje" na Home, `POST /order` em memória + buyer envia, PDF via `window.print()` + `@media print`. `SummaryScreen` (métricas) movido pra M12 e push pra M19 · 121 testes totais (24 protocol + 17 signaling + 15 composeApp + 65 webBuyer) |

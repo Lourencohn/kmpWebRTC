@@ -6,70 +6,91 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 sealed class DataChannelMessage {
+    abstract val ts: Long
+    abstract val from: String
 
     @Serializable
     @SerialName("mute")
     data class Mute(
         val muted: Boolean,
-        val from: String,
-    ) : DataChannelMessage()
-
-    @Serializable
-    @SerialName("scroll")
-    data class Scroll(
-        val productId: String,
-        val offset: Float,
-        val ts: Long,
-        val from: String,
-    ) : DataChannelMessage()
-
-    @Serializable
-    @SerialName("pointAt")
-    data class PointAt(
-        val productId: String,
-        val ts: Long,
-        val from: String,
-        val durationMs: Long = 3_000,
+        override val ts: Long,
+        override val from: String,
     ) : DataChannelMessage()
 
     @Serializable
     @SerialName("navigate")
     data class Navigate(
-        val productId: String,
-        val ts: Long,
-        val from: String,
+        val view: ViewState,
+        override val ts: Long,
+        override val from: String,
     ) : DataChannelMessage()
 
     @Serializable
-    @SerialName("cartUpdate")
-    data class CartUpdate(
-        val productId: String,
-        val size: String,
-        val units: Int,
-        val ts: Long,
-        val from: String,
+    @SerialName("scroll")
+    data class Scroll(
+        val anchor: ScrollAnchor,
+        override val ts: Long,
+        override val from: String,
     ) : DataChannelMessage()
 
     @Serializable
-    @SerialName("orderConfirm")
-    data class OrderConfirm(
-        val orderId: String,
-        val ts: Long,
-        val from: String,
-        val lines: List<OrderLine>,
-        val totalCents: Long,
+    @SerialName("pointAt")
+    data class PointAt(
+        val target: String,
+        val xRatio: Float = 0.5f,
+        val yRatio: Float = 0.5f,
+        override val ts: Long,
+        override val from: String,
+        val durationMs: Long = 3_000,
+    ) : DataChannelMessage()
+
+    @Serializable
+    @SerialName("cartInvalidated")
+    data class CartInvalidated(
+        val carrinhoId: Long,
+        val reason: CartChangeReason,
+        override val ts: Long,
+        override val from: String,
+        val hint: CartChangeHint? = null,
+    ) : DataChannelMessage()
+
+    @Serializable
+    @SerialName("orderPlaced")
+    data class OrderPlaced(
+        val carrinhoId: Long,
+        override val ts: Long,
+        override val from: String,
+        val pedidoId: String? = null,
     ) : DataChannelMessage()
 }
 
 @Serializable
-data class OrderLine(
-    val productId: String,
-    val size: String,
-    val units: Int,
-    val unitPriceCents: Long,
-) {
-    val subtotalCents: Long get() = unitPriceCents * units
+enum class CartChangeReason {
+    @SerialName("itemAdded")
+    ItemAdded,
+
+    @SerialName("itemRemoved")
+    ItemRemoved,
+
+    @SerialName("quantityChanged")
+    QuantityChanged,
+
+    @SerialName("prazoChanged")
+    PrazoChanged,
+
+    @SerialName("cleared")
+    Cleared,
+
+    @SerialName("finalized")
+    Finalized,
 }
+
+@Serializable
+data class CartChangeHint(
+    val produtoPreId: Long? = null,
+    val unitsDelta: Int = 0,
+    val label: String? = null,
+)
 
 val DataChannelJson: Json = Json {
     classDiscriminator = "type"

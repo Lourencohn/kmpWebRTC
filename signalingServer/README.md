@@ -44,7 +44,7 @@ brew install flyctl
 fly auth login
 
 fly apps create trovatacast-signaling
-fly secrets set PUBLIC_BUYER_URL=https://buyer.trovatacast.app --app trovatacast-signaling
+fly secrets set PUBLIC_CATALOG_URL=https://trovata.app.br --app trovatacast-signaling
 fly deploy
 ```
 

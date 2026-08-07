@@ -1,6 +1,6 @@
 import { formatBrl } from '../cart/store'
 import { SampleCatalog } from '../data/catalog'
-import type { OrderLine } from '../protocol/dataChannel'
+import type { OrderLine } from '../protocol/order'
 
 export type OrderSummaryPayload = {
   orderId: string
