@@ -7,6 +7,7 @@ primary_region = "gru"
   PORT = "8080"
   STATIC_DIR = "/app/static"
   PUBLIC_CATALOG_URL = "https://trovata.app.br"
+  SFA_API_URL = "https://api.trovata.app.br/api"
 
 [http_service]
   internal_port = 8080
