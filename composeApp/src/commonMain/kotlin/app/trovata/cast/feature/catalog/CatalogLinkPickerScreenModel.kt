@@ -6,8 +6,10 @@ import app.trovata.cast.data.remote.SessionsApiResult
 import app.trovata.cast.data.remote.sfa.SfaApiResult
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
+import app.trovata.cast.data.remote.sfa.CatalogLinkPage
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +34,10 @@ data class CatalogLinkPickerUiState(
     val filter: CatalogLinkFilter = CatalogLinkFilter.Disponiveis,
     val client: ClientDraft = ClientDraft(),
     val companyName: String = "",
+    val companySlug: String = "",
+    val search: String = "",
+    val total: Int = 0,
+    val hasMore: Boolean = false,
     val isLoading: Boolean = true,
     val isSubmitting: Boolean = false,
     val error: String? = null,
@@ -52,7 +58,7 @@ data class CatalogLinkPickerUiState(
     val unavailableCount: Int get() = links.count { !it.disponivel }
 }
 
-typealias LoadCatalogLinksFn = suspend (empresaSlug: String) -> SfaApiResult<List<SellerCatalogLink>>
+typealias LoadCatalogLinksFn = suspend (empresaSlug: String, search: String?) -> SfaApiResult<CatalogLinkPage>
 typealias CreateSessionFn = suspend (SessionCreateRequest) -> SessionsApiResult<SessionCreateResponse>
 typealias PersistSessionFn = suspend (
     SessionCreateRequest,
@@ -72,9 +78,15 @@ class CatalogLinkPickerScreenModel(
 ) : ScreenModel {
 
     private val _state = MutableStateFlow(
-        CatalogLinkPickerUiState(client = initialClient, companyName = companyNameProvider()),
+        CatalogLinkPickerUiState(
+            client = initialClient,
+            companyName = companyNameProvider(),
+            companySlug = empresaSlugProvider(),
+        ),
     )
     val state: StateFlow<CatalogLinkPickerUiState> = _state.asStateFlow()
+
+    private var searchJob: Job? = null
 
     init {
         refresh()
@@ -88,17 +100,21 @@ class CatalogLinkPickerScreenModel(
             }
             return
         }
+        val query = _state.value.search.trim().takeIf { it.isNotBlank() }
         _state.update { it.copy(isLoading = true, error = null) }
-        screenModelScope.launch {
-            when (val result = loadCatalogLinks(empresaSlug)) {
+        searchJob?.cancel()
+        searchJob = screenModelScope.launch {
+            when (val result = loadCatalogLinks(empresaSlug, query)) {
                 is SfaApiResult.Ok -> _state.update { current ->
-                    val links = result.value
+                    val page = result.value
                     current.copy(
-                        links = links,
+                        links = page.links,
+                        total = page.total,
+                        hasMore = page.hasMore,
                         isLoading = false,
                         error = null,
                         selectedUuid = current.selectedUuid?.takeIf { uuid ->
-                            links.any { it.uuid == uuid }
+                            page.links.any { it.uuid == uuid }
                         },
                     )
                 }
@@ -108,6 +124,12 @@ class CatalogLinkPickerScreenModel(
             }
         }
     }
+
+    fun setSearch(query: String) {
+        _state.update { it.copy(search = query) }
+    }
+
+    fun submitSearch() = refresh()
 
     fun select(link: SellerCatalogLink) {
         if (!link.disponivel) {

@@ -3,6 +3,7 @@ package app.trovata.cast.feature.catalog
 import app.trovata.cast.data.local.SessionClientNotes
 import app.trovata.cast.data.local.StoredSessionRecord
 import app.trovata.cast.data.remote.SessionsApiResult
+import app.trovata.cast.data.remote.sfa.CatalogLinkPage
 import app.trovata.cast.data.remote.sfa.SfaApiResult
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
@@ -65,14 +66,15 @@ class CatalogLinkPickerScreenModelTest {
 
     private fun model(
         links: List<SellerCatalogLink> = listOf(vigente, expirado, inativo),
-        loadResult: SfaApiResult<List<SellerCatalogLink>> = SfaApiResult.Ok(links),
+        loadResult: SfaApiResult<CatalogLinkPage> =
+            SfaApiResult.Ok(CatalogLinkPage(links = links, total = links.size, hasMore = false)),
         createSession: CreateSessionFn = { error("not called") },
         persistSession: PersistSessionFn = { _, _, _, _ -> error("not called") },
         empresaSlug: String = "buba-teste",
         onLoad: (String) -> Unit = {},
         initialClient: ClientDraft = ClientDraft(),
     ) = CatalogLinkPickerScreenModel(
-        loadCatalogLinks = { slug ->
+        loadCatalogLinks = { slug, _ ->
             onLoad(slug)
             loadResult
         },

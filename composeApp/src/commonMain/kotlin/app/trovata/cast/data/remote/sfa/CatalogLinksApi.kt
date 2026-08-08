@@ -20,7 +20,7 @@ class CatalogLinksApi(
         empresaSlug: String,
         search: String? = null,
         maxPages: Int = MAX_PAGES,
-    ): SfaApiResult<List<SellerCatalogLink>> {
+    ): SfaApiResult<CatalogLinkPage> {
         if (empresaSlug.isBlank()) {
             return SfaApiResult.Fail("missing_empresa", "Empresa ativa sem slug", 0)
         }
@@ -28,6 +28,8 @@ class CatalogLinksApi(
             val token = tokenProvider()
                 ?: return SfaApiResult.Fail("unauthenticated", "Faça login novamente", 401)
             val collected = mutableListOf<SellerCatalogLink>()
+            var total = 0
+            var hasMore = false
             var page = 1
             while (page <= maxPages) {
                 val response = client.get("$baseUrl/empresa/$empresaSlug/catalogos-links") {
@@ -47,10 +49,18 @@ class CatalogLinksApi(
                 }
                 val envelope = response.body<SfaPaginatedEnvelope<CatalogoLinkDto>>()
                 envelope.data.orEmpty().forEach { collected.add(it.toSellerCatalogLink()) }
-                if (!envelope.hasNextPage()) break
+                total = envelope.page?.total ?: collected.size
+                hasMore = envelope.hasNextPage()
+                if (!hasMore) break
                 page++
             }
-            SfaApiResult.Ok(collected)
+            SfaApiResult.Ok(
+                CatalogLinkPage(
+                    links = collected,
+                    total = maxOf(total, collected.size),
+                    hasMore = hasMore,
+                ),
+            )
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (t: Throwable) {
@@ -65,10 +75,16 @@ class CatalogLinksApi(
     }
 
     private companion object {
-        const val MAX_PAGES = 20
+        const val MAX_PAGES = 1
         const val PER_PAGE = 100
     }
 }
+
+data class CatalogLinkPage(
+    val links: List<SellerCatalogLink>,
+    val total: Int,
+    val hasMore: Boolean,
+)
 
 fun CatalogoLinkDto.toSellerCatalogLink(): SellerCatalogLink {
     val clienteNome = nomeFantasia?.takeIf { it.isNotBlank() }

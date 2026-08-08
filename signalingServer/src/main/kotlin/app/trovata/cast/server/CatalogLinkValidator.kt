@@ -43,7 +43,8 @@ class SfaCatalogLinkValidator(
             append(empresaSlug.encodeURLPathPart())
             append('/')
             append(catalogoUuid.encodeURLPathPart())
-            append("/vendedor")
+            append('/')
+            append(VALIDATION_RESOURCE)
         }
         return try {
             val response = client.get(url) {
@@ -68,6 +69,10 @@ class SfaCatalogLinkValidator(
             log.warn("validação do catálogo falhou, seguindo sem bloquear", t)
             CatalogLinkCheck.Skipped
         }
+    }
+
+    private companion object {
+        const val VALIDATION_RESOURCE = "clientes-liberados"
     }
 
     private fun rejectionMessage(body: String): String = when {

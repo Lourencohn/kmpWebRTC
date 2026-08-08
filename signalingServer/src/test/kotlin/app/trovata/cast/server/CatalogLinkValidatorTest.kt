@@ -36,7 +36,7 @@ class CatalogLinkValidatorTest {
     fun catalogoValidoPassaEBateNaRotaPublicaDaVitrine() = runTest {
         val (subject, urls) = validator {
             respond(
-                content = """{"data":{"id":31,"nome_fantasia":"Marina Prado"}}""",
+                content = """{"data":[],"email_catalogo_link":null}""",
                 status = HttpStatusCode.OK,
                 headers = headersOf(HttpHeaders.ContentType, "application/json"),
             )
@@ -44,7 +44,7 @@ class CatalogLinkValidatorTest {
 
         assertIs<CatalogLinkCheck.Valid>(subject.check(slug, uuid, bearerToken = null))
         assertEquals(
-            "https://api-int.trovata.app.br/catalogos-links/$slug/$uuid/vendedor",
+            "https://api-int.trovata.app.br/catalogos-links/$slug/$uuid/clientes-liberados",
             urls.single(),
         )
     }

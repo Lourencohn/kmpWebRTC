@@ -30,7 +30,7 @@ val screenModelModule = module {
         val catalogLinks = get<CatalogLinksApi>()
         val auth = get<AuthRepository>()
         CatalogLinkPickerScreenModel(
-            loadCatalogLinks = { slug -> catalogLinks.listForSeller(slug) },
+            loadCatalogLinks = { slug, search -> catalogLinks.listForSeller(slug, search) },
             createSession = sessionsApi::createSession,
             persistSession = sessionsRepository::persistCreated,
             empresaSlugProvider = { auth.activeCompany.value?.slug.orEmpty() },

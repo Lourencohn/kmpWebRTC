@@ -110,8 +110,11 @@ private fun CompanyRow(company: Company, onClick: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
             )
-            val subtitle = company.legalName ?: company.cnpj
-            if (subtitle != null) {
+            val subtitle = listOfNotNull(
+                company.slug.takeIf { it.isNotBlank() },
+                company.legalName ?: company.cnpj,
+            ).joinToString(" · ")
+            if (subtitle.isNotBlank()) {
                 Text(text = subtitle, color = colors.ink4, fontSize = 12.sp, maxLines = 1)
             }
         }

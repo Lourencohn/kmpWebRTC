@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -27,6 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -86,6 +92,8 @@ data class CatalogLinkPickerScreen(
             onBack = { navigator.pop() },
             onSelect = screenModel::select,
             onFilter = screenModel::setFilter,
+            onSearchChange = screenModel::setSearch,
+            onSearchSubmit = screenModel::submitSearch,
             onRetry = screenModel::refresh,
             onGenerate = {
                 screenModel.generateLink(
@@ -104,6 +112,8 @@ private fun CatalogLinkPickerBody(
     onBack: () -> Unit,
     onSelect: (SellerCatalogLink) -> Unit,
     onFilter: (CatalogLinkFilter) -> Unit,
+    onSearchChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
     onRetry: () -> Unit,
     onGenerate: () -> Unit,
     onDismissError: () -> Unit,
@@ -123,15 +133,17 @@ private fun CatalogLinkPickerBody(
                 IconBtn(icon = TrovataIcons.back, onClick = onBack, kind = IconBtnKind.Line)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Escolher catálogo",
+                        text = state.client.name?.let { "Para ${it.split(' ').first()}" }
+                            ?: "Escolher catálogo",
                         color = colors.ink4,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
-                        text = state.client.name?.let { "Para ${it.split(' ').first()}" }
-                            ?: state.companyName.takeIf { it.isNotBlank() }
-                            ?: "Nova sessão",
+                        text = listOfNotNull(
+                            state.companyName.takeIf { it.isNotBlank() },
+                            state.companySlug.takeIf { it.isNotBlank() },
+                        ).joinToString(" · ").ifBlank { "Nova sessão" },
                         color = colors.ink,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -141,6 +153,40 @@ private fun CatalogLinkPickerBody(
                     text = "${visible.size}",
                     tone = if (state.selectedUuid != null) PillTone.Brand else PillTone.Neutral,
                 )
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BasicTextField(
+                    value = state.search,
+                    onValueChange = onSearchChange,
+                    singleLine = true,
+                    textStyle = TextStyle(color = colors.ink, fontSize = 13.sp),
+                    cursorBrush = SolidColor(colors.brand),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(colors.surface, RoundedCornerShape(999.dp))
+                        .border(1.dp, colors.line, RoundedCornerShape(999.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    decorationBox = { inner ->
+                        if (state.search.isEmpty()) {
+                            Text(
+                                text = "Buscar catálogo por nome ou cliente",
+                                color = colors.ink4,
+                                fontSize = 13.sp,
+                            )
+                        }
+                        inner()
+                    },
+                )
+                Btn(text = "Buscar", onClick = onSearchSubmit, kind = BtnKind.Surface, size = BtnSize.Sm)
             }
 
             LazyRow(
@@ -177,6 +223,17 @@ private fun CatalogLinkPickerBody(
                             selected = link.uuid == state.selectedUuid,
                             onClick = { onSelect(link) },
                         )
+                    }
+                    if (state.hasMore) {
+                        item {
+                            Text(
+                                text = "Mostrando os ${state.links.size} mais recentes de ${state.total}. Use a busca para achar outro.",
+                                color = colors.ink4,
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            )
+                        }
                     }
                 }
             }
