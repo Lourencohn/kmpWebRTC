@@ -89,10 +89,6 @@ class SessionsRepository(private val db: TrovataDatabase) {
             )
         }
     }
-
-    suspend fun selectedSkus(sessionId: String): List<String> = withContext(Dispatchers.Default) {
-        db.sessionsQueries.selectSelectedProducts(sessionId).executeAsList()
-    }
 }
 
 data class SessionClientNotes(

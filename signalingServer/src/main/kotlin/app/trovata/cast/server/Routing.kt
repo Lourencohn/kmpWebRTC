@@ -1,6 +1,7 @@
 package app.trovata.cast.server
 
 import app.trovata.cast.protocol.ErrorResponse
+import app.trovata.cast.protocol.IceServerConfig
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
 import app.trovata.cast.protocol.buildLiveInviteUrl
@@ -19,11 +20,12 @@ fun Application.sessionRoutes(
     store: SessionStore,
     catalogBaseUrl: String,
     validator: CatalogLinkValidator = DisabledCatalogLinkValidator,
+    iceServers: List<IceServerConfig> = emptyList(),
 ) {
     routing {
         route("/session") {
-            post { call.createSession(store, catalogBaseUrl, validator) }
-            get("/{token}") { call.fetchSession(store) }
+            post { call.createSession(store, catalogBaseUrl, validator, iceServers) }
+            get("/{token}") { call.fetchSession(store, iceServers) }
         }
     }
 }
@@ -32,6 +34,7 @@ private suspend fun ApplicationCall.createSession(
     store: SessionStore,
     catalogBaseUrl: String,
     validator: CatalogLinkValidator,
+    iceServers: List<IceServerConfig>,
 ) {
     val request = try {
         receive<SessionCreateRequest>()
@@ -68,6 +71,7 @@ private suspend fun ApplicationCall.createSession(
                 token = stored.token,
             ),
             expiresAtMs = stored.expiresAtMs,
+            iceServers = iceServers,
         ),
     )
 }
@@ -85,12 +89,15 @@ private fun SessionCreateRequest.validationError(): ErrorResponse? = when {
     else -> null
 }
 
-private suspend fun ApplicationCall.fetchSession(store: SessionStore) {
+private suspend fun ApplicationCall.fetchSession(
+    store: SessionStore,
+    iceServers: List<IceServerConfig>,
+) {
     val token = parameters["token"].orEmpty()
     val stored = store.get(token)
     if (stored == null) {
         respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Sessão não encontrada ou expirada"))
         return
     }
-    respond(stored.toInfo())
+    respond(stored.toInfo().copy(iceServers = iceServers))
 }

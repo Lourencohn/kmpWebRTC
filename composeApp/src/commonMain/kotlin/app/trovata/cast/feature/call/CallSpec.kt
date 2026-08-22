@@ -3,6 +3,8 @@ package app.trovata.cast.feature.call
 data class CallSpec(
     val token: String,
     val sessionId: String,
+    val empresaSlug: String,
+    val catalogoUuid: String,
     val clientName: String?,
     val sellerName: String,
     val collectionLabel: String,

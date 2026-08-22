@@ -23,6 +23,9 @@
 | M10 → M12 | ⏳ pendente | — | ver `docs/06-roadmap.md` |
 | Integração Catálogo Link — Fase 1 (catálogos reais) | ✅ concluído | (sem commit ainda) | `CatalogLinksApi` + `CatalogLinkPickerScreen` sobre `GET /empresa/{slug}/catalogos-links`; picker de produtos aposentado; `Company.slug` |
 | Integração Catálogo Link — Fase 2 (convite) | ✅ concluído | (sem commit ainda) | `POST /session` validando contra o Laravel real, Bearer do vendedor repassado, convite apontando para o `sfa_front` |
+| Integração Catálogo Link — Fase 4a (vitrine real no app) | ✅ concluído | (sem commit ainda) | `VitrineApi` sobre a rota pública `/vitrine`; a `LiveCall` mostra os produtos do catálogo link, com preço e ordem do próprio catálogo, paginados |
+| Infra — ICE configurável (pré-TURN) | ✅ concluído | (sem commit ainda) | `iceServers` viajam em `POST /session` e `GET /session/{token}`; app e buyer consomem; TURN entra por variável de ambiente |
+| Limpeza — pedido paralelo removido | ✅ concluído | (sem commit ainda) | `POST /order`, `OrderStore` e os DTOs de submissão saíram; buyer perdeu os módulos órfãos da vitrine antiga |
 | Integração Catálogo Link — Fase 0 (contrato) | ✅ concluído | (sem commit ainda) | `SessionCreateRequest` por identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`/`OrderPlaced`, URL de convite no `sfa_front`. Ver `prompt.md` e `docs/10-integracao-catalogo-link.md` |
 
 ---
@@ -730,6 +733,98 @@ Com `SFA_API_URL=https://api.trovata.app.br/api`:
 
 ---
 
+## Integração Catálogo Link — Fase 4a (o vendedor vê a mesma vitrine que o cliente)
+
+> Pré-requisito da co-presença. Enquanto as duas pontas liam catálogos diferentes, apontar um produto podia apontar para o vazio.
+
+### O problema
+
+A `LiveCall` lia `CatalogRepository`, ou seja, o cache do `api-int` sincronizado em SQLDelight: outra origem, outra ordenação e outro preço. O cliente, do outro lado, vê `catalogos-links/{slug}/{uuid}/vitrine`, que aplica tabela de preço do catálogo link, desconto por faixa, saldo, sequência e as restrições de tipo de venda. O protocolo já ancora tudo em `produtoPreId` (`ScrollAnchor`, `ProductFocus`, `LiveAnchor`), mas os ids vinham de uma lista que o cliente não estava vendo.
+
+### O que mudou
+
+- **`data/remote/sfa/VitrineApi.kt`** — `GET {laravelApiUrl}/catalogos-links/{slug}/{uuid}/vitrine` com `page`, `total`, `search`, `categoria`, `catalogo_carrinho` e `destaques`. Rota pública, sem `Authorization`. Devolve `VitrinePage(produtos, currentPage, lastPage, total)`.
+- **`dto/VitrineDto.kt`** — espelha o contrato que o `sfa_front` consome (`CatalogoLinkVitrine`), incluindo `produto_pre_1_id`, `complemento_1_id`, `saldo_disponivel`, `is_carrinho`, `lista_multiplo_venda` e `arquivos`. O envelope da vitrine é **flat** (`data`, `current_page`, `per_page`, `total`, `last_page`), diferente do `{data, meta}` das rotas privadas.
+- **`LenientNumbers.kt`** — `preco_final` e `preco_de` chegam ora como número (`144.9`), ora como string no padrão brasileiro (`"1.189,90"`). Dois serializers toleram as duas formas e entregam cents.
+- **`LiveCallScreenModel`** — deixa de injetar `CatalogRepository` e `SessionsRepository` e passa a carregar da `VitrineApi`, com `isLoadingCatalog`, `catalogError`, `catalogPage` e `catalogLastPage` no state. `selectedSkus` sai do fluxo: não existe mais seleção de produtos.
+- **`CallSpec` / `LiveCallScreen` / `InviteScreen`** — propagam `empresaSlug` e `catalogoUuid`, que já vinham em `StoredSessionRecord`.
+- **`LiveCallScreen`** — estado vazio honesto (carregando, erro com "Tentar de novo", vitrine sem produtos) e paginação no rodapé quando há mais de uma página.
+
+### Decisões
+
+- **Nenhum cálculo nosso.** `preco_final` já vem com a regra do catálogo link aplicada; o app converte para cents e exibe. `preco_de` só é mostrado quando `teve_desconto` é verdadeiro.
+- **Mapeamento para o `Product` da UI** (`feature/call/VitrineUi.kt`) em vez de reescrever os componentes. `sizes` fica vazio porque a grade vem de `/produtos/{id}/grades`, que entra junto do carrinho ao vivo.
+- **Sem cache local da vitrine.** A lista é sempre da API: é o catálogo do cliente, não uma cópia nossa.
+
+### O que ficou pendente
+
+- **Grade e cores** (`/produtos/{produto_pre_id}/grades`, `/itens-cores`) — necessárias para o detalhe do produto e para o carrinho ao vivo (Fase 5).
+- **Navegação por seção** — a vitrine tem categoria, grupo, marca e coleção; hoje o app carrega a listagem completa paginada. `CatalogRoute.Secao` já existe no protocolo esperando isso.
+- **`CartRepository` / `OrderRepository` / `OrderStore`** continuam no grafo, agora claramente órfãos do modelo antigo. Saem na Fase 5.
+- **`selectedSkus` e `SelectedProductEntity`** ficaram sem uso no fluxo da chamada.
+
+### Verificação
+
+- `./gradlew :protocol:jvmTest :signalingServer:test :composeApp:testDebugUnitTest` ✅ (29 + 30 + 44 = 103; 7 novos em `VitrineApiTest`, cobrindo caminho da URL, ausência de auth, preço numérico e string, `preco_de` sem desconto, 404 e falha de rede)
+- `./gradlew :composeApp:assembleDebug` ✅
+- **Não verificado contra a API real**: falta rodar com um catálogo link vigente para confirmar os nomes de campo que a query da vitrine devolve, já que o `SELECT` final é `produtos.*` e não um Resource fechado.
+
+---
+
+## Infra — ICE configurável (o degrau antes do TURN)
+
+Antes, os dois lados tinham a lista de ICE fixa em código, só com STUN público (`PeerSession.kt` e `webrtc/peer.ts`). Em NAT simétrico, comum em 4G e Wi-Fi corporativo, isso simplesmente não conecta, e trocar exigia recompilar app e buyer.
+
+Agora o servidor é a fonte da configuração:
+
+- `protocol/`: `IceServerConfig(urls, username?, credential?)`, presente em `SessionCreateResponse` e `SessionInfo`.
+- `signalingServer/`: `IceConfig.fromEnv()` lê `ICE_STUN_URLS`, `ICE_TURN_URLS` (ambas em CSV), `ICE_TURN_USERNAME` e `ICE_TURN_CREDENTIAL`. Sem nada configurado, mantém o STUN público de hoje, então o comportamento atual não muda.
+- `composeApp/`: `PeerSession` recebe um `iceServersProvider` que consulta `GET /session/{token}` na hora de abrir a conexão, com fallback para o default se a chamada falhar. Buscar na hora, e não no momento do convite, importa porque credencial de TURN costuma ser temporária.
+- `webBuyer/`: `startLiveSession` lê os `iceServers` da mesma rota antes de criar o `RTCPeerConnection`.
+
+Para ligar TURN em produção, nada de código:
+
+```bash
+fly secrets set ICE_TURN_URLS="turn:host:3478?transport=udp,turns:host:5349" \
+                ICE_TURN_USERNAME="..." ICE_TURN_CREDENTIAL="..."
+```
+
+Continua em aberto quem fornece e paga o TURN. O que saiu do caminho crítico foi a parte técnica.
+
+### Verificação
+- `./gradlew :protocol:jvmTest :signalingServer:test :composeApp:testDebugUnitTest` ✅ (29 + 35 + 44 = 108; 5 novos entre `IceConfigTest` e o cenário de `SessionRoutesTest`)
+- `(cd webBuyer && npm run typecheck && npm test)` ✅ (67 testes)
+
+---
+
+## Limpeza — o pedido paralelo saiu do caminho
+
+O plano de integração diz que o pedido nasce e morre no Laravel. O que ainda existia do modelo antigo virou ruído: código sem chamador, com testes verdes dando falsa sensação de cobertura.
+
+### Removido
+
+- **`signalingServer`**: `OrderRoutes.kt` (`POST /order`, `GET /order/{id}`, `GET /session/{token}/orders`) e `OrderStore.kt`, mais o wiring no `Main.kt`. Nenhum cliente chamava: o app nunca chamou, e o `main.ts` do buyer parou de chamar quando virou vitrine.
+- **`protocol`**: `OrderSubmissionRequest`, `OrderSubmissionResponse`, `OrderRecord` e `OrderSource`. `OrderLine` fica, porque o resumo de pedido do vendedor ainda usa.
+- **`webBuyer`**: `api/orders.ts`, `ui/orderSummary.ts`, `ui/cartSheet.ts`, `ui/productDetail.ts`, `ui/productCard.ts`, `cart/store.ts` e `protocol/order.ts`, todos órfãos desde a reescrita da vitrine. `views/arrival.ts` ficou só com `renderLoading`, que é o único trecho ainda montado.
+- **`composeApp`**: `SessionsRepository.selectedSkus`, sem chamador desde que a `LiveCall` passou a ler a vitrine real.
+
+### Mantido de propósito
+
+- **`CartRepository`** continua alimentando a gaveta de carrinho do vendedor durante a chamada. Some na Fase 5, quando o conteúdo do carrinho passar a vir do Laravel; removê-lo agora deixaria a tela sem fonte.
+- **`OrderRepository`** alimenta "Pedidos fechados hoje" na Home, além de Insights, Conta e Dashboard. Também sai na Fase 5 ou 6, quando esses números vierem dos pedidos reais. Tirar agora esvaziaria quatro telas sem substituto.
+- **`SelectedProductEntity`** continua no schema (a query de escrita segue existindo); só a leitura órfã saiu. Remover tabela pede migration e não há ganho hoje.
+
+### Efeito na contagem de testes
+
+Caiu de 108 para 100 testes Kotlin e de 67 para 50 no webBuyer. A diferença é exatamente a cobertura do código removido: `OrderDtoTest`, `OrderRoutesTest`, `orders.test.ts` e a parte de `arrival.test.ts` que exercitava telas que não são mais montadas.
+
+### Verificação
+- `./gradlew :protocol:jvmTest :signalingServer:test :composeApp:testDebugUnitTest` ✅ (26 + 30 + 44 = 100)
+- `./gradlew :composeApp:assembleDebug` ✅
+- `(cd webBuyer && npm run typecheck && npm test)` ✅ (50 testes)
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -747,6 +842,9 @@ Com `SFA_API_URL=https://api.trovata.app.br/api`:
 | 2026-05-22 | Infra: webBuyer no Cloudflare Pages (`trovatacast-buyer.pages.dev`) via GH Actions + Wrangler; Fly `PUBLIC_BUYER_URL` setado; Mac do vendedor não é mais necessário para nenhum componente |
 | 2026-05-23 | M8 fechado: DC `Navigate` + `CartUpdate`, `BuyerProductDetail` sheet, cart dock no cliente, gaveta + toast no vendedor, `CartRepository` (SQLDelight) · 78 testes totais (9 protocol + 15 composeApp + 12 signaling + 54 webBuyer) |
 | 2026-05-23 | M9 fase 1 fechado: DC `OrderConfirm`, botão Confirmar pedido na gaveta, `OrderSummaryOverlay` (vendedor) + `mountOrderSummary` (cliente). PDF, persistência server-side e push ficam pra fase 2 · 83 testes totais (11 protocol + 15 composeApp + 12 signaling + 57 webBuyer) |
+| 2026-08-22 | Integração Catálogo Link — Fase 4a fechada: `VitrineApi` sobre a rota pública da vitrine, `LiveCall` mostrando os produtos do catálogo link (preço, ordem e saldo do próprio catálogo) com paginação e estados vazios; `CatalogRepository` sai do fluxo da chamada · 103 testes Kotlin (29 protocol + 30 signaling + 44 composeApp) |
+| 2026-08-22 | Infra: ICE configurável pelo servidor (`ICE_STUN_URLS`/`ICE_TURN_*`), consumido por app e buyer na abertura da conexão · 108 testes Kotlin + 67 webBuyer |
+| 2026-08-22 | Limpeza: `POST /order`/`OrderStore` e os módulos órfãos do buyer removidos; `CartRepository` e `OrderRepository` ficam até a Fase 5 por ainda terem telas dependentes · 100 testes Kotlin + 50 webBuyer |
 | 2026-08-06 | Integração Catálogo Link — Fases 1 e 2 fechadas: app lista catálogos link reais do vendedor (`CatalogLinksApi`, `CatalogLinkPickerScreen`, `Company.slug`), picker de produtos removido, `POST /session` validando contra o Laravel de produção e convite apontando para o `sfa_front`. Descobertos o prefixo `/api` da API Laravel e o 500 mascarado em catálogo expirado · 163 testes totais (29 protocol + 30 signaling + 37 composeApp + 67 webBuyer) |
 | 2026-08-06 | Integração Catálogo Link — Fase 0 fechada: contrato redesenhado no `protocol/` (identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`, `OrderPlaced`), URL de convite apontando para o `sfa_front` com `?live=`, `SessionEvent`/`Codec` removidos · 142 testes totais (29 protocol + 20 signaling + 26 composeApp + 67 webBuyer) |
 | 2026-05-23 | M9 fase 2 (parcial) fechada: `OrderRepository` + `Orders.sq`, "Pedidos fechados hoje" na Home, `POST /order` em memória + buyer envia, PDF via `window.print()` + `@media print`. `SummaryScreen` (métricas) movido pra M12 e push pra M19 · 121 testes totais (24 protocol + 17 signaling + 15 composeApp + 65 webBuyer) |

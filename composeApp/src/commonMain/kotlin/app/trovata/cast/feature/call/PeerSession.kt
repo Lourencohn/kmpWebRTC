@@ -66,6 +66,7 @@ class PeerSession(
     private val selfPeerId: String,
     private val selfRole: PeerRole,
     private val iceServers: List<IceServer> = DefaultIceServers,
+    private val iceServersProvider: (suspend () -> List<IceServer>)? = null,
     private val presenceIntervalMs: Long = 5_000,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
@@ -111,7 +112,11 @@ class PeerSession(
         if (pc != null) return
         log.i { "start role=$selfRole peerId=$selfPeerId" }
         _state.value = PeerSessionState.Negotiating
-        val connection = PeerConnection(RtcConfiguration(iceServers = iceServers))
+        val resolvedIceServers = iceServersProvider
+            ?.let { provider -> runCatching { provider() }.getOrNull()?.takeIf { it.isNotEmpty() } }
+            ?: iceServers
+        log.i { "iceServers=${resolvedIceServers.flatMap { it.urls }}" }
+        val connection = PeerConnection(RtcConfiguration(iceServers = resolvedIceServers))
         pc = connection
 
         localStream = runCatching { MediaDevices.getUserMedia(audio = true) }

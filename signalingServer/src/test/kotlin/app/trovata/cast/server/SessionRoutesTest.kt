@@ -1,6 +1,7 @@
 package app.trovata.cast.server
 
 import app.trovata.cast.protocol.ErrorResponse
+import app.trovata.cast.protocol.IceServerConfig
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
 import app.trovata.cast.protocol.SessionInfo
@@ -131,6 +132,36 @@ class SessionRoutesTest {
         assertEquals(HttpStatusCode.BadRequest, response.status)
         val body: ErrorResponse = response.body()
         assertEquals("missing_catalogo", body.code)
+    }
+
+    @Test
+    fun sessaoCarregaOsIceServersConfigurados() = testApplication {
+        val turn = IceServerConfig(
+            urls = listOf("turn:turn.example:3478"),
+            username = "trovata",
+            credential = "segredo",
+        )
+        application {
+            install(ServerContentNegotiation) { json(Json { ignoreUnknownKeys = true; explicitNulls = false }) }
+            sessionRoutes(
+                store = SessionStore(),
+                catalogBaseUrl = "https://trovata.app.br",
+                iceServers = listOf(turn),
+            )
+        }
+        val client = createClient {
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        val created: SessionCreateResponse = client.post("/session") {
+            contentType(ContentType.Application.Json)
+            setBody(sampleRequest())
+        }.body()
+        assertEquals(turn, created.iceServers.single())
+
+        val info: SessionInfo = client.get("/session/${created.token}").body()
+        assertEquals("turn:turn.example:3478", info.iceServers.single().urls.single())
+        assertEquals("segredo", info.iceServers.single().credential)
     }
 
     @Test

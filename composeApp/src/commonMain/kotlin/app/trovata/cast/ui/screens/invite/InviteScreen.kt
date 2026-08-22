@@ -68,6 +68,8 @@ data class InviteScreen(val record: StoredSessionRecord) : Screen {
                     LiveCallScreen(
                         token = record.token,
                         sessionId = record.sessionId,
+                        empresaSlug = record.empresaSlug,
+                        catalogoUuid = record.catalogoUuid,
                         sellerName = record.sellerName,
                         clientName = record.clientName,
                         collectionLabel = record.catalogLabel,

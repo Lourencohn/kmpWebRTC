@@ -8,6 +8,7 @@ import app.trovata.cast.data.remote.sfa.CatalogLinksApi
 import app.trovata.cast.data.remote.sfa.KeycloakAuthService
 import app.trovata.cast.data.remote.sfa.SfaApi
 import app.trovata.cast.data.remote.sfa.SfaConfig
+import app.trovata.cast.data.remote.sfa.VitrineApi
 import io.ktor.client.HttpClient
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -27,6 +28,7 @@ val networkModule = module {
     }
     single { KeycloakAuthService(get(SfaHttpClient)) }
     single { AccountApi(get(SfaHttpClient)) }
+    single { VitrineApi(get(SfaHttpClient)) }
     single {
         CatalogLinksApi(
             client = get(SfaHttpClient),

@@ -54,7 +54,6 @@ fun Application.module() {
     val sfaApiUrl = System.getenv("SFA_API_URL")?.takeIf { it.isNotBlank() }
     val store = SessionStore()
     val rooms = RoomManager()
-    val orders = OrderStore()
     val catalogValidator = sfaApiUrl
         ?.let { SfaCatalogLinkValidator(HttpClient(OkHttp), it) }
         ?: DisabledCatalogLinkValidator
@@ -65,9 +64,8 @@ fun Application.module() {
             call.respond(Version(name = "trovatacast-signaling", version = "0.1.0"))
         }
     }
-    sessionRoutes(store, catalogBaseUrl, catalogValidator)
+    sessionRoutes(store, catalogBaseUrl, catalogValidator, IceConfig.fromEnv())
     signalingRoutes(rooms, store)
-    orderRoutes(orders, store)
 
     val staticRoot = File(System.getenv("STATIC_DIR")?.takeIf { it.isNotBlank() } ?: "static")
     if (staticRoot.isDirectory) {

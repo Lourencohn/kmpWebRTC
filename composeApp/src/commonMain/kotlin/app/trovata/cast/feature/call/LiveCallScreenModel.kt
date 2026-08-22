@@ -1,10 +1,9 @@
 package app.trovata.cast.feature.call
 
 import app.trovata.cast.data.local.CartRepository
-import app.trovata.cast.data.local.CatalogRepository
 import app.trovata.cast.data.local.OrderRepository
-import app.trovata.cast.data.local.SessionsRepository
-import app.trovata.cast.data.local.toUiProduct
+import app.trovata.cast.data.remote.sfa.SfaApiResult
+import app.trovata.cast.data.remote.sfa.VitrineApi
 import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.SignalingState
@@ -57,6 +56,11 @@ data class LiveCallUiState(
     val cart: List<CartLineUi> = emptyList(),
     val products: List<Product> = emptyList(),
     val priceCentsByRef: Map<String, Long> = emptyMap(),
+    val isLoadingCatalog: Boolean = true,
+    val catalogError: String? = null,
+    val catalogPage: Int = 1,
+    val catalogLastPage: Int = 1,
+    val catalogTotal: Int = 0,
     val collectionLabel: String = "",
     val focusedProductId: String? = null,
     val showProductSheet: Boolean = false,
@@ -82,8 +86,7 @@ class LiveCallScreenModel(
     private val peer: PeerSession,
     private val cartRepository: CartRepository,
     private val orderRepository: OrderRepository,
-    private val catalogRepository: CatalogRepository,
-    private val sessionsRepository: SessionsRepository,
+    private val vitrineApi: VitrineApi,
     private val callScope: Scope,
 ) : ScreenModel {
 
@@ -93,7 +96,8 @@ class LiveCallScreenModel(
     private val collectionLabel = spec.collectionLabel
     private val sellerName = spec.sellerName
     private val clientShop = spec.clientShop
-    private val priceTableId = spec.priceTableId
+    private val empresaSlug = spec.empresaSlug
+    private val catalogoUuid = spec.catalogoUuid
     private val carrinhoId = spec.carrinhoId
 
     private val _state = MutableStateFlow(
@@ -102,19 +106,7 @@ class LiveCallScreenModel(
     val state: StateFlow<LiveCallUiState> = _state.asStateFlow()
 
     init {
-        screenModelScope.launch {
-            val selected = sessionsRepository.selectedSkus(sessionId)
-            val catalog = if (selected.isNotEmpty()) {
-                catalogRepository.snapshotForRefs(selected, priceTableId)
-            } else {
-                catalogRepository.snapshot(priceTableId)
-            }
-            val ui = catalog.map { it.toUiProduct() }
-            val prices = buildMap {
-                catalog.forEach { product -> product.priceCents?.let { put(product.ref, it) } }
-            }
-            _state.update { it.copy(products = ui, priceCentsByRef = prices) }
-        }
+        screenModelScope.launch { loadVitrine() }
         screenModelScope.launch {
             signaling.state.collect { s -> _state.update { it.copy(signaling = s) } }
         }
@@ -157,6 +149,54 @@ class LiveCallScreenModel(
                 }
             }
         }
+    }
+
+    private suspend fun loadVitrine(page: Int = 1) {
+        _state.update { it.copy(isLoadingCatalog = true) }
+        when (
+            val result = vitrineApi.produtos(
+                empresaSlug = empresaSlug,
+                catalogoUuid = catalogoUuid,
+                page = page,
+                carrinhoId = carrinhoId,
+            )
+        ) {
+            is SfaApiResult.Fail -> _state.update {
+                it.copy(isLoadingCatalog = false, catalogError = result.message)
+            }
+            is SfaApiResult.Ok -> {
+                val produtos = result.value.produtos
+                _state.update { current ->
+                    current.copy(
+                        isLoadingCatalog = false,
+                        catalogError = null,
+                        products = produtos.map { produto -> produto.toUiProduct() },
+                        priceCentsByRef = produtos.mapNotNull { produto ->
+                            produto.precoCents?.let { produto.ref to it }
+                        }.toMap(),
+                        catalogPage = result.value.currentPage,
+                        catalogLastPage = result.value.lastPage,
+                        catalogTotal = result.value.total,
+                    )
+                }
+            }
+        }
+    }
+
+    fun reloadVitrine() {
+        screenModelScope.launch { loadVitrine(_state.value.catalogPage) }
+    }
+
+    fun nextCatalogPage() {
+        val snapshot = _state.value
+        if (snapshot.catalogPage >= snapshot.catalogLastPage) return
+        screenModelScope.launch { loadVitrine(snapshot.catalogPage + 1) }
+    }
+
+    fun prevCatalogPage() {
+        val snapshot = _state.value
+        if (snapshot.catalogPage <= 1) return
+        screenModelScope.launch { loadVitrine(snapshot.catalogPage - 1) }
     }
 
     fun start() {

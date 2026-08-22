@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -74,6 +75,8 @@ import org.koin.core.parameter.parametersOf
 data class LiveCallScreen(
     val token: String,
     val sessionId: String,
+    val empresaSlug: String,
+    val catalogoUuid: String,
     val sellerName: String,
     val clientName: String?,
     val collectionLabel: String = "",
@@ -88,6 +91,8 @@ data class LiveCallScreen(
             val spec = CallSpec(
                 token = token,
                 sessionId = sessionId,
+                empresaSlug = empresaSlug,
+                catalogoUuid = catalogoUuid,
                 clientName = clientName,
                 sellerName = sellerName,
                 collectionLabel = collectionLabel,
@@ -121,6 +126,9 @@ data class LiveCallScreen(
             onDismissCart = { screenModel.dismissCartDrawer() },
             onDismissProductSheet = { screenModel.dismissProductSheet() },
             onConfirmOrder = { screenModel.confirmOrder() },
+            onRetryCatalog = { screenModel.reloadVitrine() },
+            onPrevCatalogPage = { screenModel.prevCatalogPage() },
+            onNextCatalogPage = { screenModel.nextCatalogPage() },
         )
     }
 }
@@ -138,6 +146,9 @@ private fun LiveCallBody(
     onDismissCart: () -> Unit,
     onDismissProductSheet: () -> Unit,
     onConfirmOrder: () -> Unit,
+    onRetryCatalog: () -> Unit,
+    onPrevCatalogPage: () -> Unit,
+    onNextCatalogPage: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
     val productByRef = remember(state.products) { state.products.associateBy { it.ref } }
@@ -154,9 +165,16 @@ private fun LiveCallBody(
                     CatalogPanel(
                         products = state.products,
                         collectionLabel = state.collectionLabel,
+                        isLoading = state.isLoadingCatalog,
+                        error = state.catalogError,
+                        page = state.catalogPage,
+                        lastPage = state.catalogLastPage,
                         onScroll = onScroll,
                         onPointAt = onPointAt,
                         onOpenDetail = onOpenDetail,
+                        onRetryCatalog = onRetryCatalog,
+                        onPrevPage = onPrevCatalogPage,
+                        onNextPage = onNextCatalogPage,
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
@@ -258,9 +276,16 @@ private fun CallTopBar(state: LiveCallUiState, modifier: Modifier = Modifier) {
 private fun CatalogPanel(
     products: List<Product>,
     collectionLabel: String,
+    isLoading: Boolean,
+    error: String?,
+    page: Int,
+    lastPage: Int,
     onScroll: (productId: String, offset: Float) -> Unit,
     onPointAt: (productId: String) -> Unit,
     onOpenDetail: (productId: String) -> Unit,
+    onRetryCatalog: () -> Unit,
+    onPrevPage: () -> Unit,
+    onNextPage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = TrovataTokens.colors
@@ -317,6 +342,15 @@ private fun CatalogPanel(
             )
         }
         Spacer(modifier = Modifier.height(10.dp))
+        if (products.isEmpty()) {
+            CatalogPlaceholder(
+                isLoading = isLoading,
+                error = error,
+                onRetry = onRetryCatalog,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
+            return@Column
+        }
         LazyVerticalGrid(
             state = gridState,
             columns = GridCells.Fixed(2),
@@ -344,6 +378,78 @@ private fun CatalogPanel(
                 )
             }
         }
+        if (lastPage > 1) {
+            CatalogPager(
+                page = page,
+                lastPage = lastPage,
+                isLoading = isLoading,
+                onPrevPage = onPrevPage,
+                onNextPage = onNextPage,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CatalogPlaceholder(
+    isLoading: Boolean,
+    error: String?,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = error ?: if (isLoading) "Carregando o catálogo..." else "Nenhum produto nesta vitrine",
+            color = Color.White.copy(alpha = 0.72f),
+            fontSize = 13.sp,
+        )
+        if (error != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Btn(text = "Tentar de novo", onClick = onRetry, kind = BtnKind.Dark, size = BtnSize.Sm)
+        }
+    }
+}
+
+@Composable
+private fun CatalogPager(
+    page: Int,
+    lastPage: Int,
+    isLoading: Boolean,
+    onPrevPage: () -> Unit,
+    onNextPage: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Btn(
+            text = "Anterior",
+            onClick = onPrevPage,
+            kind = BtnKind.Dark,
+            size = BtnSize.Sm,
+            enabled = page > 1 && !isLoading,
+        )
+        Text(
+            text = "Página $page de $lastPage",
+            color = Color.White.copy(alpha = 0.6f),
+            fontSize = 11.5.sp,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+        )
+        Btn(
+            text = "Próxima",
+            onClick = onNextPage,
+            kind = BtnKind.Dark,
+            size = BtnSize.Sm,
+            enabled = page < lastPage && !isLoading,
+        )
     }
 }
 

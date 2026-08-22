@@ -5,6 +5,7 @@ import app.trovata.cast.protocol.ErrorResponse
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
 import app.trovata.cast.protocol.SessionInfo
+import com.shepeliev.webrtckmp.IceServer
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -73,3 +74,11 @@ class SessionsApi(
             status = status.value,
         )
 }
+
+suspend fun SessionsApi.iceServersFor(token: String): List<IceServer> =
+    when (val result = fetchSession(token)) {
+        is SessionsApiResult.Ok -> result.value.iceServers.map {
+            IceServer(urls = it.urls, username = it.username.orEmpty(), password = it.credential.orEmpty())
+        }
+        is SessionsApiResult.Fail -> emptyList()
+    }

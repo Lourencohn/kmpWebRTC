@@ -32,6 +32,8 @@ class KoinGraphTest {
         val spec = CallSpec(
             token = "tok-test",
             sessionId = "sess-test",
+            empresaSlug = "buba-teste",
+            catalogoUuid = "uuid-test",
             clientName = "Cliente",
             sellerName = "Vendedor",
             collectionLabel = "Coleção",

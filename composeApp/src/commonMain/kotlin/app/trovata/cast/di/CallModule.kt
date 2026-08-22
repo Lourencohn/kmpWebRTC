@@ -1,6 +1,8 @@
 package app.trovata.cast.di
 
 import app.trovata.cast.data.signaling.KtorSignalingTransport
+import app.trovata.cast.data.remote.SessionsApi
+import app.trovata.cast.data.remote.iceServersFor
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.signalingUrlFor
 import app.trovata.cast.feature.call.CallSpec
@@ -39,10 +41,12 @@ val callModule = module {
         } onClose { it?.dispose() }
 
         scoped { (spec: CallSpec) ->
+            val sessionsApi = get<SessionsApi>()
             PeerSession(
                 signaling = get { parametersOf(spec) },
                 selfPeerId = spec.sellerPeerId,
                 selfRole = PeerRole.Seller,
+                iceServersProvider = { sessionsApi.iceServersFor(spec.token) },
                 scope = get { parametersOf(spec) },
             )
         } onClose { it?.dispose() }
@@ -54,8 +58,7 @@ val callModule = module {
                 peer = get { parametersOf(spec) },
                 cartRepository = get(),
                 orderRepository = get(),
-                catalogRepository = get(),
-                sessionsRepository = get(),
+                vitrineApi = get(),
                 callScope = this,
             )
         }

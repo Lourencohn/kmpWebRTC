@@ -44,12 +44,27 @@ function ensureAudioSink(): HTMLAudioElement {
   return element
 }
 
+async function fetchIceServers(serverBase: string, token: string): Promise<RTCIceServer[] | undefined> {
+  try {
+    const response = await fetch(`${serverBase.replace(/\/$/, '')}/session/${encodeURIComponent(token)}`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) return undefined
+    const body = (await response.json()) as { iceServers?: RTCIceServer[] }
+    const servers = body.iceServers
+    return Array.isArray(servers) && servers.length > 0 ? servers : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export async function startLiveSession(
   serverBase: string,
   token: string,
   displayName: string,
 ): Promise<LiveSession> {
   const peerId = randomPeerId()
+  const iceServers = await fetchIceServers(serverBase, token)
   const messageHandlers: ((message: DataChannelMessage) => void)[] = []
   const statusHandlers: ((status: PeerStatus) => void)[] = []
 
@@ -70,7 +85,7 @@ export async function startLiveSession(
 
   const peer = new PeerSession(
     signaling,
-    { peerId, selfRole: 'Buyer', localAudio },
+    { peerId, selfRole: 'Buyer', localAudio, iceServers },
     {
       onStatus: (status, detail) => {
         console.info('[trovata/web] peer', status, detail ?? '')

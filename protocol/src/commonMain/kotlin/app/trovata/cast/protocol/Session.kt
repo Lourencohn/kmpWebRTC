@@ -15,11 +15,19 @@ data class SessionCreateRequest(
 )
 
 @Serializable
+data class IceServerConfig(
+    val urls: List<String>,
+    val username: String? = null,
+    val credential: String? = null,
+)
+
+@Serializable
 data class SessionCreateResponse(
     val sessionId: String,
     val token: String,
     val url: String,
     val expiresAtMs: Long,
+    val iceServers: List<IceServerConfig> = emptyList(),
 )
 
 @Serializable
@@ -34,6 +42,7 @@ data class SessionInfo(
     val clientEmail: String? = null,
     val createdAtMs: Long,
     val expiresAtMs: Long,
+    val iceServers: List<IceServerConfig> = emptyList(),
 )
 
 @Serializable
