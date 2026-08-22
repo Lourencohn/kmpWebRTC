@@ -210,6 +210,7 @@ private fun LiveCallBody(
                 ) {
                     ProductDetailScreen(
                         product = product,
+                        grade = state.focusedGrade,
                         related = state.products.filter { it.ref != product.ref }.take(6),
                         inCallContext = true,
                         customerName = clientName,

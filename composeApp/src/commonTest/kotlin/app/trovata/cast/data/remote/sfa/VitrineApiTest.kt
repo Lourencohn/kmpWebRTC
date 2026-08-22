@@ -134,6 +134,100 @@ class VitrineApiTest {
     }
 
     @Test
+    fun montaOCaminhoDaGradeDoProduto() = runTest {
+        val requests = mutableListOf<HttpRequestData>()
+        val api = api(body = """{"data":{"id":10,"variacoes":[]}}""", capture = requests)
+
+        api.grade(empresaSlug = "buba", catalogoUuid = "uuid-1", produtoPreId = 10, carrinhoId = 5)
+
+        val request = requests.single()
+        assertEquals("/api/catalogos-links/buba/uuid-1/produtos/10/grades", request.url.encodedPath)
+        assertEquals("5", request.url.parameters["catalogo_carrinho"])
+    }
+
+    @Test
+    fun mapeiaCoresTamanhosESaldo() = runTest {
+        val body = """
+        {
+          "data": {
+            "id": 4821, "id_erp": "22587", "descricao": "Blusa Tricot",
+            "lista_multiplo_venda": "6", "saldo_total_disponivel": 30, "produto_indisponivel": false,
+            "variacoes": [
+              {
+                "complemento_1": { "id": 3, "id_erp": "AZ", "descricao": "AZUL" },
+                "grades": [
+                  {
+                    "complemento_3": null,
+                    "tamanhos": [
+                      { "complemento_2": { "id": 11, "id_erp": "P", "descricao": "P" }, "disponivel": 12, "adicionados_count": 0 },
+                      { "complemento_2": { "id": 12, "id_erp": "M", "descricao": "M" }, "disponivel": "8", "adicionados_count": 6 }
+                    ]
+                  }
+                ],
+                "arquivos": [ { "caminho_thumb": "https://cdn/azul.jpg" } ]
+              },
+              {
+                "complemento_1": { "id": 4, "descricao": "PRETO" },
+                "grades": [ { "tamanhos": [ { "complemento_2": { "id": 13, "descricao": "G" }, "disponivel": 10 } ] } ],
+                "arquivos": []
+              }
+            ]
+          }
+        }
+        """.trimIndent()
+
+        val grade = (api(body = body).grade("buba", "u", 4821) as SfaApiResult.Ok).value
+
+        assertEquals(4821L, grade.produtoPreId)
+        assertEquals(6, grade.multiploVenda)
+        assertEquals(30, grade.saldoTotal)
+        assertEquals(2, grade.cores.size)
+
+        val azul = grade.cores.first()
+        assertEquals(3L, azul.complemento1Id)
+        assertEquals("AZUL", azul.descricao)
+        assertEquals("https://cdn/azul.jpg", azul.imageUrl)
+        assertEquals(listOf("P", "M"), azul.tamanhos.map { it.label })
+        assertEquals(listOf(12, 8), azul.tamanhos.map { it.disponivel })
+        assertEquals(6, azul.tamanhos.last().adicionados)
+        assertEquals(20, azul.saldoTotal)
+
+        val preto = grade.cores.last()
+        assertEquals("PRETO", preto.descricao)
+        assertNull(preto.imageUrl)
+    }
+
+    @Test
+    fun usaVariacaoUnicaQuandoNaoVemListaDeVariacoes() = runTest {
+        val body = """
+        {
+          "data": {
+            "id": 9, "descricao": "Produto nove",
+            "variacoes": [],
+            "variacao": {
+              "complemento_1": { "id": 1, "descricao": "ÚNICA" },
+              "grades": [ { "tamanhos": [ { "complemento_2": { "id": 2, "descricao": "U" }, "disponivel": 4 } ] } ],
+              "arquivos": []
+            }
+          }
+        }
+        """.trimIndent()
+
+        val grade = (api(body = body).grade("buba", "u", 9) as SfaApiResult.Ok).value
+
+        assertEquals(1, grade.cores.size)
+        assertEquals("ÚNICA", grade.cores.single().descricao)
+        assertEquals(4, grade.cores.single().tamanhos.single().disponivel)
+    }
+
+    @Test
+    fun gradeSemDadosViraFalhaDeDominio() = runTest {
+        val fail = api(body = """{"data":null}""").grade("buba", "u", 1) as SfaApiResult.Fail
+
+        assertEquals("grade_vazia", fail.code)
+    }
+
+    @Test
     fun traduzErroDeCatalogoInexistente() = runTest {
         val fail = api(status = HttpStatusCode.NotFound).produtos("buba", "u") as SfaApiResult.Fail
 

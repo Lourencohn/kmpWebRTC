@@ -26,6 +26,7 @@
 | Integração Catálogo Link — Fase 4a (vitrine real no app) | ✅ concluído | (sem commit ainda) | `VitrineApi` sobre a rota pública `/vitrine`; a `LiveCall` mostra os produtos do catálogo link, com preço e ordem do próprio catálogo, paginados |
 | Infra — ICE configurável (pré-TURN) | ✅ concluído | (sem commit ainda) | `iceServers` viajam em `POST /session` e `GET /session/{token}`; app e buyer consomem; TURN entra por variável de ambiente |
 | Limpeza — pedido paralelo removido | ✅ concluído | (sem commit ainda) | `POST /order`, `OrderStore` e os DTOs de submissão saíram; buyer perdeu os módulos órfãos da vitrine antiga |
+| Integração Catálogo Link — Fase 4b (grade real) | ✅ concluído | (sem commit ainda) | `VitrineApi.grade()` sobre `/produtos/{id}/grades`; detalhe do produto na chamada mostra cores e tamanhos reais com saldo, no lugar dos dados fabricados |
 | Integração Catálogo Link — Fase 0 (contrato) | ✅ concluído | (sem commit ainda) | `SessionCreateRequest` por identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`/`OrderPlaced`, URL de convite no `sfa_front`. Ver `prompt.md` e `docs/10-integracao-catalogo-link.md` |
 
 ---
@@ -825,6 +826,35 @@ Caiu de 108 para 100 testes Kotlin e de 67 para 50 no webBuyer. A diferença é 
 
 ---
 
+## Integração Catálogo Link — Fase 4b (grade real no detalhe do produto)
+
+Até aqui, o detalhe do produto na chamada inventava tamanho e cor: `sampleSizesFor` distribuía estoques de uma lista fixa (`24, 36, 18, 6, 12`) e `sampleSwatchesFor` pintava swatches com nomes decorativos ("Verde-musgo", "Areia"). Era a dívida registrada no §10 do `09-mock-to-real-migration.md`, e ficou insustentável quando a listagem passou a ser real: produto verdadeiro com grade inventada engana mais do que mock declarado.
+
+### O que mudou
+
+- **`VitrineApi.grade(empresaSlug, catalogoUuid, produtoPreId, carrinhoId?)`** sobre `GET catalogos-links/{slug}/{uuid}/produtos/{id}/grades`, rota pública como a da vitrine.
+- **`dto/GradeDto.kt`** espelha o `ProdutoComGradeResource`: `variacoes[].complemento_1` (a cor), `variacoes[].grades[].tamanhos[]` com `complemento_2`, `disponivel` e `adicionados_count`, mais `arquivos` por variação. Quando a resposta traz `variacao` no singular em vez da lista, o mapeamento usa ela.
+- **Modelo**: `ProdutoGrade(cores: List<CorGrade>)`, com `CorGrade(complemento1Id, descricao, imageUrl, tamanhos)` e `TamanhoGrade(complemento2Id, label, disponivel, adicionados)`. São exatamente as chaves que o item de carrinho do catálogo link exige (`complemento_1_id` + quantidades por `complemento_2`), então a Fase 5 já encontra o dado no formato certo.
+- **`LiveCallScreenModel`** busca a grade ao abrir o detalhe, com `isLoadingGrade` e `gradeError` no state. Se o vendedor trocar de produto antes da resposta chegar, o resultado atrasado é descartado em vez de sobrescrever o produto novo.
+- **`ProductDetailScreen`** aceita `grade` opcional: quando existe, tamanhos e cores vêm dela; quando não, mantém o comportamento antigo, o que preserva a tela fora da chamada (aba Catálogo) enquanto ela não for ligada.
+
+### Decisões
+
+- **Preço não veio da grade.** O `calculos.preco` das variações usa o value object `Preco` do Laravel, com serialização própria; como o preço já chega pronto na listagem da vitrine, não valia acoplar a mais uma estrutura nesta fatia.
+- **`BigDecimal` do PHP** chega ora como número, ora como string. O `LenientDoubleSerializer` criado para os preços resolve os dois casos, e o teste cobre `"8"` como string.
+
+### Pendências
+
+- **Preço por variação** (cor com preço diferente) continua não modelado.
+- **Cores na aba Catálogo** seguem fabricadas: só a chamada recebe a grade real por enquanto.
+- **`/itens-cores`** não foi consumido; a lista de cores sai das próprias variações da grade.
+
+### Verificação
+- `./gradlew :protocol:jvmTest :signalingServer:test :composeApp:testDebugUnitTest` ✅ (26 + 30 + 48 = 104; 4 novos cobrindo caminho da rota, mapeamento de cores/tamanhos/saldo, `variacao` singular e resposta sem dados)
+- `./gradlew :composeApp:assembleDebug` ✅
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -845,6 +875,7 @@ Caiu de 108 para 100 testes Kotlin e de 67 para 50 no webBuyer. A diferença é 
 | 2026-08-22 | Integração Catálogo Link — Fase 4a fechada: `VitrineApi` sobre a rota pública da vitrine, `LiveCall` mostrando os produtos do catálogo link (preço, ordem e saldo do próprio catálogo) com paginação e estados vazios; `CatalogRepository` sai do fluxo da chamada · 103 testes Kotlin (29 protocol + 30 signaling + 44 composeApp) |
 | 2026-08-22 | Infra: ICE configurável pelo servidor (`ICE_STUN_URLS`/`ICE_TURN_*`), consumido por app e buyer na abertura da conexão · 108 testes Kotlin + 67 webBuyer |
 | 2026-08-22 | Limpeza: `POST /order`/`OrderStore` e os módulos órfãos do buyer removidos; `CartRepository` e `OrderRepository` ficam até a Fase 5 por ainda terem telas dependentes · 100 testes Kotlin + 50 webBuyer |
+| 2026-08-22 | Integração Catálogo Link — Fase 4b fechada: grade real (cores, tamanhos e saldo) no detalhe do produto durante a chamada, no formato que o item de carrinho do catálogo link exige · 104 testes Kotlin + 50 webBuyer |
 | 2026-08-06 | Integração Catálogo Link — Fases 1 e 2 fechadas: app lista catálogos link reais do vendedor (`CatalogLinksApi`, `CatalogLinkPickerScreen`, `Company.slug`), picker de produtos removido, `POST /session` validando contra o Laravel de produção e convite apontando para o `sfa_front`. Descobertos o prefixo `/api` da API Laravel e o 500 mascarado em catálogo expirado · 163 testes totais (29 protocol + 30 signaling + 37 composeApp + 67 webBuyer) |
 | 2026-08-06 | Integração Catálogo Link — Fase 0 fechada: contrato redesenhado no `protocol/` (identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`, `OrderPlaced`), URL de convite apontando para o `sfa_front` com `?live=`, `SessionEvent`/`Codec` removidos · 142 testes totais (29 protocol + 20 signaling + 26 composeApp + 67 webBuyer) |
 | 2026-05-23 | M9 fase 2 (parcial) fechada: `OrderRepository` + `Orders.sq`, "Pedidos fechados hoje" na Home, `POST /order` em memória + buyer envia, PDF via `window.print()` + `@media print`. `SummaryScreen` (métricas) movido pra M12 e push pra M19 · 121 testes totais (24 protocol + 17 signaling + 15 composeApp + 65 webBuyer) |

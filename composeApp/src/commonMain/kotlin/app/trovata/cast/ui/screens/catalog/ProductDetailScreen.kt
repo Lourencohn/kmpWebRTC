@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.data.sample.FashionPalette
+import app.trovata.cast.data.remote.sfa.ProdutoGrade
 import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.sample.ProductSwatchPalette
 import app.trovata.cast.data.sample.ProductTag
@@ -75,6 +76,7 @@ fun ProductDetailScreen(
     product: Product,
     modifier: Modifier = Modifier,
     imageUrls: List<String> = emptyList(),
+    grade: ProdutoGrade? = null,
     related: List<Product> = emptyList(),
     inCallContext: Boolean = false,
     customerName: String? = null,
@@ -85,8 +87,8 @@ fun ProductDetailScreen(
 ) {
     val colors = TrovataTokens.colors
     val images = remember(product.ref, imageUrls) { imageUrls.ifEmpty { listOfNotNull(product.imageUrl) } }
-    val sizes = remember(product.ref) { sampleSizesFor(product) }
-    val swatches = remember(product.ref) { sampleSwatchesFor(product) }
+    val sizes = remember(product.ref, grade) { grade?.toSizeStocks() ?: sampleSizesFor(product) }
+    val swatches = remember(product.ref, grade) { grade?.toColors() ?: sampleSwatchesFor(product) }
     var selectedColor by remember(product.ref) { mutableStateOf(swatches.firstOrNull()?.name) }
     var selectedSize by remember(product.ref) { mutableStateOf(sizes.firstOrNull { it.stock > 0 }?.label ?: sizes.first().label) }
     var galleryIndex by remember(product.ref) { mutableIntStateOf(0) }
@@ -678,4 +680,18 @@ private fun sampleSwatchesFor(product: Product): List<ProductDetailColor> {
     val names = listOf("Verde-musgo", "Areia", "Caramelo", "Grafite")
     val count = product.colorCount.coerceAtLeast(1).coerceAtMost(palette.size)
     return List(count) { i -> ProductDetailColor(name = names[i % names.size], color = palette[i % palette.size]) }
+}
+
+
+private fun ProdutoGrade.toSizeStocks(): List<ProductDetailSizeStock> {
+    val tamanhos = cores.firstOrNull()?.tamanhos.orEmpty()
+    if (tamanhos.isEmpty()) return listOf(ProductDetailSizeStock("Único", saldoTotal))
+    return tamanhos.map { ProductDetailSizeStock(label = it.label, stock = it.disponivel) }
+}
+
+private fun ProdutoGrade.toColors(): List<ProductDetailColor> {
+    val palette = ProductSwatchPalette.swatches
+    return cores.mapIndexed { index, cor ->
+        ProductDetailColor(name = cor.descricao, color = palette[index % palette.size])
+    }
 }

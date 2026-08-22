@@ -3,6 +3,7 @@ package app.trovata.cast.feature.call
 import app.trovata.cast.data.local.CartRepository
 import app.trovata.cast.data.local.OrderRepository
 import app.trovata.cast.data.remote.sfa.SfaApiResult
+import app.trovata.cast.data.remote.sfa.ProdutoGrade
 import app.trovata.cast.data.remote.sfa.VitrineApi
 import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.signaling.SignalingClient
@@ -58,6 +59,9 @@ data class LiveCallUiState(
     val priceCentsByRef: Map<String, Long> = emptyMap(),
     val isLoadingCatalog: Boolean = true,
     val catalogError: String? = null,
+    val focusedGrade: ProdutoGrade? = null,
+    val isLoadingGrade: Boolean = false,
+    val gradeError: String? = null,
     val catalogPage: Int = 1,
     val catalogLastPage: Int = 1,
     val catalogTotal: Int = 0,
@@ -225,14 +229,44 @@ class LiveCallScreenModel(
     }
 
     fun openProductDetail(productId: String) {
-        _state.update { it.copy(focusedProductId = productId, showProductSheet = true) }
+        _state.update {
+            it.copy(
+                focusedProductId = productId,
+                showProductSheet = true,
+                focusedGrade = null,
+                gradeError = null,
+            )
+        }
         val id = produtoPreIdOf(productId) ?: return
+        loadGrade(id)
         peer.publishNavigate(
             ViewState(
                 route = CatalogRoute.Todos,
                 focus = ProductFocus(produtoPreId = id),
             ),
         )
+    }
+
+    private fun loadGrade(produtoPreId: Long) {
+        _state.update { it.copy(isLoadingGrade = true, gradeError = null) }
+        screenModelScope.launch {
+            when (
+                val result = vitrineApi.grade(
+                    empresaSlug = empresaSlug,
+                    catalogoUuid = catalogoUuid,
+                    produtoPreId = produtoPreId,
+                    carrinhoId = carrinhoId,
+                )
+            ) {
+                is SfaApiResult.Fail -> _state.update {
+                    it.copy(isLoadingGrade = false, gradeError = result.message)
+                }
+                is SfaApiResult.Ok -> _state.update {
+                    if (produtoPreIdOf(it.focusedProductId.orEmpty()) != produtoPreId) it
+                    else it.copy(isLoadingGrade = false, focusedGrade = result.value, gradeError = null)
+                }
+            }
+        }
     }
 
     private fun produtoPreIdOf(ref: String): Long? =
