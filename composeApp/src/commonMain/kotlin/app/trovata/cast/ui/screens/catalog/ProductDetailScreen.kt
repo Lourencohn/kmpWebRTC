@@ -87,10 +87,14 @@ fun ProductDetailScreen(
 ) {
     val colors = TrovataTokens.colors
     val images = remember(product.ref, imageUrls) { imageUrls.ifEmpty { listOfNotNull(product.imageUrl) } }
-    val sizes = remember(product.ref, grade) { grade?.toSizeStocks() ?: sampleSizesFor(product) }
+    val sizes = remember(product.ref, grade) {
+        (grade?.toSizeStocks() ?: sampleSizesFor(product)).ifEmpty { listOf(ProductDetailSizeStock("Único", 0)) }
+    }
     val swatches = remember(product.ref, grade) { grade?.toColors() ?: sampleSwatchesFor(product) }
-    var selectedColor by remember(product.ref) { mutableStateOf(swatches.firstOrNull()?.name) }
-    var selectedSize by remember(product.ref) { mutableStateOf(sizes.firstOrNull { it.stock > 0 }?.label ?: sizes.first().label) }
+    var selectedColor by remember(product.ref, swatches) { mutableStateOf(swatches.firstOrNull()?.name) }
+    var selectedSize by remember(product.ref, sizes) {
+        mutableStateOf(sizes.firstOrNull { it.stock > 0 }?.label ?: sizes.first().label)
+    }
     var galleryIndex by remember(product.ref) { mutableIntStateOf(0) }
 
     Box(modifier = modifier.fillMaxSize().background(colors.bg)) {
@@ -666,6 +670,7 @@ private fun Modifier.clickableNoIndication(onClick: () -> Unit): Modifier =
     )
 
 private fun sampleSizesFor(product: Product): List<ProductDetailSizeStock> {
+    if (product.sizes.isEmpty()) return emptyList()
     if (product.sizes.size == 1 && product.sizes.first().equals("Único", ignoreCase = true)) {
         return listOf(ProductDetailSizeStock("Único", 36))
     }

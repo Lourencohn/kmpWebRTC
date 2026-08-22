@@ -4,6 +4,7 @@ import app.trovata.cast.data.auth.AuthRepository
 import app.trovata.cast.data.remote.HttpClientFactory
 import app.trovata.cast.data.remote.SessionsApi
 import app.trovata.cast.data.remote.sfa.AccountApi
+import app.trovata.cast.data.remote.sfa.CarrinhoApi
 import app.trovata.cast.data.remote.sfa.CatalogLinksApi
 import app.trovata.cast.data.remote.sfa.KeycloakAuthService
 import app.trovata.cast.data.remote.sfa.SfaApi
@@ -29,6 +30,12 @@ val networkModule = module {
     single { KeycloakAuthService(get(SfaHttpClient)) }
     single { AccountApi(get(SfaHttpClient)) }
     single { VitrineApi(get(SfaHttpClient)) }
+    single {
+        CarrinhoApi(
+            client = get(SfaHttpClient),
+            tokenProvider = { get<AuthRepository>().accessToken() },
+        )
+    }
     single {
         CatalogLinksApi(
             client = get(SfaHttpClient),
