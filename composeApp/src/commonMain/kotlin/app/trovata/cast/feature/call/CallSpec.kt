@@ -6,6 +6,8 @@ data class CallSpec(
     val empresaSlug: String,
     val catalogoUuid: String,
     val clientName: String?,
+    val clientEmail: String?,
+    val catalogoLinkId: Long?,
     val sellerName: String,
     val collectionLabel: String,
     val clientShop: String? = null,

@@ -106,6 +106,7 @@ class PeerSession(
     private var remotePeerId: String? = null
     private var localStream: MediaStream? = null
     private var presenceJob: Job? = null
+    private var pendingOffer: SignalingMessage.Offer? = null
     private val collectorJobs = mutableListOf<Job>()
 
     suspend fun start() {
@@ -170,6 +171,11 @@ class PeerSession(
         collectorJobs += scope.launch(start = CoroutineStart.UNDISPATCHED) {
             signaling.incoming.collect { handleSignal(it) }
         }
+        pendingOffer?.let { offer ->
+            pendingOffer = null
+            remotePeerId = offer.from
+            answerOffer(connection, offer)
+        }
         collectorJobs += scope.launch {
             _outgoingScroll.filterNotNull().sample(33).collect { message ->
                 val channel = dc ?: return@collect
@@ -204,8 +210,29 @@ class PeerSession(
         )
     }
 
+    private suspend fun answerOffer(connection: PeerConnection, message: SignalingMessage.Offer) {
+        connection.setRemoteDescription(SessionDescription(SessionDescriptionType.Offer, message.sdp))
+        val answer = connection.createAnswer(OfferAnswerOptions())
+        connection.setLocalDescription(answer)
+        log.i { "answer sent to=${message.from}" }
+        signaling.send(
+            SignalingMessage.Answer(
+                sdp = answer.sdp,
+                from = selfPeerId,
+                to = message.from,
+            ),
+        )
+    }
+
     private suspend fun handleSignal(message: SignalingMessage) {
-        val connection = pc ?: return
+        val connection = pc
+        if (connection == null) {
+            if (message is SignalingMessage.Offer) {
+                log.i { "offer bufferizada, peer ainda inicializando" }
+                pendingOffer = message
+            }
+            return
+        }
         when (message) {
             is SignalingMessage.RoomState -> {
                 val other = message.peers.firstOrNull { it.peerId != selfPeerId }
@@ -224,17 +251,7 @@ class PeerSession(
             is SignalingMessage.Offer -> {
                 log.i { "offer from=${message.from}" }
                 remotePeerId = message.from
-                connection.setRemoteDescription(SessionDescription(SessionDescriptionType.Offer, message.sdp))
-                val answer = connection.createAnswer(OfferAnswerOptions())
-                connection.setLocalDescription(answer)
-                log.i { "answer sent to=${message.from}" }
-                signaling.send(
-                    SignalingMessage.Answer(
-                        sdp = answer.sdp,
-                        from = selfPeerId,
-                        to = message.from,
-                    ),
-                )
+                answerOffer(connection, message)
             }
             is SignalingMessage.Answer -> {
                 log.i { "answer from=${message.from}" }
@@ -387,12 +404,13 @@ class PeerSession(
         presenceJob?.cancel()
         collectorJobs.forEach { it.cancel() }
         collectorJobs.clear()
-        dc?.close()
+        runCatching { dc?.close() }
         dc = null
-        localStream?.tracks?.forEach { it.stop() }
+        runCatching { localStream?.tracks?.forEach { it.stop() } }
         localStream = null
-        pc?.close()
+        runCatching { pc?.close() }
         pc = null
+        pendingOffer = null
         _localMuted.value = false
         _remoteMuted.value = false
         _outgoingScroll.value = null

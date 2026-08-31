@@ -1,6 +1,5 @@
 package app.trovata.cast.di
 
-import app.trovata.cast.data.local.CartRepository
 import app.trovata.cast.data.local.CatalogRepository
 import app.trovata.cast.data.local.ClientsRepository
 import app.trovata.cast.data.local.OrderRepository
@@ -9,7 +8,6 @@ import org.koin.dsl.module
 
 val repositoryModule = module {
     single { SessionsRepository(get()) }
-    single { CartRepository(get()) }
     single { OrderRepository(get()) }
     single { CatalogRepository(get()) }
     single { ClientsRepository(get()) }

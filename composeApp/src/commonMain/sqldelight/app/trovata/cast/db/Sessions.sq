@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS SessionEntity (
     clientShop TEXT,
     scheduledFor TEXT,
     createdAtMs INTEGER NOT NULL,
-    expiresAtMs INTEGER NOT NULL
+    expiresAtMs INTEGER NOT NULL,
+    clientEmail TEXT,
+    catalogoLinkId INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS SelectedProductEntity (
@@ -22,46 +24,25 @@ CREATE TABLE IF NOT EXISTS SelectedProductEntity (
 
 CREATE INDEX IF NOT EXISTS idx_selected_session ON SelectedProductEntity(sessionId);
 
-CREATE TABLE IF NOT EXISTS CartLineEntity (
-    sessionId TEXT NOT NULL,
-    sku TEXT NOT NULL,
-    size TEXT NOT NULL,
-    units INTEGER NOT NULL,
-    updatedAtMs INTEGER NOT NULL,
-    PRIMARY KEY (sessionId, sku, size),
-    FOREIGN KEY (sessionId) REFERENCES SessionEntity(sessionId) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_cart_session ON CartLineEntity(sessionId);
-
 insertSession:
-INSERT INTO SessionEntity(sessionId, token, url, sellerName, empresaSlug, catalogoUuid, catalogoNome, clientName, clientShop, scheduledFor, createdAtMs, expiresAtMs)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO SessionEntity(sessionId, token, url, sellerName, empresaSlug, catalogoUuid, catalogoNome, clientName, clientShop, scheduledFor, createdAtMs, expiresAtMs, clientEmail, catalogoLinkId)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 insertSelectedProduct:
 INSERT OR IGNORE INTO SelectedProductEntity(sessionId, sku) VALUES (?, ?);
 
 selectAllSessions:
-SELECT * FROM SessionEntity ORDER BY createdAtMs DESC;
+SELECT sessionId, token, url, sellerName, empresaSlug, catalogoUuid, catalogoNome, clientName, clientEmail, clientShop, catalogoLinkId, scheduledFor, createdAtMs, expiresAtMs
+FROM SessionEntity
+ORDER BY createdAtMs DESC;
 
 selectSessionByToken:
-SELECT * FROM SessionEntity WHERE token = ?;
+SELECT sessionId, token, url, sellerName, empresaSlug, catalogoUuid, catalogoNome, clientName, clientEmail, clientShop, catalogoLinkId, scheduledFor, createdAtMs, expiresAtMs
+FROM SessionEntity
+WHERE token = ?;
 
 selectSelectedProducts:
 SELECT sku FROM SelectedProductEntity WHERE sessionId = ?;
 
 deleteSession:
 DELETE FROM SessionEntity WHERE sessionId = ?;
-
-upsertCartLine:
-INSERT OR REPLACE INTO CartLineEntity(sessionId, sku, size, units, updatedAtMs)
-VALUES (?, ?, ?, ?, ?);
-
-deleteCartLine:
-DELETE FROM CartLineEntity WHERE sessionId = ? AND sku = ? AND size = ?;
-
-selectCartLinesBySession:
-SELECT sku, size, units, updatedAtMs FROM CartLineEntity WHERE sessionId = ? ORDER BY updatedAtMs ASC;
-
-clearCart:
-DELETE FROM CartLineEntity WHERE sessionId = ?;

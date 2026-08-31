@@ -174,7 +174,9 @@ class CatalogLinkPickerScreenModel(
             sellerId = sellerId,
             sellerName = sellerName,
             catalogoNome = link.nome,
+            catalogoLinkId = link.id,
             clientName = snapshot.client.name ?: link.clienteNome,
+            clientEmail = link.clienteEmail,
         )
         val notes = SessionClientNotes(
             shop = snapshot.client.shop ?: link.clienteNome,

@@ -52,12 +52,45 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import org.koin.compose.koinInject
 
-data class InviteScreen(val record: StoredSessionRecord) : Screen {
+data class InviteScreen(
+    val sessionId: String,
+    val token: String,
+    val url: String,
+    val sellerName: String,
+    val empresaSlug: String,
+    val catalogoUuid: String,
+    val catalogoNome: String?,
+    val catalogoLinkId: Long?,
+    val clientName: String?,
+    val clientEmail: String?,
+    val clientShop: String?,
+    val scheduledFor: String?,
+    val createdAtMs: Long,
+    val expiresAtMs: Long,
+) : Screen {
 
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val share = koinInject<ShareController>()
+        val record = remember(token) {
+            StoredSessionRecord(
+                sessionId = sessionId,
+                token = token,
+                url = url,
+                sellerName = sellerName,
+                empresaSlug = empresaSlug,
+                catalogoUuid = catalogoUuid,
+                catalogoNome = catalogoNome,
+                catalogoLinkId = catalogoLinkId,
+                clientName = clientName,
+                clientEmail = clientEmail,
+                clientShop = clientShop,
+                scheduledFor = scheduledFor,
+                createdAtMs = createdAtMs,
+                expiresAtMs = expiresAtMs,
+            )
+        }
         InviteBody(
             record = record,
             share = share,
@@ -72,6 +105,8 @@ data class InviteScreen(val record: StoredSessionRecord) : Screen {
                         catalogoUuid = record.catalogoUuid,
                         sellerName = record.sellerName,
                         clientName = record.clientName,
+                        clientEmail = record.clientEmail,
+                        catalogoLinkId = record.catalogoLinkId,
                         collectionLabel = record.catalogLabel,
                     ),
                 )
@@ -79,6 +114,23 @@ data class InviteScreen(val record: StoredSessionRecord) : Screen {
         )
     }
 }
+
+fun InviteScreen(record: StoredSessionRecord): InviteScreen = InviteScreen(
+    sessionId = record.sessionId,
+    token = record.token,
+    url = record.url,
+    sellerName = record.sellerName,
+    empresaSlug = record.empresaSlug,
+    catalogoUuid = record.catalogoUuid,
+    catalogoNome = record.catalogoNome,
+    catalogoLinkId = record.catalogoLinkId,
+    clientName = record.clientName,
+    clientEmail = record.clientEmail,
+    clientShop = record.clientShop,
+    scheduledFor = record.scheduledFor,
+    createdAtMs = record.createdAtMs,
+    expiresAtMs = record.expiresAtMs,
+)
 
 @Composable
 private fun InviteBody(

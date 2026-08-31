@@ -56,9 +56,9 @@ val callModule = module {
                 spec = spec,
                 signaling = get { parametersOf(spec) },
                 peer = get { parametersOf(spec) },
-                cartRepository = get(),
                 orderRepository = get(),
                 vitrineApi = get(),
+                carrinhoApi = get(),
                 callScope = this,
             )
         }

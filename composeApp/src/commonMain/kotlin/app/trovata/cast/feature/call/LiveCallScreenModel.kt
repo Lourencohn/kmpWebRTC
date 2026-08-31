@@ -1,13 +1,17 @@
 package app.trovata.cast.feature.call
 
-import app.trovata.cast.data.local.CartRepository
 import app.trovata.cast.data.local.OrderRepository
+import app.trovata.cast.data.remote.sfa.CarrinhoApi
+import app.trovata.cast.data.remote.sfa.CarrinhoItemLinha
+import app.trovata.cast.data.remote.sfa.ContextoComercial
+import app.trovata.cast.data.remote.sfa.ItemParaCarrinho
 import app.trovata.cast.data.remote.sfa.SfaApiResult
 import app.trovata.cast.data.remote.sfa.ProdutoGrade
 import app.trovata.cast.data.remote.sfa.VitrineApi
 import app.trovata.cast.data.sample.Product
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.SignalingState
+import app.trovata.cast.protocol.CartChangeHint
 import app.trovata.cast.protocol.CartChangeReason
 import app.trovata.cast.protocol.CatalogRoute
 import app.trovata.cast.protocol.DataChannelMessage
@@ -27,12 +31,31 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import org.koin.core.scope.Scope
 
-data class CartLineUi(
-    val productId: String,
-    val size: String,
+data class CartSizeUi(
+    val complemento2Id: Long?,
+    val label: String,
     val units: Int,
-    val updatedAtMs: Long,
 )
+
+data class CartLineUi(
+    val itemId: Long,
+    val produtoPreId: Long?,
+    val ref: String,
+    val name: String,
+    val color: String?,
+    val units: Int,
+    val totalCents: Long,
+    val sizes: List<CartSizeUi>,
+) {
+    val sizesLabel: String get() = sizes.joinToString(" · ") { "${it.label} ${it.units}un" }
+}
+
+enum class CartStage {
+    Idle,
+    Opening,
+    Ready,
+    Failed,
+}
 
 data class CartToast(
     val text: String,
@@ -55,8 +78,13 @@ data class LiveCallUiState(
     val localMuted: Boolean = false,
     val remoteMuted: Boolean = false,
     val cart: List<CartLineUi> = emptyList(),
+    val cartStage: CartStage = CartStage.Idle,
+    val cartError: String? = null,
+    val carrinhoId: Long? = null,
+    val cartClientName: String? = null,
+    val isSavingItem: Boolean = false,
+    val isFinishingCart: Boolean = false,
     val products: List<Product> = emptyList(),
-    val priceCentsByRef: Map<String, Long> = emptyMap(),
     val isLoadingCatalog: Boolean = true,
     val catalogError: String? = null,
     val focusedGrade: ProdutoGrade? = null,
@@ -82,35 +110,49 @@ data class LiveCallUiState(
         else -> null
     }
     val cartCount: Int get() = cart.sumOf { it.units }
+    val cartTotalCents: Long get() = cart.sumOf { it.totalCents }
+    val canSellToCart: Boolean get() = cartStage == CartStage.Ready && carrinhoId != null
 }
 
 class LiveCallScreenModel(
     private val spec: CallSpec,
     private val signaling: SignalingClient,
     private val peer: PeerSession,
-    private val cartRepository: CartRepository,
     private val orderRepository: OrderRepository,
     private val vitrineApi: VitrineApi,
+    private val carrinhoApi: CarrinhoApi,
     private val callScope: Scope,
 ) : ScreenModel {
 
     private val token = spec.token
     private val sessionId = spec.sessionId
     private val clientName = spec.clientName
+    private val clientEmail = spec.clientEmail
+    private val catalogoLinkId = spec.catalogoLinkId
     private val collectionLabel = spec.collectionLabel
     private val sellerName = spec.sellerName
     private val clientShop = spec.clientShop
     private val empresaSlug = spec.empresaSlug
     private val catalogoUuid = spec.catalogoUuid
-    private val carrinhoId = spec.carrinhoId
+
+    private var contexto: ContextoComercial? = null
+    private var prazoId: Long = 0
 
     private val _state = MutableStateFlow(
-        LiveCallUiState(token = token, role = PeerRole.Seller, collectionLabel = collectionLabel),
+        LiveCallUiState(
+            token = token,
+            role = PeerRole.Seller,
+            collectionLabel = collectionLabel,
+            carrinhoId = spec.carrinhoId,
+        ),
     )
     val state: StateFlow<LiveCallUiState> = _state.asStateFlow()
 
     init {
-        screenModelScope.launch { loadVitrine() }
+        screenModelScope.launch {
+            openCart()
+            loadVitrine()
+        }
         screenModelScope.launch {
             signaling.state.collect { s -> _state.update { it.copy(signaling = s) } }
         }
@@ -137,20 +179,60 @@ class LiveCallScreenModel(
                 _state.update { it.copy(showProductSheet = false, showCartDrawer = false) }
             }
         }
-        screenModelScope.launch {
-            cartRepository.observe(sessionId).collect { lines ->
+    }
+
+    private suspend fun openCart() {
+        val email = clientEmail?.trim().orEmpty()
+        if (email.isBlank()) {
+            _state.update {
+                it.copy(
+                    cartStage = CartStage.Failed,
+                    cartError = "Esse catálogo link não tem e-mail de cliente. Cadastre no Catálogo Link para vender na chamada.",
+                )
+            }
+            return
+        }
+        _state.update { it.copy(cartStage = CartStage.Opening, cartError = null) }
+
+        when (val sessao = carrinhoApi.abrirCarrinho(empresaSlug, catalogoUuid, email)) {
+            is SfaApiResult.Fail -> {
+                _state.update { it.copy(cartStage = CartStage.Failed, cartError = sessao.message) }
+                return
+            }
+            is SfaApiResult.Ok -> {
+                prazoId = sessao.value.prazoId ?: 0
                 _state.update {
-                    it.copy(
-                        cart = lines.map { line ->
-                            CartLineUi(
-                                productId = line.sku,
-                                size = line.size,
-                                units = line.units,
-                                updatedAtMs = line.updatedAtMs,
-                            )
-                        },
-                    )
+                    it.copy(carrinhoId = sessao.value.id, cartClientName = sessao.value.clienteNome)
                 }
+            }
+        }
+
+        when (val resolved = carrinhoApi.contextoComercial(empresaSlug, catalogoUuid)) {
+            is SfaApiResult.Fail -> {
+                _state.update { it.copy(cartStage = CartStage.Failed, cartError = resolved.message) }
+                return
+            }
+            is SfaApiResult.Ok -> contexto = resolved.value
+        }
+
+        _state.update { it.copy(cartStage = CartStage.Ready, cartError = null) }
+        refreshCart()
+    }
+
+    fun retryCart() {
+        if (_state.value.cartStage == CartStage.Opening) return
+        screenModelScope.launch {
+            openCart()
+            loadVitrine(_state.value.catalogPage)
+        }
+    }
+
+    private suspend fun refreshCart() {
+        val carrinhoId = _state.value.carrinhoId ?: return
+        when (val result = carrinhoApi.itens(empresaSlug, catalogoUuid, carrinhoId)) {
+            is SfaApiResult.Fail -> _state.update { it.copy(cartError = result.message) }
+            is SfaApiResult.Ok -> _state.update {
+                it.copy(cart = result.value.map { linha -> linha.toCartLineUi() }, cartError = null)
             }
         }
     }
@@ -162,7 +244,7 @@ class LiveCallScreenModel(
                 empresaSlug = empresaSlug,
                 catalogoUuid = catalogoUuid,
                 page = page,
-                carrinhoId = carrinhoId,
+                carrinhoId = _state.value.carrinhoId,
             )
         ) {
             is SfaApiResult.Fail -> _state.update {
@@ -175,9 +257,6 @@ class LiveCallScreenModel(
                         isLoadingCatalog = false,
                         catalogError = null,
                         products = produtos.map { produto -> produto.toUiProduct() },
-                        priceCentsByRef = produtos.mapNotNull { produto ->
-                            produto.precoCents?.let { produto.ref to it }
-                        }.toMap(),
                         catalogPage = result.value.currentPage,
                         catalogLastPage = result.value.lastPage,
                         catalogTotal = result.value.total,
@@ -255,7 +334,7 @@ class LiveCallScreenModel(
                     empresaSlug = empresaSlug,
                     catalogoUuid = catalogoUuid,
                     produtoPreId = produtoPreId,
-                    carrinhoId = carrinhoId,
+                    carrinhoId = _state.value.carrinhoId,
                 )
             ) {
                 is SfaApiResult.Fail -> _state.update {
@@ -264,6 +343,74 @@ class LiveCallScreenModel(
                 is SfaApiResult.Ok -> _state.update {
                     if (produtoPreIdOf(it.focusedProductId.orEmpty()) != produtoPreId) it
                     else it.copy(isLoadingGrade = false, focusedGrade = result.value, gradeError = null)
+                }
+            }
+        }
+    }
+
+    fun addFocusedProductToCart(complemento1Id: Long?, unitsBySize: Map<Long, Int>) {
+        val snapshot = _state.value
+        val carrinhoId = snapshot.carrinhoId
+        val contextoComercial = contexto
+        val produtoPreId = snapshot.focusedGrade?.produtoPreId
+            ?: produtoPreIdOf(snapshot.focusedProductId.orEmpty())
+        if (carrinhoId == null || contextoComercial == null || produtoPreId == null) {
+            _state.update { it.copy(cartError = "O carrinho do cliente ainda não está pronto") }
+            return
+        }
+        if (complemento1Id == null) {
+            _state.update { it.copy(cartError = "Escolha uma cor para lançar no pedido") }
+            return
+        }
+        val quantidades = unitsBySize.filterValues { it > 0 }
+        if (quantidades.isEmpty()) {
+            _state.update { it.copy(cartError = "Informe a quantidade de ao menos um tamanho") }
+            return
+        }
+        if (snapshot.isSavingItem) return
+        _state.update { it.copy(isSavingItem = true, cartError = null) }
+
+        screenModelScope.launch {
+            val result = carrinhoApi.salvarItem(
+                empresaSlug = empresaSlug,
+                catalogoUuid = catalogoUuid,
+                carrinhoId = carrinhoId,
+                contexto = contextoComercial,
+                prazoId = prazoId,
+                item = ItemParaCarrinho(
+                    produtoPreId = produtoPreId,
+                    complemento1Id = complemento1Id,
+                    quantidadePorTamanho = quantidades,
+                ),
+            )
+            when (result) {
+                is SfaApiResult.Fail -> _state.update {
+                    it.copy(isSavingItem = false, cartError = result.message)
+                }
+                is SfaApiResult.Ok -> {
+                    val units = quantidades.values.sum()
+                    val label = refOf(produtoPreId)
+                    peer.publishCartInvalidated(
+                        carrinhoId = carrinhoId,
+                        reason = CartChangeReason.ItemAdded,
+                        hint = CartChangeHint(
+                            produtoPreId = produtoPreId,
+                            unitsDelta = units,
+                            label = label,
+                        ),
+                    )
+                    _state.update {
+                        it.copy(
+                            isSavingItem = false,
+                            cartError = null,
+                            toast = CartToast(
+                                text = "${units}un de ${label ?: "produto"} no pedido",
+                                createdAtMs = Clock.System.now().toEpochMilliseconds(),
+                            ),
+                        )
+                    }
+                    refreshCart()
+                    loadGrade(produtoPreId)
                 }
             }
         }
@@ -279,6 +426,7 @@ class LiveCallScreenModel(
 
     fun openCartDrawer() {
         _state.update { it.copy(showCartDrawer = true) }
+        screenModelScope.launch { refreshCart() }
     }
 
     fun dismissCartDrawer() {
@@ -286,50 +434,66 @@ class LiveCallScreenModel(
     }
 
     fun dismissProductSheet() {
-        _state.update { it.copy(showProductSheet = false) }
+        _state.update { it.copy(showProductSheet = false, focusedGrade = null) }
+        peer.publishNavigate(ViewState(route = CatalogRoute.Todos))
     }
 
     fun dismissToast() {
         _state.update { it.copy(toast = null) }
     }
 
+    fun clearCartError() {
+        _state.update { it.copy(cartError = null) }
+    }
+
     fun confirmOrder() {
         val current = _state.value
-        if (current.summary != null) return
+        if (current.summary != null || current.isFinishingCart) return
         if (current.cart.isEmpty()) return
-        val ts = Clock.System.now().toEpochMilliseconds()
-        val lines = current.cart.map { line ->
-            OrderLine(
-                productId = line.productId,
-                size = line.size,
-                units = line.units,
-                unitPriceCents = current.priceCentsByRef[line.productId] ?: 0L,
-            )
+        val carrinhoId = current.carrinhoId ?: return
+        val linkId = catalogoLinkId
+        if (linkId == null) {
+            _state.update {
+                it.copy(cartError = "Sessão sem o identificador do catálogo link. Gere o convite novamente.")
+            }
+            return
         }
-        val totalCents = lines.sumOf { it.subtotalCents }
-        val orderId = newOrderId(ts)
-        carrinhoId?.let { peer.publishOrderPlaced(carrinhoId = it, pedidoId = orderId) }
+        _state.update { it.copy(isFinishingCart = true, cartError = null) }
+
         screenModelScope.launch {
-            persistOrder(
-                orderId = orderId,
-                ts = ts,
-                lines = lines,
-                totalCents = totalCents,
-                confirmedByMe = true,
-            )
-        }
-        _state.update {
-            it.copy(
-                summary = OrderSummaryUi(
-                    orderId = orderId,
-                    ts = ts,
-                    lines = lines,
-                    totalCents = totalCents,
-                    confirmedByMe = true,
-                ),
-                showCartDrawer = false,
-                showProductSheet = false,
-            )
+            when (val result = carrinhoApi.marcarProntoParaEnvio(empresaSlug, linkId, carrinhoId)) {
+                is SfaApiResult.Fail -> _state.update {
+                    it.copy(isFinishingCart = false, cartError = result.message)
+                }
+                is SfaApiResult.Ok -> {
+                    val ts = Clock.System.now().toEpochMilliseconds()
+                    val lines = current.cart.flatMap { it.toOrderLines() }
+                    val totalCents = current.cartTotalCents
+                    val orderId = "CAR-$carrinhoId"
+                    peer.publishOrderPlaced(carrinhoId = carrinhoId, pedidoId = orderId)
+                    persistOrder(
+                        orderId = orderId,
+                        ts = ts,
+                        lines = lines,
+                        totalCents = totalCents,
+                        confirmedByMe = true,
+                    )
+                    _state.update {
+                        it.copy(
+                            isFinishingCart = false,
+                            summary = OrderSummaryUi(
+                                orderId = orderId,
+                                ts = ts,
+                                lines = lines,
+                                totalCents = totalCents,
+                                confirmedByMe = true,
+                            ),
+                            showCartDrawer = false,
+                            showProductSheet = false,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -345,7 +509,7 @@ class LiveCallScreenModel(
             orderId = orderId,
             sessionId = sessionId,
             sessionToken = token,
-            clientName = clientName,
+            clientName = _state.value.cartClientName ?: clientName,
             clientShop = clientShop,
             sellerName = sellerName,
             totalCents = totalCents,
@@ -379,6 +543,7 @@ class LiveCallScreenModel(
         _state.update {
             it.copy(toast = CartToast(text = text, createdAtMs = Clock.System.now().toEpochMilliseconds()))
         }
+        screenModelScope.launch { refreshCart() }
     }
 
     override fun onDispose() {
@@ -386,8 +551,35 @@ class LiveCallScreenModel(
     }
 }
 
-private fun newOrderId(ts: Long): String {
-    val tsPart = ts.toString(36).takeLast(6)
-    val suffix = (1..4).map { ('A'..'Z').random() }.joinToString("")
-    return "ORD-$tsPart-$suffix"
+fun CarrinhoItemLinha.toCartLineUi(): CartLineUi = CartLineUi(
+    itemId = itemId,
+    produtoPreId = produtoPreId,
+    ref = ref,
+    name = nome,
+    color = cor,
+    units = quantidade,
+    totalCents = totalCents ?: 0L,
+    sizes = tamanhos.map { CartSizeUi(it.complemento2Id, it.label, it.quantidade) },
+)
+
+private fun CartLineUi.toOrderLines(): List<OrderLine> {
+    val unitPriceCents = if (units > 0) totalCents / units else 0L
+    if (sizes.isEmpty()) {
+        return listOf(
+            OrderLine(
+                productId = ref,
+                size = "Único",
+                units = units,
+                unitPriceCents = unitPriceCents,
+            ),
+        )
+    }
+    return sizes.map { size ->
+        OrderLine(
+            productId = ref,
+            size = size.label,
+            units = size.units,
+            unitPriceCents = unitPriceCents,
+        )
+    }
 }

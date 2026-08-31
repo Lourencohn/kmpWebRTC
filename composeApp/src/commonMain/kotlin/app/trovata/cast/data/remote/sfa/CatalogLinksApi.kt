@@ -95,6 +95,7 @@ fun CatalogoLinkDto.toSellerCatalogLink(): SellerCatalogLink {
         uuid = uuid,
         nome = descricao?.takeIf { it.isNotBlank() } ?: clienteNome ?: "Catálogo $id",
         clienteNome = clienteNome,
+        clienteEmail = eMail?.takeIf { it.isNotBlank() },
         vendedorNome = vendedor?.nomeFantasia ?: vendedor?.razaoSocial,
         ativo = situacao == null || situacao.equals("A", ignoreCase = true),
         expirado = expirado == true,

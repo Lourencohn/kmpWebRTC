@@ -24,9 +24,10 @@ if (!root) {
   throw new Error('app root not found')
 }
 
+const HOSTED_SIGNALING_BASE = 'https://trovatacast-signaling.fly.dev'
+
 const SERVER_BASE =
-  (import.meta.env.VITE_SIGNALING_BASE as string | undefined) ??
-  (import.meta.env.PROD ? window.location.origin : 'http://localhost:8080')
+  (import.meta.env.VITE_SIGNALING_BASE as string | undefined) ?? HOSTED_SIGNALING_BASE
 
 function tokenFromUrl(): string | null {
   const params = new URLSearchParams(window.location.search)

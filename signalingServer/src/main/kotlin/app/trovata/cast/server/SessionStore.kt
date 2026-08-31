@@ -22,6 +22,7 @@ data class StoredSession(
         catalogoUuid = request.catalogoUuid,
         sellerName = request.sellerName,
         catalogoNome = request.catalogoNome,
+        catalogoLinkId = request.catalogoLinkId,
         carrinhoId = request.carrinhoId,
         clientName = request.clientName,
         clientEmail = request.clientEmail,

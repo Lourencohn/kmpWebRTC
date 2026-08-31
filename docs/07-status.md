@@ -855,6 +855,40 @@ Até aqui, o detalhe do produto na chamada inventava tamanho e cor: `sampleSizes
 
 ---
 
+## Integração Catálogo Link — Fase 5 (a televenda grava no carrinho do cliente)
+
+### O problema
+
+Até aqui o app mostrava a vitrine e a grade reais, mas o pedido continuava numa cópia local (`CartRepository` em SQLDelight). O que o vendedor lançava na chamada não existia para o Catálogo Link: o cliente não via, o backoffice não via, e nada virava pedido. A venda estava sendo feita duas vezes, em dois lugares que não se falavam.
+
+### O que mudou
+
+- **`clientEmail` e `catalogoLinkId` atravessam o caminho todo.** Os dois vinham do catálogo escolhido e se perdiam antes da chamada. Agora vão no `SessionCreateRequest`/`SessionInfo`, na tabela local de sessões (migração `1.sqm`, schema na versão 2) e no `CallSpec`. Sem o e-mail não há carrinho; sem o id numérico não há "pronto para envio".
+- **O carrinho abre junto com a chamada.** `LiveCallScreenModel` chama `POST .../login` com o e-mail do catálogo link, retomando o carrinho "Digitando" do cliente, e resolve tabela de preço e tipo de venda em seguida. O `carrinhoId` resultante passa a alimentar a vitrine e a grade, então `is_carrinho` e `adicionados_count` chegam certos.
+- **Quantidade por tamanho no detalhe do produto.** A cor selecionada troca a grade exibida, cada tamanho tem stepper no múltiplo de venda do catálogo, iniciado com o que já está no carrinho, e o botão lança tudo de uma vez em `POST .../itens-multiple`.
+- **A gaveta lê o Laravel.** As linhas vêm de `carrinhos/{id}/itens-para-rota-publica`, com tamanhos, quantidades e valores calculados pelo backend.
+- **O fechamento é "pronto para envio".** `PATCH empresa/{slug}/catalogos-links/{id}/carrinhos/{id}` na rota privada, com o Bearer do vendedor.
+- **`CartRepository` saiu**, junto com a tabela `CartLineEntity`.
+
+### Decisões
+
+- **Retomar o carrinho do cliente, não criar outro.** `POST .../carrinhos` clona um carrinho existente; quem cria de fato é o `login` por e-mail. Retomar mantém vendedor e cliente no mesmo carrinho.
+- **Preço lido por `numerador`/`denominador`.** O `PrecoTransformer` do Laravel serializa `valor` como decimal com ponto (`"144.900000"`), formato que o parser BR do projeto interpretaria errado. A fração é exata e não depende de locale.
+- **Quantidade zero não é enviada**, igual ao `use-adicao-produto-dialog` do `sfa_front`: o payload leva o total absoluto por tamanho, não um delta.
+- **`OrderRepository` fica.** O fechamento continua gerando registro local (`CAR-{carrinhoId}`) porque Home, Insights e Conta leem dele.
+
+### Pendências
+
+- **Remover item do carrinho** pelo app (existe `DELETE .../itens/{id}`, ainda não consumido).
+- **Prazo e desconto** seguem como o carrinho já os tem; o app não os edita.
+- **`carrinhos-resumo/{id}` está quebrada no `sfa_back`**: a rota aponta para `CatalogoCarrinhoController::showPublic`, método que não existe no controller. O app usa `carrinhos/{id}` (`show`), que existe.
+
+### Verificação
+- `./gradlew :composeApp:testDebugUnitTest :protocol:allTests :signalingServer:test` ✅ (64 no composeApp, 7 novos cobrindo listagem de itens, rota do resumo, carrinho vazio, mapeamento de linha e leitura de preço fracionário)
+- `./gradlew :composeApp:compileKotlinIosSimulatorArm64 :signalingServer:build` ✅
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -879,3 +913,4 @@ Até aqui, o detalhe do produto na chamada inventava tamanho e cor: `sampleSizes
 | 2026-08-06 | Integração Catálogo Link — Fases 1 e 2 fechadas: app lista catálogos link reais do vendedor (`CatalogLinksApi`, `CatalogLinkPickerScreen`, `Company.slug`), picker de produtos removido, `POST /session` validando contra o Laravel de produção e convite apontando para o `sfa_front`. Descobertos o prefixo `/api` da API Laravel e o 500 mascarado em catálogo expirado · 163 testes totais (29 protocol + 30 signaling + 37 composeApp + 67 webBuyer) |
 | 2026-08-06 | Integração Catálogo Link — Fase 0 fechada: contrato redesenhado no `protocol/` (identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`, `OrderPlaced`), URL de convite apontando para o `sfa_front` com `?live=`, `SessionEvent`/`Codec` removidos · 142 testes totais (29 protocol + 20 signaling + 26 composeApp + 67 webBuyer) |
 | 2026-05-23 | M9 fase 2 (parcial) fechada: `OrderRepository` + `Orders.sq`, "Pedidos fechados hoje" na Home, `POST /order` em memória + buyer envia, PDF via `window.print()` + `@media print`. `SummaryScreen` (métricas) movido pra M12 e push pra M19 · 121 testes totais (24 protocol + 17 signaling + 15 composeApp + 65 webBuyer) |
+| 2026-08-30 | Integração Catálogo Link — Fase 5 fechada: `clientEmail`/`catalogoLinkId` propagados até a chamada (migração SQLDelight v2), carrinho do cliente aberto por e-mail, quantidade por tamanho no detalhe, gaveta lendo `itens-para-rota-publica` e fechamento por "pronto para envio"; `CartRepository` removido · 64 testes no composeApp |

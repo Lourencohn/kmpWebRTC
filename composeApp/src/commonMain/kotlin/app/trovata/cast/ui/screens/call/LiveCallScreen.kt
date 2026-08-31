@@ -45,6 +45,7 @@ import app.trovata.cast.data.sample.Product
 import app.trovata.cast.di.CallSession
 import app.trovata.cast.feature.call.CallSpec
 import app.trovata.cast.feature.call.CartLineUi
+import app.trovata.cast.feature.call.CartStage
 import app.trovata.cast.feature.call.CartToast
 import app.trovata.cast.feature.call.LiveCallScreenModel
 import app.trovata.cast.feature.call.LiveCallUiState
@@ -79,6 +80,8 @@ data class LiveCallScreen(
     val catalogoUuid: String,
     val sellerName: String,
     val clientName: String?,
+    val clientEmail: String? = null,
+    val catalogoLinkId: Long? = null,
     val collectionLabel: String = "",
 ) : Screen {
 
@@ -94,6 +97,8 @@ data class LiveCallScreen(
                 empresaSlug = empresaSlug,
                 catalogoUuid = catalogoUuid,
                 clientName = clientName,
+                clientEmail = clientEmail,
+                catalogoLinkId = catalogoLinkId,
                 sellerName = sellerName,
                 collectionLabel = collectionLabel,
                 sellerPeerId = sellerPeerId,
@@ -126,6 +131,9 @@ data class LiveCallScreen(
             onDismissCart = { screenModel.dismissCartDrawer() },
             onDismissProductSheet = { screenModel.dismissProductSheet() },
             onConfirmOrder = { screenModel.confirmOrder() },
+            onAddToCart = { corId, units -> screenModel.addFocusedProductToCart(corId, units) },
+            onRetryCart = { screenModel.retryCart() },
+            onDismissCartError = { screenModel.clearCartError() },
             onRetryCatalog = { screenModel.reloadVitrine() },
             onPrevCatalogPage = { screenModel.prevCatalogPage() },
             onNextCatalogPage = { screenModel.nextCatalogPage() },
@@ -146,6 +154,9 @@ private fun LiveCallBody(
     onDismissCart: () -> Unit,
     onDismissProductSheet: () -> Unit,
     onConfirmOrder: () -> Unit,
+    onAddToCart: (complemento1Id: Long?, unitsBySize: Map<Long, Int>) -> Unit,
+    onRetryCart: () -> Unit,
+    onDismissCartError: () -> Unit,
     onRetryCatalog: () -> Unit,
     onPrevCatalogPage: () -> Unit,
     onNextCatalogPage: () -> Unit,
@@ -214,8 +225,11 @@ private fun LiveCallBody(
                         related = state.products.filter { it.ref != product.ref }.take(6),
                         inCallContext = true,
                         customerName = clientName,
+                        canSell = state.canSellToCart,
+                        isSaving = state.isSavingItem,
                         onBack = onDismissProductSheet,
                         onPointAt = onPointAt,
+                        onAddToCart = onAddToCart,
                     )
                 }
             }
@@ -227,6 +241,18 @@ private fun LiveCallBody(
                 productByRef = productByRef,
                 onDismiss = onDismissCart,
                 onConfirmOrder = onConfirmOrder,
+            )
+        }
+
+        state.cartError?.let { message ->
+            CartErrorBanner(
+                message = message,
+                canRetry = state.cartStage == CartStage.Failed,
+                onRetry = onRetryCart,
+                onDismiss = onDismissCartError,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 116.dp, start = 16.dp, end = 16.dp),
             )
         }
 
@@ -588,9 +614,6 @@ private fun CartDrawer(
     onConfirmOrder: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
-    val total = state.cart.sumOf { line ->
-        (state.priceCentsByRef[line.productId] ?: 0L) * line.units
-    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -614,13 +637,20 @@ private fun CartDrawer(
                     .background(colors.line, RoundedCornerShape(2.dp)),
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Pedido em construção",
-                    color = colors.ink,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Pedido em construção",
+                        color = colors.ink,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = cartSubtitleFor(state),
+                        color = colors.ink3,
+                        fontSize = 11.5.sp,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
                 IconBtn(
                     icon = TrovataIcons.chev,
                     onClick = onDismiss,
@@ -635,22 +665,23 @@ private fun CartDrawer(
                 LazyColumn(
                     modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
                 ) {
-                    items(state.cart, key = { it.productId + "/" + it.size }) { line ->
-                        CartRow(
-                            line = line,
-                            product = productByRef[line.productId],
-                            unitPriceCents = state.priceCentsByRef[line.productId] ?: 0L,
-                        )
+                    items(state.cart, key = { it.itemId }) { line ->
+                        CartRow(line = line, product = productByRef[line.ref])
                     }
                 }
-                CartTotalBar(units = state.cart.sumOf { it.units }, totalCents = total)
+                CartTotalBar(units = state.cartCount, totalCents = state.cartTotalCents)
                 Spacer(modifier = Modifier.height(2.dp))
                 Btn(
-                    text = "Confirmar pedido · ${formatBrl(total)}",
+                    text = if (state.isFinishingCart) {
+                        "Enviando..."
+                    } else {
+                        "Marcar pronto para envio · ${formatBrl(state.cartTotalCents)}"
+                    },
                     onClick = onConfirmOrder,
                     kind = BtnKind.Jade,
                     size = BtnSize.Lg,
                     icon = TrovataIcons.check,
+                    enabled = !state.isFinishingCart,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -658,33 +689,99 @@ private fun CartDrawer(
     }
 }
 
+private fun cartSubtitleFor(state: LiveCallUiState): String = when (state.cartStage) {
+    CartStage.Idle -> "Preparando o carrinho do cliente"
+    CartStage.Opening -> "Abrindo o carrinho do cliente"
+    CartStage.Failed -> state.cartError ?: "Carrinho indisponível"
+    CartStage.Ready -> {
+        val cliente = state.cartClientName?.takeIf { it.isNotBlank() }
+        if (cliente != null) "Carrinho de $cliente no Catálogo Link" else "Carrinho aberto no Catálogo Link"
+    }
+}
+
 @Composable
-private fun CartRow(line: CartLineUi, product: Product?, unitPriceCents: Long) {
+private fun CartErrorBanner(
+    message: String,
+    canRetry: Boolean,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = TrovataTokens.colors
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(colors.surface, RoundedCornerShape(14.dp))
+            .border(1.dp, colors.line, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = message,
+            color = colors.ink2,
+            fontSize = 12.sp,
+            modifier = Modifier.weight(1f),
+        )
+        if (canRetry) {
+            Btn(
+                text = "Tentar de novo",
+                onClick = onRetry,
+                kind = BtnKind.Surface,
+                size = BtnSize.Sm,
+            )
+        }
+        IconBtn(
+            icon = TrovataIcons.chevDown,
+            onClick = onDismiss,
+            kind = IconBtnKind.Line,
+            size = 32.dp,
+            contentDescription = "Fechar aviso",
+        )
+    }
+}
+
+@Composable
+private fun CartRow(line: CartLineUi, product: Product?) {
+    val colors = TrovataTokens.colors
+    val trailing: @Composable () -> Unit = {
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = line.sizesLabel.ifBlank { "${line.units}un" },
+                color = colors.ink3,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = formatBrl(line.totalCents),
+                color = colors.ink,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
     if (product == null) {
-        Text(text = "${line.productId} · ${line.size} · ${line.units}un", color = colors.ink2)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = line.name, color = colors.ink, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    text = listOfNotNull(line.ref, line.color).joinToString(" · "),
+                    color = colors.ink3,
+                    fontSize = 11.sp,
+                )
+            }
+            trailing()
+        }
         return
     }
     ProductRow(
         product = product,
         size = ProductRowSize.Md,
         quantity = line.units,
-        trailing = {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "Tam ${line.size}",
-                    color = colors.ink3,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    text = formatBrl(unitPriceCents * line.units),
-                    color = colors.ink,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        },
+        trailing = trailing,
     )
 }
 

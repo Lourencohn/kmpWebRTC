@@ -5,6 +5,7 @@ data class SellerCatalogLink(
     val uuid: String,
     val nome: String,
     val clienteNome: String?,
+    val clienteEmail: String?,
     val vendedorNome: String?,
     val ativo: Boolean,
     val expirado: Boolean,

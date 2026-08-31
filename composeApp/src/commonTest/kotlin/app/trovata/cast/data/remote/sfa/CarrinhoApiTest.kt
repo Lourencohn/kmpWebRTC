@@ -160,6 +160,78 @@ class CarrinhoApiTest {
     }
 
     @Test
+    fun resumoLeOCarrinhoPelaRotaPublicaDoCatalogo() = runTest {
+        val requests = mutableListOf<HttpRequestData>()
+        val api = api(
+            respostas = mapOf(
+                "/carrinhos/907" to """{"data":{"id":907,"itens":2,"situacao":"Digitando","nome_cliente":"Loja do Diego"}}""",
+            ),
+            capture = requests,
+        )
+
+        val carrinho = (api.resumo("buba", "uuid-1", 907) as SfaApiResult.Ok).value
+
+        assertEquals("/api/catalogos-links/buba/uuid-1/carrinhos/907", requests.single().url.encodedPath)
+        assertEquals(2, carrinho.itens)
+    }
+
+    @Test
+    fun listaItensDoCarrinhoComTamanhosEValores() = runTest {
+        val corpo = """
+        {
+          "data": [{
+            "id": 51, "tipo": "produto", "catalogo_carrinho_id": 907,
+            "produto_pre_id": 4821, "produto_pre_1_id": 9012, "sequencia": 1,
+            "quantidades": { "total": 18, "por_caixa": null, "multiplicador": null },
+            "valores": {
+              "unitario": { "numerador": "1449", "denominador": "10", "valor": "144.900000", "formatado": "R$ 144.90" },
+              "total": { "numerador": "26082", "denominador": "10", "valor": "2608.200000" }
+            },
+            "produto": { "id": 4821, "id_erp": "22587", "descricao": "Blusa Tricot" },
+            "arquivo": { "caminho_thumb": "https://cdn/t.jpg" },
+            "variacao": { "complemento_1": { "id": 3, "descricao": "AZUL" } },
+            "grades": [
+              { "complemento_2": { "id": 11, "descricao": "P" }, "carrinho_item_grade": { "id": 1, "quantidade": 12 } },
+              { "complemento_2": { "id": 12, "descricao": "M" }, "carrinho_item_grade": { "id": 2, "quantidade": 6 } },
+              { "complemento_2": { "id": 13, "descricao": "G" }, "carrinho_item_grade": null }
+            ]
+          }],
+          "meta": { "current_page": 1, "last_page": 1, "per_page": 50, "total": 1 }
+        }
+        """.trimIndent()
+        val requests = mutableListOf<HttpRequestData>()
+        val api = api(respostas = mapOf("itens-para-rota-publica" to corpo), capture = requests)
+
+        val itens = (api.itens("buba", "uuid-1", 907) as SfaApiResult.Ok).value
+
+        assertEquals(
+            "/api/catalogos-links/buba/uuid-1/carrinhos/907/itens-para-rota-publica",
+            requests.single().url.encodedPath,
+        )
+        val linha = itens.single()
+        assertEquals(51L, linha.itemId)
+        assertEquals(4821L, linha.produtoPreId)
+        assertEquals("22587", linha.ref)
+        assertEquals("Blusa Tricot", linha.nome)
+        assertEquals("AZUL", linha.cor)
+        assertEquals("https://cdn/t.jpg", linha.imageUrl)
+        assertEquals(18, linha.quantidade)
+        assertEquals(14490L, linha.unitarioCents)
+        assertEquals(260820L, linha.totalCents)
+        assertEquals(listOf("P", "M"), linha.tamanhos.map { it.label })
+        assertEquals(listOf(12, 6), linha.tamanhos.map { it.quantidade })
+    }
+
+    @Test
+    fun carrinhoVazioNaoViraErro() = runTest {
+        val api = api(respostas = mapOf("itens-para-rota-publica" to """{"data":[],"meta":{"total":0}}"""))
+
+        val itens = (api.itens("buba", "uuid-1", 907) as SfaApiResult.Ok).value
+
+        assertTrue(itens.isEmpty())
+    }
+
+    @Test
     fun marcarProntoUsaARotaPrivadaComBearer() = runTest {
         val requests = mutableListOf<HttpRequestData>()
         val api = api(capture = requests)

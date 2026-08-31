@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -64,11 +65,15 @@ import org.jetbrains.compose.resources.painterResource
 data class ProductDetailSizeStock(
     val label: String,
     val stock: Int,
+    val complemento2Id: Long? = null,
+    val inCart: Int = 0,
 )
 
 data class ProductDetailColor(
     val name: String,
     val color: Color,
+    val complemento1Id: Long? = null,
+    val sizes: List<ProductDetailSizeStock> = emptyList(),
 )
 
 @Composable
@@ -80,27 +85,43 @@ fun ProductDetailScreen(
     related: List<Product> = emptyList(),
     inCallContext: Boolean = false,
     customerName: String? = null,
+    canSell: Boolean = false,
+    isSaving: Boolean = false,
     onBack: () -> Unit,
     onPointAt: ((String) -> Unit)? = null,
+    onAddToCart: ((complemento1Id: Long?, unitsBySize: Map<Long, Int>) -> Unit)? = null,
     onShareLink: ((Product) -> Unit)? = null,
     onStartSession: ((Product) -> Unit)? = null,
 ) {
     val colors = TrovataTokens.colors
     val images = remember(product.ref, imageUrls) { imageUrls.ifEmpty { listOfNotNull(product.imageUrl) } }
-    val sizes = remember(product.ref, grade) {
-        (grade?.toSizeStocks() ?: sampleSizesFor(product)).ifEmpty { listOf(ProductDetailSizeStock("Único", 0)) }
+    val swatches = remember(product.ref, grade) {
+        (grade?.toColors() ?: sampleSwatchesFor(product)).ifEmpty {
+            listOf(ProductDetailColor(name = "Único", color = ProductSwatchPalette.swatches.first()))
+        }
     }
-    val swatches = remember(product.ref, grade) { grade?.toColors() ?: sampleSwatchesFor(product) }
-    var selectedColor by remember(product.ref, swatches) { mutableStateOf(swatches.firstOrNull()?.name) }
+    var selectedColor by remember(product.ref, swatches) { mutableStateOf(swatches.first().name) }
+    val activeSwatch = swatches.firstOrNull { it.name == selectedColor } ?: swatches.first()
+    val sizes = remember(product.ref, activeSwatch) {
+        activeSwatch.sizes.ifEmpty { sampleSizesFor(product) }
+            .ifEmpty { listOf(ProductDetailSizeStock(label = "Único", stock = 0)) }
+    }
     var selectedSize by remember(product.ref, sizes) {
         mutableStateOf(sizes.firstOrNull { it.stock > 0 }?.label ?: sizes.first().label)
     }
+    val step = remember(grade, product.moq) { (grade?.multiploVenda ?: product.moq).coerceAtLeast(1) }
+    var units by remember(product.ref, activeSwatch) {
+        mutableStateOf(sizes.mapNotNull { size -> size.complemento2Id?.let { it to size.inCart } }.toMap())
+    }
+    val sellable = canSell && onAddToCart != null && activeSwatch.complemento1Id != null &&
+        sizes.any { it.complemento2Id != null }
+    val totalUnits = units.values.sum()
     var galleryIndex by remember(product.ref) { mutableIntStateOf(0) }
 
     Box(modifier = modifier.fillMaxSize().background(colors.bg)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 56.dp, bottom = 120.dp),
+            contentPadding = PaddingValues(top = 56.dp, bottom = if (sellable) 168.dp else 120.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item {
@@ -132,7 +153,13 @@ fun ProductDetailScreen(
                 StockBySize(
                     sizes = sizes,
                     selectedLabel = selectedSize,
+                    sellable = sellable,
+                    step = step,
+                    units = units,
                     onSelect = { selectedSize = it },
+                    onUnitsChange = { complemento2Id, value ->
+                        units = units + (complemento2Id to value)
+                    },
                 )
             }
             item {
@@ -149,7 +176,11 @@ fun ProductDetailScreen(
 
         DetailActionBar(
             inCallContext = inCallContext,
+            sellable = sellable,
+            isSaving = isSaving,
+            totalUnits = totalUnits,
             onPointAt = { onPointAt?.invoke(product.ref) },
+            onAddToCart = { onAddToCart?.invoke(activeSwatch.complemento1Id, units) },
             onShare = { onShareLink?.invoke(product) },
             onStartSession = { onStartSession?.invoke(product) },
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -446,13 +477,23 @@ private fun ColorSwatches(
 private fun StockBySize(
     sizes: List<ProductDetailSizeStock>,
     selectedLabel: String,
+    sellable: Boolean,
+    step: Int,
+    units: Map<Long, Int>,
     onSelect: (String) -> Unit,
+    onUnitsChange: (complemento2Id: Long, units: Int) -> Unit,
 ) {
     val colors = TrovataTokens.colors
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         SectionLabel(
-            text = "Grade · estoque por tamanho",
-            action = { Pill(text = "Em estoque", tone = PillTone.Jade, icon = TrovataIcons.check) },
+            text = if (sellable) "Grade · quantidade por tamanho" else "Grade · estoque por tamanho",
+            action = {
+                if (sellable) {
+                    Pill(text = "Múltiplo ${step}un", tone = PillTone.Brand)
+                } else {
+                    Pill(text = "Em estoque", tone = PillTone.Jade, icon = TrovataIcons.check)
+                }
+            },
         )
         Column(
             modifier = Modifier
@@ -497,9 +538,9 @@ private fun StockBySize(
                         )
                         Text(
                             text = when {
-                                size.stock >= 12 -> "Disponibilidade alta"
-                                size.stock >= 6 -> "Estoque limitado"
-                                size.stock > 0 -> "Pouquíssimas peças"
+                                size.stock >= 12 -> "${size.stock}un disponíveis"
+                                size.stock >= 6 -> "Estoque limitado · ${size.stock}un"
+                                size.stock > 0 -> "Pouquíssimas peças · ${size.stock}un"
                                 else -> "Esgotado"
                             },
                             color = colors.ink3,
@@ -507,23 +548,32 @@ private fun StockBySize(
                             modifier = Modifier.padding(top = 1.dp),
                         )
                     }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = size.stock.toString(),
-                            color = colors.ink,
-                            style = TrovataTokens.type.mono.copy(
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.01).em,
-                            ),
+                    if (sellable && size.complemento2Id != null) {
+                        SizeStepper(
+                            value = units[size.complemento2Id] ?: 0,
+                            step = step,
+                            max = size.stock,
+                            onChange = { onUnitsChange(size.complemento2Id, it) },
                         )
-                        Text(
-                            text = "UN",
-                            color = colors.ink4,
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.08.em,
-                        )
+                    } else {
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = size.stock.toString(),
+                                color = colors.ink,
+                                style = TrovataTokens.type.mono.copy(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = (-0.01).em,
+                                ),
+                            )
+                            Text(
+                                text = "UN",
+                                color = colors.ink4,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.08.em,
+                            )
+                        }
                     }
                 }
                 if (index < sizes.lastIndex) {
@@ -531,6 +581,48 @@ private fun StockBySize(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SizeStepper(
+    value: Int,
+    step: Int,
+    max: Int,
+    onChange: (Int) -> Unit,
+) {
+    val colors = TrovataTokens.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        IconBtn(
+            icon = TrovataIcons.minus,
+            onClick = { onChange((value - step).coerceAtLeast(0)) },
+            kind = IconBtnKind.Line,
+            size = 32.dp,
+            contentDescription = "Diminuir quantidade",
+        )
+        Text(
+            text = value.toString(),
+            color = if (value > 0) colors.ink else colors.ink4,
+            style = TrovataTokens.type.mono.copy(
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+            ),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(36.dp),
+        )
+        IconBtn(
+            icon = TrovataIcons.plus,
+            onClick = {
+                val next = value + step
+                onChange(if (max > 0) next.coerceAtMost(max) else next)
+            },
+            kind = IconBtnKind.Line,
+            size = 32.dp,
+            contentDescription = "Aumentar quantidade",
+        )
     }
 }
 
@@ -609,54 +701,73 @@ private fun RelatedProducts(products: List<Product>) {
 @Composable
 private fun DetailActionBar(
     inCallContext: Boolean,
+    sellable: Boolean,
+    isSaving: Boolean,
+    totalUnits: Int,
     onPointAt: () -> Unit,
+    onAddToCart: () -> Unit,
     onShare: () -> Unit,
     onStartSession: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = TrovataTokens.colors
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .background(colors.surface)
             .border(1.dp, colors.line, RoundedCornerShape(0.dp))
             .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        IconBtn(
-            icon = TrovataIcons.heart,
-            onClick = {},
-            kind = IconBtnKind.Line,
-            size = 44.dp,
-            contentDescription = "Favoritar",
-        )
-        if (inCallContext) {
+        if (sellable) {
             Btn(
-                text = "Apontar agora",
-                onClick = onPointAt,
-                kind = BtnKind.Primary,
-                size = BtnSize.Md,
-                icon = TrovataIcons.pointer,
-                modifier = Modifier.weight(1f),
+                text = if (totalUnits > 0) "Lançar ${totalUnits}un no pedido" else "Escolha a quantidade",
+                onClick = onAddToCart,
+                kind = BtnKind.Jade,
+                size = BtnSize.Lg,
+                icon = TrovataIcons.check,
+                enabled = totalUnits > 0 && !isSaving,
+                modifier = Modifier.fillMaxWidth(),
             )
-        } else {
-            Btn(
-                text = "Compartilhar",
-                onClick = onShare,
-                kind = BtnKind.Surface,
-                size = BtnSize.Md,
-                icon = TrovataIcons.share,
-                modifier = Modifier.weight(1f),
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconBtn(
+                icon = TrovataIcons.heart,
+                onClick = {},
+                kind = IconBtnKind.Line,
+                size = 44.dp,
+                contentDescription = "Favoritar",
             )
-            Btn(
-                text = "Iniciar sessão",
-                onClick = onStartSession,
-                kind = BtnKind.Primary,
-                size = BtnSize.Md,
-                icon = TrovataIcons.video,
-                modifier = Modifier.weight(1.3f),
-            )
+            if (inCallContext) {
+                Btn(
+                    text = "Apontar agora",
+                    onClick = onPointAt,
+                    kind = BtnKind.Primary,
+                    size = BtnSize.Md,
+                    icon = TrovataIcons.pointer,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Btn(
+                    text = "Compartilhar",
+                    onClick = onShare,
+                    kind = BtnKind.Surface,
+                    size = BtnSize.Md,
+                    icon = TrovataIcons.share,
+                    modifier = Modifier.weight(1f),
+                )
+                Btn(
+                    text = "Iniciar sessão",
+                    onClick = onStartSession,
+                    kind = BtnKind.Primary,
+                    size = BtnSize.Md,
+                    icon = TrovataIcons.video,
+                    modifier = Modifier.weight(1.3f),
+                )
+            }
         }
     }
 }
@@ -688,15 +799,21 @@ private fun sampleSwatchesFor(product: Product): List<ProductDetailColor> {
 }
 
 
-private fun ProdutoGrade.toSizeStocks(): List<ProductDetailSizeStock> {
-    val tamanhos = cores.firstOrNull()?.tamanhos.orEmpty()
-    if (tamanhos.isEmpty()) return listOf(ProductDetailSizeStock("Único", saldoTotal))
-    return tamanhos.map { ProductDetailSizeStock(label = it.label, stock = it.disponivel) }
-}
-
 private fun ProdutoGrade.toColors(): List<ProductDetailColor> {
     val palette = ProductSwatchPalette.swatches
     return cores.mapIndexed { index, cor ->
-        ProductDetailColor(name = cor.descricao, color = palette[index % palette.size])
+        ProductDetailColor(
+            name = cor.descricao,
+            color = palette[index % palette.size],
+            complemento1Id = cor.complemento1Id,
+            sizes = cor.tamanhos.map { tamanho ->
+                ProductDetailSizeStock(
+                    label = tamanho.label,
+                    stock = tamanho.disponivel,
+                    complemento2Id = tamanho.complemento2Id,
+                    inCart = tamanho.adicionados,
+                )
+            },
+        )
     }
 }

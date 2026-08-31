@@ -2,6 +2,7 @@ package app.trovata.cast.data.remote.sfa
 
 import app.trovata.cast.data.remote.sfa.dto.CarrinhoDto
 import app.trovata.cast.data.remote.sfa.dto.CarrinhoEnvelope
+import app.trovata.cast.data.remote.sfa.dto.CarrinhoItemDto
 import app.trovata.cast.data.remote.sfa.dto.CarrinhoGradeItemPayload
 import app.trovata.cast.data.remote.sfa.dto.CarrinhoItemPayload
 import app.trovata.cast.data.remote.sfa.dto.CarrinhoItensRequest
@@ -11,6 +12,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -32,6 +34,25 @@ data class CarrinhoSessao(
 data class ContextoComercial(
     val tabelaPrecoId: Long,
     val tipoVendaId: Long,
+)
+
+data class CarrinhoItemTamanho(
+    val complemento2Id: Long?,
+    val label: String,
+    val quantidade: Int,
+)
+
+data class CarrinhoItemLinha(
+    val itemId: Long,
+    val produtoPreId: Long?,
+    val ref: String,
+    val nome: String,
+    val cor: String?,
+    val imageUrl: String?,
+    val quantidade: Int,
+    val unitarioCents: Long?,
+    val totalCents: Long?,
+    val tamanhos: List<CarrinhoItemTamanho>,
 )
 
 data class ItemParaCarrinho(
@@ -94,7 +115,7 @@ class CarrinhoApi(
         item: ItemParaCarrinho,
     ): SfaApiResult<Unit> = safeCall {
         val grades = item.quantidadePorTamanho
-            .filterValues { it >= 0 }
+            .filterValues { it > 0 }
             .map { (complemento2Id, qtde) ->
                 CarrinhoGradeItemPayload(complemento2Id = complemento2Id, qtde = qtde.toDouble())
             }
@@ -132,12 +153,30 @@ class CarrinhoApi(
         carrinhoId: Long,
     ): SfaApiResult<CarrinhoSessao> = safeCall {
         val response = client.get(
-            "$baseUrl/catalogos-links/$empresaSlug/$catalogoUuid/carrinhos-resumo/$carrinhoId",
+            "$baseUrl/catalogos-links/$empresaSlug/$catalogoUuid/carrinhos/$carrinhoId",
         )
         if (!response.status.isSuccess()) return@safeCall fail(response.status.value)
         val carrinho = response.body<CarrinhoEnvelope>().data
             ?: return@safeCall SfaApiResult.Fail("carrinho_ausente", "Carrinho não encontrado", 0)
         SfaApiResult.Ok(carrinho.toCarrinhoSessao())
+    }
+
+    suspend fun itens(
+        empresaSlug: String,
+        catalogoUuid: String,
+        carrinhoId: Long,
+        page: Int = 1,
+        total: Int = ITENS_POR_PAGINA,
+    ): SfaApiResult<List<CarrinhoItemLinha>> = safeCall {
+        val response = client.get(
+            "$baseUrl/catalogos-links/$empresaSlug/$catalogoUuid/carrinhos/$carrinhoId/itens-para-rota-publica",
+        ) {
+            parameter("page", page)
+            parameter("total", total)
+        }
+        if (!response.status.isSuccess()) return@safeCall fail(response.status.value)
+        val envelope = response.body<SfaPaginatedEnvelope<CarrinhoItemDto>>()
+        SfaApiResult.Ok(envelope.data.orEmpty().map { it.toCarrinhoItemLinha() })
     }
 
     suspend fun marcarProntoParaEnvio(
@@ -172,6 +211,10 @@ class CarrinhoApi(
         404 -> SfaApiResult.Fail("not_found", "Carrinho ou catálogo não encontrado", status)
         else -> SfaApiResult.Fail("http_$status", "O servidor respondeu $status", status)
     }
+
+    private companion object {
+        const val ITENS_POR_PAGINA = 50
+    }
 }
 
 fun CarrinhoDto.toCarrinhoSessao(): CarrinhoSessao = CarrinhoSessao(
@@ -182,3 +225,32 @@ fun CarrinhoDto.toCarrinhoSessao(): CarrinhoSessao = CarrinhoSessao(
     itens = itens ?: 0,
     situacao = situacao,
 )
+
+fun CarrinhoItemDto.toCarrinhoItemLinha(): CarrinhoItemLinha {
+    val tamanhos = grades.mapNotNull { grade ->
+        val quantidade = (grade.carrinhoItemGrade ?: grade.selecao)?.quantidade?.toInt() ?: 0
+        if (quantidade <= 0) return@mapNotNull null
+        CarrinhoItemTamanho(
+            complemento2Id = grade.complemento2?.id,
+            label = grade.complemento2?.descricao?.takeIf { it.isNotBlank() }
+                ?: grade.complemento2?.idErp?.takeIf { it.isNotBlank() }
+                ?: "Único",
+            quantidade = quantidade,
+        )
+    }
+    val quantidadeTotal = quantidades?.total?.toInt() ?: tamanhos.sumOf { it.quantidade }
+    return CarrinhoItemLinha(
+        itemId = id,
+        produtoPreId = produtoPreId,
+        ref = produto?.idErp?.takeIf { it.isNotBlank() } ?: produtoPreId?.toString().orEmpty(),
+        nome = produto?.descricao?.takeIf { it.isNotBlank() }
+            ?: produto?.apelido?.takeIf { it.isNotBlank() }
+            ?: "Produto",
+        cor = variacao?.complemento1?.descricao?.takeIf { it.isNotBlank() },
+        imageUrl = arquivo?.melhorImagem,
+        quantidade = quantidadeTotal,
+        unitarioCents = valores?.unitario?.cents,
+        totalCents = valores?.total?.cents,
+        tamanhos = tamanhos,
+    )
+}

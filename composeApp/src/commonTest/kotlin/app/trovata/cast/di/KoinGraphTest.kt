@@ -35,6 +35,8 @@ class KoinGraphTest {
             empresaSlug = "buba-teste",
             catalogoUuid = "uuid-test",
             clientName = "Cliente",
+            clientEmail = "cliente@loja.com.br",
+            catalogoLinkId = 811,
             sellerName = "Vendedor",
             collectionLabel = "Coleção",
             sellerPeerId = newSellerPeerId(),

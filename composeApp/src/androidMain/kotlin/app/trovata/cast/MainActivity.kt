@@ -8,6 +8,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import app.trovata.cast.platform.ActivityProvider
 
 class MainActivity : ComponentActivity() {
@@ -20,10 +23,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         ActivityProvider.attach(this)
+        hideSystemNavigation()
         ensureCallPermissions()
         setContent {
             App()
         }
+    }
+
+    private fun hideSystemNavigation() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.navigationBars())
     }
 
     private fun ensureCallPermissions() {
@@ -36,6 +48,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         ActivityProvider.attach(this)
+        hideSystemNavigation()
     }
 
     override fun onDestroy() {
