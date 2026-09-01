@@ -409,8 +409,7 @@ class LiveCallScreenModel(
                             ),
                         )
                     }
-                    refreshCart()
-                    loadGrade(produtoPreId)
+                    syncCartState()
                 }
             }
         }
@@ -533,7 +532,8 @@ class LiveCallScreenModel(
             ?: "o carrinho"
         val units = msg.hint?.unitsDelta ?: 0
         val text = when (msg.reason) {
-            CartChangeReason.ItemAdded -> "$who adicionou ${units}un de $name"
+            CartChangeReason.ItemAdded ->
+                if (units > 0) "$who adicionou ${units}un de $name" else "$who atualizou $name"
             CartChangeReason.ItemRemoved -> "$who removeu $name"
             CartChangeReason.QuantityChanged -> "$who ajustou $name"
             CartChangeReason.PrazoChanged -> "$who mudou o prazo"
@@ -543,7 +543,15 @@ class LiveCallScreenModel(
         _state.update {
             it.copy(toast = CartToast(text = text, createdAtMs = Clock.System.now().toEpochMilliseconds()))
         }
-        screenModelScope.launch { refreshCart() }
+        screenModelScope.launch { syncCartState() }
+    }
+
+    private suspend fun syncCartState() {
+        refreshCart()
+        loadVitrine(_state.value.catalogPage)
+        val focused = _state.value.focusedGrade?.produtoPreId
+            ?: produtoPreIdOf(_state.value.focusedProductId.orEmpty())
+        if (focused != null) loadGrade(focused)
     }
 
     override fun onDispose() {
