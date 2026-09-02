@@ -51,8 +51,7 @@ import app.trovata.cast.ui.components.Wordmark
 @Composable
 fun AuthWelcomeScreen(
     modifier: Modifier = Modifier,
-    onEnterWithWhatsapp: () -> Unit = {},
-    onExistingAccount: () -> Unit = {},
+    onEnter: () -> Unit = {},
 ) {
     val colors = TrovataTokens.colors
 
@@ -86,7 +85,7 @@ fun AuthWelcomeScreen(
                     )
                 }
                 Text(
-                    text = "v1.2.0",
+                    text = "v0.1.0",
                     color = colors.ink4,
                     style = TrovataTokens.type.mono.copy(fontSize = 11.sp),
                 )
@@ -180,17 +179,10 @@ fun AuthWelcomeScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Btn(
-                    text = "Entrar pelo WhatsApp",
-                    onClick = onEnterWithWhatsapp,
+                    text = "Entrar",
+                    onClick = onEnter,
                     kind = BtnKind.Primary,
                     size = BtnSize.Lg,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Btn(
-                    text = "Já tenho conta — entrar",
-                    onClick = onExistingAccount,
-                    kind = BtnKind.Ghost,
-                    size = BtnSize.Md,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(

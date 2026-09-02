@@ -74,12 +74,7 @@ class CatalogSyncService(
     }
 
     suspend fun syncEssentials(): SyncReport {
-        val essentials: List<suspend () -> SyncEntityResult> = listOf(
-            ::syncCategorias, ::syncColecoes, ::syncMarcas,
-            ::syncProdutosPre, ::syncArquivos, ::syncClientes,
-            ::syncTabelasPrecos, ::syncComplementos1, ::syncComplementos2, ::syncComplementos3,
-            ::syncItensPrecos, ::syncProdutosComerciais, ::syncPrazos,
-        )
+        val essentials: List<suspend () -> SyncEntityResult> = listOf(::syncClientes)
         return SyncReport(essentials.map { it() })
     }
 

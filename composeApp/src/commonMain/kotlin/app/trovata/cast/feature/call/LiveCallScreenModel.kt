@@ -8,7 +8,7 @@ import app.trovata.cast.data.remote.sfa.ItemParaCarrinho
 import app.trovata.cast.data.remote.sfa.SfaApiResult
 import app.trovata.cast.data.remote.sfa.ProdutoGrade
 import app.trovata.cast.data.remote.sfa.VitrineApi
-import app.trovata.cast.data.sample.Product
+import app.trovata.cast.ui.components.Product
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.SignalingState
 import app.trovata.cast.protocol.CartChangeHint

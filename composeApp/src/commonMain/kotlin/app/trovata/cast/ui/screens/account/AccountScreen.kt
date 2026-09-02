@@ -29,10 +29,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import app.trovata.cast.data.sample.AccountRow
-import app.trovata.cast.data.sample.AccountStat
-import app.trovata.cast.data.sample.SampleAccount
-import app.trovata.cast.data.sample.SupportRow
+import app.trovata.cast.feature.account.AccountRow
+import app.trovata.cast.feature.account.AccountStat
+import app.trovata.cast.feature.account.SupportRow
 import app.trovata.cast.feature.account.AccountUiState
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Avatar
@@ -225,7 +224,7 @@ private fun BrandIdentityCard(state: AccountUiState) {
                 .fillMaxWidth()
                 .background(
                     brush = Brush.linearGradient(
-                        colors = listOf(SampleAccount.brandGradientTop, SampleAccount.brandGradientBottom),
+                        colors = listOf(brandGradientTop, brandGradientBottom),
                     ),
                     shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
                 )
@@ -476,3 +475,6 @@ private fun SignOutButton(onClick: () -> Unit) {
         )
     }
 }
+
+private val brandGradientTop = Color(0xFF1F2521)
+private val brandGradientBottom = Color(0xFF161B17)

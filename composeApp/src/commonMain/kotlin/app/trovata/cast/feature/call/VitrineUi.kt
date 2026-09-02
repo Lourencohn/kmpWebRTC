@@ -3,7 +3,7 @@ package app.trovata.cast.feature.call
 import app.trovata.cast.data.local.centsToBrl
 import app.trovata.cast.data.remote.sfa.VitrineProduto
 import app.trovata.cast.ui.components.GarmentKind
-import app.trovata.cast.data.sample.Product
+import app.trovata.cast.ui.components.Product
 
 fun VitrineProduto.toUiProduct(): Product = Product(
     ref = ref,

@@ -20,7 +20,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -37,7 +36,6 @@ import app.trovata.cast.ui.components.BtnKind
 import app.trovata.cast.ui.components.BtnSize
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
-import app.trovata.cast.ui.components.PlaceholderBar
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.components.TabHeader
 import app.trovata.cast.ui.components.TrovataCard
@@ -85,27 +83,13 @@ fun ClientsScreen(
                     )
                     when {
                         state.isLoading -> EmptyState(text = "Carregando clientes...")
-                        state.results.isEmpty() && state.query.isBlank() -> ClientListScaffold()
+                        state.results.isEmpty() && state.query.isBlank() ->
+                            EmptyState(text = if (state.syncing) "Sincronizando clientes..." else "Nenhum cliente sincronizado para esta empresa")
                         state.results.isEmpty() -> EmptyState(text = "Nenhum cliente encontrado")
                         else -> ClientList(clients = state.results, onInvite = onInviteClient)
                     }
                 }
             }
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 16.dp),
-        ) {
-            Btn(
-                text = "Cliente",
-                onClick = {},
-                kind = BtnKind.Dark,
-                size = BtnSize.Md,
-                icon = TrovataIcons.plus,
-                modifier = Modifier.shadow(elevation = 12.dp, shape = RoundedCornerShape(999.dp), clip = false),
-            )
         }
     }
 }
@@ -157,36 +141,6 @@ private fun EmptyState(text: String) {
             contentAlignment = Alignment.Center,
         ) {
             Text(text = text, color = colors.ink3, fontSize = 13.sp)
-        }
-    }
-}
-
-@Composable
-private fun ClientListScaffold() {
-    val colors = TrovataTokens.colors
-    TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
-        Column {
-            repeat(6) { index ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(11.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(modifier = Modifier.size(40.dp).background(colors.surface2, RoundedCornerShape(999.dp)))
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        PlaceholderBar(modifier = Modifier.fillMaxWidth(0.5f))
-                        PlaceholderBar(modifier = Modifier.fillMaxWidth(0.72f), height = 9.dp)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(width = 84.dp, height = 32.dp)
-                            .background(colors.surface2, RoundedCornerShape(999.dp)),
-                    )
-                }
-                if (index < 5) {
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
-                }
-            }
         }
     }
 }

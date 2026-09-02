@@ -29,10 +29,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import app.trovata.cast.data.sample.FashionPalette
-import app.trovata.cast.data.sample.Product
-import app.trovata.cast.data.sample.ProductSwatchPalette
-import app.trovata.cast.data.sample.ProductTag
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.color.oklch
 import coil3.compose.AsyncImage

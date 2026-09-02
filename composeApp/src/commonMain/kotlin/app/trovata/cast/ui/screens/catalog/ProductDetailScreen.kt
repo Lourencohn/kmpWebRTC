@@ -41,11 +41,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import app.trovata.cast.data.sample.FashionPalette
+import app.trovata.cast.ui.components.FashionPalette
 import app.trovata.cast.data.remote.sfa.ProdutoGrade
-import app.trovata.cast.data.sample.Product
-import app.trovata.cast.data.sample.ProductSwatchPalette
-import app.trovata.cast.data.sample.ProductTag
+import app.trovata.cast.ui.components.Product
+import app.trovata.cast.ui.components.ProductSwatchPalette
+import app.trovata.cast.ui.components.ProductTag
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind

@@ -23,8 +23,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import app.trovata.cast.data.sample.FashionPalette
-import app.trovata.cast.data.sample.Product
 import app.trovata.cast.theme.TrovataTokens
 import org.jetbrains.compose.resources.painterResource
 

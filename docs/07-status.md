@@ -28,6 +28,7 @@
 | Limpeza — pedido paralelo removido | ✅ concluído | (sem commit ainda) | `POST /order`, `OrderStore` e os DTOs de submissão saíram; buyer perdeu os módulos órfãos da vitrine antiga |
 | Integração Catálogo Link — Fase 4b (grade real) | ✅ concluído | (sem commit ainda) | `VitrineApi.grade()` sobre `/produtos/{id}/grades`; detalhe do produto na chamada mostra cores e tamanhos reais com saldo, no lugar dos dados fabricados |
 | Integração Catálogo Link — Fase 0 (contrato) | ✅ concluído | (sem commit ainda) | `SessionCreateRequest` por identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`/`OrderPlaced`, URL de convite no `sfa_front`. Ver `prompt.md` e `docs/10-integracao-catalogo-link.md` |
+| Release de demonstração (app enxugado para televenda) | ✅ concluído | (sem commit ainda) | Três abas (Sessões, Catálogos, Clientes), catálogo local e painéis sem fonte de dados removidos, telas do protótipo aposentadas |
 
 ---
 
@@ -889,6 +890,45 @@ Até aqui o app mostrava a vitrine e a grade reais, mas o pedido continuava numa
 
 ---
 
+## Release de demonstração (02/09/2026)
+
+O app deixou de ter tela que não se sustenta em dado real. A navegação passou de cinco para três abas:
+
+| Aba | Fonte |
+|---|---|
+| Sessões | `SessionsRepository` (SQLDelight) + `OrderRepository` para os pedidos fechados no dia |
+| Catálogos | `CatalogLinksApi`, os catálogos link reais do vendedor, com validade, carrinhos e visitas; selecionar e gerar o convite acontece na própria aba |
+| Clientes | `ClientsRepository`, alimentado pelo `api-int` |
+
+### O que saiu
+
+- **Painel e Insights**: liam do `OrderRepository`, que só recebe pedido fechado dentro da chamada. Fora dessa condição eram tela vazia permanente, e o Painel era a aba inicial.
+- **Aba Catálogo (catálogo local)**: navegador do catálogo sincronizado do `api-int`, com busca e filtros decorativos e um botão flutuante sem ação. Não participa da televenda: quem manda na chamada é a vitrine do catálogo link. Com ela saiu o `SampleCatalog`, as oito fotos de bolsa que apareciam sempre que o banco local estava vazio.
+- **Telas órfãs do protótipo**: `IncomingCallScreen`, `SessionPrepScreen`, `AuthSetupScreen`, `AuthVerifyScreen`, `DesignSystemScreen` e `EmptyTabScreen` não eram alcançáveis por nenhuma rota. Com elas saiu todo o pacote `data/sample`.
+- **Esqueletos de carregamento falsos**: Home e Clientes desenhavam linhas cinza de "conteúdo carregando" quando a lista estava vazia. Viraram texto honesto.
+- **Boas-vindas**: "Entrar pelo WhatsApp" levava ao login de e-mail e senha do Keycloak, e a versão dizia v1.2.0. Agora é um botão "Entrar" e a versão real.
+
+### O que mudou de lugar
+
+- `Product`, `ProductTag`, `FashionPalette` e `ProductSwatchPalette` saíram de `data/sample` para `ui/components/Product.kt`: são o modelo de UI que `ProductCard`, `ProductRow` e a vitrine da chamada usam, e não têm mais nada de amostra.
+- `AccountRow`, `AccountStat` e `SupportRow` foram para `feature/account/AccountModels.kt`.
+- A lista de catálogos link virou `CatalogLinksBody`, um corpo único usado pela aba e pela tela empilhada que vem do convite a partir de um cliente.
+- O `ProductDetailScreen` **ficou**: ele é o painel de produto aberto durante a chamada (`inCallContext = true`), e não só uma tela do catálogo. Só perdeu a entrada pela aba removida.
+
+### Sincronização de login
+
+`syncEssentials` baixava treze recursos do `api-int` (produtos, preços, complementos, arquivos). Com o catálogo local fora da UI, só `clientes` alimenta alguma tela, e é só isso que roda agora. `syncAll` e as funções individuais continuam no `CatalogSyncService`, então religar é trivial quando o catálogo local voltar a ter uso.
+
+### Verificação
+- `./gradlew :composeApp:testDebugUnitTest :composeApp:assembleDebug` ✅ (64 testes)
+- APK instalado no Moto G22 apontando para staging
+
+### Próximo passo
+
+As telas da fase seguinte estão em `docs/12-proximas-telas.md`, com o endpoint que alimenta cada uma e o que depende do time do SFA.
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -914,3 +954,4 @@ Até aqui o app mostrava a vitrine e a grade reais, mas o pedido continuava numa
 | 2026-08-06 | Integração Catálogo Link — Fase 0 fechada: contrato redesenhado no `protocol/` (identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`, `OrderPlaced`), URL de convite apontando para o `sfa_front` com `?live=`, `SessionEvent`/`Codec` removidos · 142 testes totais (29 protocol + 20 signaling + 26 composeApp + 67 webBuyer) |
 | 2026-05-23 | M9 fase 2 (parcial) fechada: `OrderRepository` + `Orders.sq`, "Pedidos fechados hoje" na Home, `POST /order` em memória + buyer envia, PDF via `window.print()` + `@media print`. `SummaryScreen` (métricas) movido pra M12 e push pra M19 · 121 testes totais (24 protocol + 17 signaling + 15 composeApp + 65 webBuyer) |
 | 2026-08-30 | Integração Catálogo Link — Fase 5 fechada: `clientEmail`/`catalogoLinkId` propagados até a chamada (migração SQLDelight v2), carrinho do cliente aberto por e-mail, quantidade por tamanho no detalhe, gaveta lendo `itens-para-rota-publica` e fechamento por "pronto para envio"; `CartRepository` removido · 64 testes no composeApp |
+| 2026-09-02 | Release de demonstração: app reduzido a três abas (Sessões, Catálogos, Clientes), catálogo local e painéis sem fonte removidos, `data/sample` extinto, sync de login limitado a clientes · 64 testes no composeApp |

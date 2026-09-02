@@ -6,9 +6,9 @@ data class SfaCredentials(
 )
 
 object SfaConfig {
-    const val baseUrl: String = "https://api-int.trovata.app.br"
-    const val laravelApiUrl: String = "https://api.trovata.app.br/api"
-    const val keycloakUrl: String = "https://login.trovata.app.br"
+    const val baseUrl: String = "https://api-int-staging.trovata.app.br"
+    const val laravelApiUrl: String = "https://api-staging.trovata.app.br/api"
+    const val keycloakUrl: String = "https://login-staging.trovata.app.br"
     const val realm: String = "Base"
     const val clientId: String = "front-client"
     const val empresaId: Long = 97L

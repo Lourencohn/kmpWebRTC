@@ -5,8 +5,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOne
 import app.trovata.cast.data.remote.HttpClientFactory
 import app.trovata.cast.data.remote.sfa.dto.GradeBreakDto
-import app.trovata.cast.data.sample.Product
-import app.trovata.cast.data.sample.SampleCatalog
+import app.trovata.cast.ui.components.Product
 import app.trovata.cast.db.ProductEntity
 import app.trovata.cast.db.TrovataDatabase
 import app.trovata.cast.ui.components.GarmentKind
@@ -77,26 +76,6 @@ class CatalogRepository(
 
     suspend fun page(limit: Int, offset: Int, priceTableId: Long? = null): List<CatalogProduct> = withContext(Dispatchers.Default) {
         assemble(catalog.selectProductsPaged(limit.toLong(), offset.toLong()).executeAsList(), priceTableId)
-    }
-
-    suspend fun uiPage(limit: Int, offset: Int, priceTableId: Long? = null): List<Product> = withContext(Dispatchers.Default) {
-        page(limit, offset, priceTableId).map { it.toUiProduct() }
-    }
-
-    suspend fun uiProducts(priceTableId: Long? = null): List<Product> = withContext(Dispatchers.Default) {
-        val real = assemble(catalog.selectAllProducts().executeAsList(), priceTableId)
-        if (real.isEmpty()) SampleCatalog.products else real.map { it.toUiProduct() }
-    }
-
-    suspend fun uiProductByRef(ref: String, priceTableId: Long? = null): Product? = withContext(Dispatchers.Default) {
-        val real = assemble(catalog.selectAllProducts().executeAsList(), priceTableId)
-        if (real.isEmpty()) SampleCatalog.products.firstOrNull { it.ref == ref }
-        else real.firstOrNull { it.ref == ref }?.toUiProduct()
-    }
-
-    suspend fun gallery(productIdErp: String): List<String> = withContext(Dispatchers.Default) {
-        assets.selectImagesForProduct(productIdErp).executeAsList()
-            .mapNotNull { it.caminhoDetail ?: it.caminhoMedia ?: it.caminhoOriginal ?: it.caminhoThumb }
     }
 
     suspend fun isEmpty(): Boolean = withContext(Dispatchers.Default) {

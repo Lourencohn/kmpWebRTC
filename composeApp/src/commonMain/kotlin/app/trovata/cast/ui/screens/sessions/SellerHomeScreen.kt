@@ -42,7 +42,6 @@ import app.trovata.cast.ui.components.BtnKind
 import app.trovata.cast.ui.components.BtnSize
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
-import app.trovata.cast.ui.components.PlaceholderBar
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.components.TabHeader
 import app.trovata.cast.ui.components.TrovataCard
@@ -87,9 +86,7 @@ fun SellerHomeScreen(
             }
 
             if (isEmpty) {
-                item { ClosedTodayScaffold() }
-                item { RecentSessionsScaffold() }
-                item { EmptyHint() }
+                item { EmptySessions() }
             }
         }
     }
@@ -189,72 +186,27 @@ private fun RecentSessionRow(session: StoredSessionRecord, onOpen: () -> Unit) {
 }
 
 @Composable
-private fun ClosedTodayScaffold() {
-    val colors = TrovataTokens.colors
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        SectionLabel(text = "Pedidos fechados hoje")
-        TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
-            Column {
-                repeat(2) { index ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(modifier = Modifier.size(36.dp).background(colors.surface2, RoundedCornerShape(8.dp)))
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            PlaceholderBar(modifier = Modifier.fillMaxWidth(0.5f))
-                            PlaceholderBar(modifier = Modifier.fillMaxWidth(0.7f), height = 9.dp)
-                        }
-                        PlaceholderBar(modifier = Modifier.width(56.dp), height = 11.dp)
-                    }
-                    if (index < 1) {
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecentSessionsScaffold() {
+private fun EmptySessions() {
     val colors = TrovataTokens.colors
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         SectionLabel(text = "Sessões recentes")
-        TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
-            Column {
-                repeat(3) { index ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(modifier = Modifier.size(36.dp).background(colors.surface2, CircleShape))
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            PlaceholderBar(modifier = Modifier.fillMaxWidth(0.45f))
-                            PlaceholderBar(modifier = Modifier.fillMaxWidth(0.65f), height = 9.dp)
-                        }
-                        PlaceholderBar(modifier = Modifier.width(40.dp), height = 11.dp)
-                    }
-                    if (index < 2) {
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
-                    }
-                }
+        TrovataCard(modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Nenhuma sessão por aqui ainda",
+                    color = colors.ink,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Convide um cliente a partir de um catálogo link. Vocês navegam a mesma vitrine ao vivo, com áudio, e o carrinho é o do Catálogo Link.",
+                    color = colors.ink3,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                )
             }
         }
     }
-}
-
-@Composable
-private fun EmptyHint() {
-    val colors = TrovataTokens.colors
-    Text(
-        text = "Inicie uma sessão para mostrar o catálogo ao cliente em tempo real. Ela aparece aqui depois.",
-        color = colors.ink4,
-        fontSize = 12.sp,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp),
-    )
 }
 
 @Composable
