@@ -28,6 +28,7 @@ import app.trovata.cast.ui.icons.TrovataIcons
 
 enum class SellerTab(val id: String, val label: String, val icon: ImageVector) {
     Sessoes("sessoes", "Sessões", TrovataIcons.video),
+    Carrinhos("carrinhos", "Carrinhos", TrovataIcons.cart),
     Catalogos("catalogos", "Catálogos", TrovataIcons.grid),
     Clientes("clientes", "Clientes", TrovataIcons.users),
 }

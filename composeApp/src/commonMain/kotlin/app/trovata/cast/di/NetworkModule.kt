@@ -7,6 +7,7 @@ import app.trovata.cast.data.remote.sfa.AccountApi
 import app.trovata.cast.data.remote.sfa.CarrinhoApi
 import app.trovata.cast.data.remote.sfa.CatalogLinksApi
 import app.trovata.cast.data.remote.sfa.KeycloakAuthService
+import app.trovata.cast.data.remote.sfa.OpenCartsApi
 import app.trovata.cast.data.remote.sfa.SfaApi
 import app.trovata.cast.data.remote.sfa.SfaConfig
 import app.trovata.cast.data.remote.sfa.VitrineApi
@@ -32,6 +33,12 @@ val networkModule = module {
     single { VitrineApi(get(SfaHttpClient)) }
     single {
         CarrinhoApi(
+            client = get(SfaHttpClient),
+            tokenProvider = { get<AuthRepository>().accessToken() },
+        )
+    }
+    single {
+        OpenCartsApi(
             client = get(SfaHttpClient),
             tokenProvider = { get<AuthRepository>().accessToken() },
         )

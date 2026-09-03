@@ -39,14 +39,16 @@ data class CatalogLinkPickerScreen(
     val clientName: String? = null,
     val clientShop: String? = null,
     val scheduledFor: String? = null,
+    val clientDocument: String? = null,
+    val clientEmail: String? = null,
 ) : Screen {
 
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val authRepository = koinInject<AuthRepository>()
-        val initial = remember(clientName, clientShop, scheduledFor) {
-            ClientDraft(clientName, clientShop, scheduledFor)
+        val initial = remember(clientName, clientShop, scheduledFor, clientDocument, clientEmail) {
+            ClientDraft(clientName, clientShop, scheduledFor, clientDocument, clientEmail)
         }
         val screenModel = koinScreenModel<CatalogLinkPickerScreenModel> { parametersOf(initial) }
         val state by screenModel.state.collectAsState()

@@ -28,9 +28,10 @@ class SfaApi(
         page: Int,
         perPage: Int,
         updatedAt: String? = null,
-    ): SfaApiResult<SfaListEnvelope<JsonElement>> =
-        try {
+    ): SfaApiResult<SfaListEnvelope<JsonElement>> {
+        return try {
             val response = requestWithRetry(resource, page, perPage, updatedAt)
+                ?: return SfaApiResult.Fail("unauthenticated", "Faça login novamente", 401)
             if (response.status.isSuccess()) {
                 SfaApiResult.Ok(response.body())
             } else {
@@ -41,19 +42,20 @@ class SfaApi(
         } catch (t: Throwable) {
             SfaApiResult.Fail("network_error", t.message ?: "Sem conexão com o servidor", 0)
         }
+    }
 
     private suspend fun requestWithRetry(
         resource: String,
         page: Int,
         perPage: Int,
         updatedAt: String?,
-    ): HttpResponse {
+    ): HttpResponse? {
         var attempt = 0
         while (true) {
-            val token = tokenProvider()
+            val token = tokenProvider() ?: return null
             val empresaId = empresaIdProvider()
-            val response = client.get("$baseUrl/empresas/$empresaId/$resource") {
-                if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
+            val response = client.get("$baseUrl/v2/empresas/$empresaId/$resource") {
+                header(HttpHeaders.Authorization, "Bearer $token")
                 parameter("page", page)
                 parameter("per_page", perPage)
                 updatedAt?.let { parameter("updated_at", it) }

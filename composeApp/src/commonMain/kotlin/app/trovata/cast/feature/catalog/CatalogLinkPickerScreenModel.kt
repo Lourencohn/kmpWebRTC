@@ -21,7 +21,21 @@ data class ClientDraft(
     val name: String? = null,
     val shop: String? = null,
     val scheduledFor: String? = null,
-)
+    val documento: String? = null,
+    val email: String? = null,
+) {
+    val identificado: Boolean get() = !documento.isNullOrBlank() || !email.isNullOrBlank()
+}
+
+fun destinatarioConfere(client: ClientDraft, link: SellerCatalogLink): Boolean? {
+    val documentoCliente = somenteDigitos(client.documento)
+    val documentoLink = somenteDigitos(link.clienteDocumento)
+    if (documentoCliente != null && documentoLink != null) return documentoCliente == documentoLink
+    val emailCliente = client.email?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+    val emailLink = link.clienteEmail?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+    if (emailCliente != null && emailLink != null) return emailCliente == emailLink
+    return null
+}
 
 enum class CatalogLinkFilter(val label: String) {
     Disponiveis("Disponíveis"),
@@ -51,6 +65,31 @@ data class CatalogLinkPickerUiState(
 
     val selected: SellerCatalogLink?
         get() = links.firstOrNull { it.uuid == selectedUuid }
+
+    val emailDaChamada: String?
+        get() = client.email?.takeIf { it.isNotBlank() } ?: selected?.clienteEmail
+
+    val destinatarioDaChamada: String?
+        get() = client.name?.takeIf { it.isNotBlank() } ?: selected?.destinatarioLabel
+
+    val avisoDeDestinatario: String?
+        get() {
+            val link = selected ?: return null
+            val clienteEscolhido = client.name ?: "o cliente escolhido"
+            val emailDoCliente = client.email?.takeIf { it.isNotBlank() }
+            if (emailDoCliente == null) {
+                if (!client.identificado && client.name == null) return null
+                return if (link.clienteEmail != null) {
+                    "$clienteEscolhido não tem e-mail cadastrado. A chamada vai abrir o carrinho de ${link.destinatarioLabel ?: "quem está no catálogo"}."
+                } else {
+                    "Nem $clienteEscolhido nem esse catálogo têm e-mail. A chamada não vai conseguir abrir o carrinho."
+                }
+            }
+            if (link.temDestinatario && destinatarioConfere(client, link) == false) {
+                return "Esse catálogo está cadastrado para ${link.destinatarioLabel}. A chamada vai abrir o carrinho de $clienteEscolhido, com o e-mail dele."
+            }
+            return null
+        }
 
     val canGenerate: Boolean
         get() = selected?.disponivel == true && !isSubmitting
@@ -176,7 +215,7 @@ class CatalogLinkPickerScreenModel(
             catalogoNome = link.nome,
             catalogoLinkId = link.id,
             clientName = snapshot.client.name ?: link.clienteNome,
-            clientEmail = link.clienteEmail,
+            clientEmail = snapshot.client.email?.takeIf { it.isNotBlank() } ?: link.clienteEmail,
         )
         val notes = SessionClientNotes(
             shop = snapshot.client.shop ?: link.clienteNome,

@@ -29,6 +29,7 @@
 | Integração Catálogo Link — Fase 4b (grade real) | ✅ concluído | (sem commit ainda) | `VitrineApi.grade()` sobre `/produtos/{id}/grades`; detalhe do produto na chamada mostra cores e tamanhos reais com saldo, no lugar dos dados fabricados |
 | Integração Catálogo Link — Fase 0 (contrato) | ✅ concluído | (sem commit ainda) | `SessionCreateRequest` por identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`/`OrderPlaced`, URL de convite no `sfa_front`. Ver `prompt.md` e `docs/10-integracao-catalogo-link.md` |
 | Release de demonstração (app enxugado para televenda) | ✅ concluído | (sem commit ainda) | Três abas (Sessões, Catálogos, Clientes), catálogo local e painéis sem fonte de dados removidos, telas do protótipo aposentadas |
+| Carrinhos abertos (item 1 de `docs/12-proximas-telas.md`) | ✅ concluído | (sem commit ainda) | Quarta aba sobre `GET empresa/{slug}/carrinhos`, com "Chamar ao vivo" reaproveitando o caminho de convite |
 
 ---
 
@@ -929,6 +930,38 @@ As telas da fase seguinte estão em `docs/12-proximas-telas.md`, com o endpoint 
 
 ---
 
+## Carrinhos abertos: o que a leitura do `sfa_back` mudou no desenho
+
+A tela saiu do item 1 de `docs/12-proximas-telas.md`, mas o desenho não é o que aquele documento supunha, porque a leitura do backend antes de escrever o código mudou três decisões.
+
+**A chamada só retoma carrinho em situação `D`.** O `POST catalogos-links/{slug}/{uuid}/login`, que é o que o app já usa para abrir o carrinho dentro da chamada, cai em `GetCatalogoCarrinhoPorEmailUseCase`. Esse caso de uso procura o carrinho mais recente daquele catálogo link com o e-mail informado **e situação `D` (Digitando)**. Não achando, ele cria um carrinho novo e vazio. Ou seja: chamar ao vivo um carrinho finalizado, enviado ou cancelado não retomaria aquele carrinho, abriria outro. Por isso a tela filtra `situacao=D` por padrão e, nos demais, troca o botão por uma frase dizendo exatamente isso, em vez de oferecer uma ação que faria a coisa errada em silêncio.
+
+**O filtro `vazio` não é enviado.** `CatalogoCarrinhoListInputData` declara `#[WithCast(BuiltinTypeCast::class, 'bool')] ?bool $vazio`, e em PHP `(bool) "false"` é `true`. Sem poder chamar a API para conferir qual valor chega de fato, mandar `vazio=false` corria o risco de trazer exatamente o oposto do pedido, ou seja, só os carrinhos vazios. O `CarrinhoListagemGeralResource` já devolve `itens`, então o corte de carrinho vazio é feito no app. Fica registrado como pergunta para o time do SFA.
+
+**As datas do Laravel não são ISO.** `config/data.php` define `date_format` como `Y-m-d H:i:s` e `date_timezone` como `America/Sao_Paulo`, e `updated_at` do resource é um `Carbon`. Isso não passa por `Instant.parse`. `SfaParse.parseTimestampToMs` tenta ISO primeiro (que é o formato do `api-int`) e cai para o formato do Laravel assumindo o fuso de São Paulo. O teste correspondente prova que `2026-08-30T19:41:02Z` e `2026-08-30 16:41:02` chegam ao mesmo instante.
+
+O resto do contrato foi lido em `CarrinhoListagemGeralResource`, `CatalogoLinkPorCarrinhoResource` e `ClienteListResource`: o `uuid` do catálogo link vem aninhado na linha do carrinho, que é o que permite criar a sessão sem uma segunda chamada; `valor_total` e `quantidade_total` são `BigDecimal` e chegam como string, por causa do `BigDecimalTransformer`; a paginação é `meta` com `current_page`/`last_page`/`per_page`/`total`, e o tamanho de página é o parâmetro `total`, não `per_page`.
+
+Ordenação: o documento sugeria "parado há mais tempo" como padrão. Ficou como alternativa em um chip, e o padrão é o mesmo do `sfa_front` (`updated_at desc`), porque abrir a lista pelo carrinho mais antigo empurra para o topo o que já esfriou faz meses.
+
+**Não validado contra a API.** Nenhuma dessas rotas foi chamada: não há credencial Keycloak de vendedor disponível aqui. Os testes são de contrato sobre o payload que os resources descrevem, do mesmo jeito que na Fase 1. O formato exato e o comportamento com dado real ainda precisam ser confrontados com staging.
+
+---
+
+## O sync estava 404 desde a virada para staging
+
+A aba Clientes mostrava "Nenhum cliente sincronizado para esta empresa" na buba. A causa não era ausência de dado.
+
+O banco do aparelho (lido com `adb run-as`, build debug) tinha as 13 entidades de sync gravadas com o mesmo erro, `http_404`, e `ClientEntity` zerada. O `SfaApi` montava `"$baseUrl/empresas/{id}/{recurso}"`, que é a v1 pública do `api-int`. Três GET sem credencial contra o `api-int-staging` isolaram o problema: `empresas/97/clientes` responde 404, `v2/empresas/97/clientes` responde 401 e `empresas` responde 200. O 401 prova que a rota existe e só falta o token; o 404 diz que aquele caminho não está publicado em staging, embora exista em produção, que é o que o `docs/08-api-data-model.md` descrevia.
+
+O `AccountApi` nunca quebrou porque já usava `/v2/usuarios/logado` e `/v2/empresa-usuarios`. Só o sync tinha ficado na v1. A correção foi apontar o `SfaApi` para `/v2/empresas/...` e tratar ausência de token como falha explícita, já que na v2 o Bearer deixou de ser opcional.
+
+Verificado no aparelho depois da correção: `clientes` terminou com `inFlight = 0`, sem erro e com `lastSyncAtMs` gravado, e `ClientEntity` foi de 0 para **36.798** linhas.
+
+Esse número é a observação seguinte, e é de produto, não de bug: o primeiro login baixa a base inteira de clientes da empresa, em páginas de 1.000. No Wi-Fi levou cerca de dois minutos. Na rua, em 4G, isso é caro e o vendedor não precisa de 36 mil clientes, precisa dos dele. O `ClientEntity` já guarda `vendedorIdErp` e existe um `syncVendedoresClientes` fora do `syncEssentials`, então há caminho para escopar, mas não foi medido se a API aceita esse filtro na origem.
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -955,3 +988,5 @@ As telas da fase seguinte estão em `docs/12-proximas-telas.md`, com o endpoint 
 | 2026-05-23 | M9 fase 2 (parcial) fechada: `OrderRepository` + `Orders.sq`, "Pedidos fechados hoje" na Home, `POST /order` em memória + buyer envia, PDF via `window.print()` + `@media print`. `SummaryScreen` (métricas) movido pra M12 e push pra M19 · 121 testes totais (24 protocol + 17 signaling + 15 composeApp + 65 webBuyer) |
 | 2026-08-30 | Integração Catálogo Link — Fase 5 fechada: `clientEmail`/`catalogoLinkId` propagados até a chamada (migração SQLDelight v2), carrinho do cliente aberto por e-mail, quantidade por tamanho no detalhe, gaveta lendo `itens-para-rota-publica` e fechamento por "pronto para envio"; `CartRepository` removido · 64 testes no composeApp |
 | 2026-09-02 | Release de demonstração: app reduzido a três abas (Sessões, Catálogos, Clientes), catálogo local e painéis sem fonte removidos, `data/sample` extinto, sync de login limitado a clientes · 64 testes no composeApp |
+| 2026-09-02 | Carrinhos abertos: quarta aba sobre `GET empresa/{slug}/carrinhos` com "Chamar ao vivo", filtro por situação e ordem, `OpenCartsApi`/`OpenCartsScreenModel`, parser de data do Laravel. Descoberto que o `login` só retoma carrinho em situação `D` · 82 testes no composeApp |
+| 2026-09-02 | Sync destravado: `SfaApi` apontado para `/v2/empresas/...` depois de descobrir que a v1 pública não existe em `api-int-staging` (404 em todas as 13 entidades). `ClientEntity` foi de 0 para 36.798 no Moto G22 |

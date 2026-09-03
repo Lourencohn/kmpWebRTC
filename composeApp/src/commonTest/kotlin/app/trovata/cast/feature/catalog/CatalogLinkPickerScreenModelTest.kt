@@ -33,6 +33,7 @@ class CatalogLinkPickerScreenModelTest {
         nome = "Outono 26",
         clienteNome = "Trama Multimarcas",
         clienteEmail = "compras@trama.com.br",
+        clienteDocumento = "12.345.678/0001-99",
         vendedorNome = "Marina Prado",
         ativo = true,
         expirado = false,
@@ -288,6 +289,130 @@ class CatalogLinkPickerScreenModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(vigente.uuid, sm.state.value.selectedUuid)
+    }
+
+    @Test
+    fun oEmailDoClienteEscolhidoMandaNaChamada() = runTest(dispatcher) {
+        var captured: SessionCreateRequest? = null
+        val sm = model(
+            createSession = { request ->
+                captured = request
+                SessionsApiResult.Ok(response())
+            },
+            persistSession = { request, r, createdAt, notes -> record(request, r, createdAt, notes) },
+            initialClient = ClientDraft(
+                name = "Loja Bella",
+                documento = "99.999.999/0001-99",
+                email = "compras@bella.com.br",
+            ),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.select(vigente)
+        assertEquals("compras@bella.com.br", sm.state.value.emailDaChamada)
+        assertEquals("Loja Bella", sm.state.value.destinatarioDaChamada)
+
+        sm.generateLink()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val request = assertNotNull(captured)
+        assertEquals("compras@bella.com.br", request.clientEmail)
+        assertEquals("Loja Bella", request.clientName)
+    }
+
+    @Test
+    fun semClienteEscolhidoOCatalogoManda() = runTest(dispatcher) {
+        var captured: SessionCreateRequest? = null
+        val sm = model(
+            createSession = { request ->
+                captured = request
+                SessionsApiResult.Ok(response())
+            },
+            persistSession = { request, r, createdAt, notes -> record(request, r, createdAt, notes) },
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.select(vigente)
+        sm.generateLink()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val request = assertNotNull(captured)
+        assertEquals("compras@trama.com.br", request.clientEmail)
+        assertEquals("Trama Multimarcas", request.clientName)
+        assertNull(sm.state.value.avisoDeDestinatario)
+    }
+
+    @Test
+    fun avisaQueOCatalogoEstaCadastradoParaOutroCliente() = runTest(dispatcher) {
+        val sm = model(
+            initialClient = ClientDraft(
+                name = "Loja Bella",
+                documento = "99.999.999/0001-99",
+                email = "compras@bella.com.br",
+            ),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.select(vigente)
+        assertEquals(
+            "Esse catálogo está cadastrado para Trama Multimarcas. A chamada vai abrir o carrinho de Loja Bella, com o e-mail dele.",
+            sm.state.value.avisoDeDestinatario,
+        )
+    }
+
+    @Test
+    fun naoAvisaQuandoODocumentoConfere() = runTest(dispatcher) {
+        val sm = model(
+            initialClient = ClientDraft(
+                name = "Trama Multimarcas",
+                documento = "12345678000199",
+                email = "compras@trama.com.br",
+            ),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.select(vigente)
+        assertNull(sm.state.value.avisoDeDestinatario)
+    }
+
+    @Test
+    fun clienteSemEmailCaiNoEmailDoCatalogoEAvisa() = runTest(dispatcher) {
+        var captured: SessionCreateRequest? = null
+        val sm = model(
+            createSession = { request ->
+                captured = request
+                SessionsApiResult.Ok(response())
+            },
+            persistSession = { request, r, createdAt, notes -> record(request, r, createdAt, notes) },
+            initialClient = ClientDraft(name = "Loja Bella", documento = "99.999.999/0001-99"),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.select(vigente)
+        assertEquals(
+            "Loja Bella não tem e-mail cadastrado. A chamada vai abrir o carrinho de Trama Multimarcas.",
+            sm.state.value.avisoDeDestinatario,
+        )
+
+        sm.generateLink()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("compras@trama.com.br", assertNotNull(captured).clientEmail)
+    }
+
+    @Test
+    fun semEmailDosDoisLadosAvisaQueNaoAbreCarrinho() = runTest(dispatcher) {
+        val semEmail = vigente.copy(clienteEmail = null)
+        val sm = model(
+            links = listOf(semEmail),
+            initialClient = ClientDraft(name = "Loja Bella", documento = "99.999.999/0001-99"),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.select(semEmail)
+        assertEquals(
+            "Nem Loja Bella nem esse catálogo têm e-mail. A chamada não vai conseguir abrir o carrinho.",
+            sm.state.value.avisoDeDestinatario,
+        )
     }
 
     @Test

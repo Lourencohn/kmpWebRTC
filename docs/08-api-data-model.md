@@ -15,6 +15,7 @@ O app opera em **modo online**: busca dados de catálogo, preços e pessoas da A
 | Auth (v2) | Keycloak JWT (`Authorization: Bearer <token>`) |
 | Keycloak | `https://login.trovata.app.br` · realm `Base` · client `front-client` |
 | v1 vs v2 | `/empresas/...` é público; `/v2/empresas/...` exige JWT. Mesmos payloads. |
+| Ambiente de staging | `https://api-int-staging.trovata.app.br` **não publica a v1**: `/empresas/{id}/{recurso}` responde 404 e só `/v2/...` responde. O app usa a v2 nos dois ambientes. |
 | Empresa do ambiente | **BUBA** (puericultura/brinquedos) — o schema é **agnóstico de categoria** |
 
 Credenciais e tokens de exemplo ficam em `.env` (não versionar segredos reais).

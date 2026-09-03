@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import app.trovata.cast.feature.carts.OpenCartsScreenModel
 import app.trovata.cast.feature.catalog.CatalogLinkPickerScreenModel
 import app.trovata.cast.feature.catalog.ClientDraft
 import app.trovata.cast.feature.clients.ClientsScreenModel
@@ -17,6 +18,7 @@ import app.trovata.cast.navigation.AccountRoute
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.SellerTab
 import app.trovata.cast.ui.components.TabBar
+import app.trovata.cast.ui.screens.carts.OpenCartsTab
 import app.trovata.cast.ui.screens.catalog.CatalogLinksTab
 import app.trovata.cast.ui.screens.clients.ClientsScreen
 import app.trovata.cast.ui.screens.invite.InviteScreen
@@ -42,6 +44,7 @@ object TabsHostRoute : Screen {
         val clientsState by clientsModel.state.collectAsState()
 
         val catalogLinksModel = koinScreenModel<CatalogLinkPickerScreenModel> { parametersOf(ClientDraft()) }
+        val openCartsModel = koinScreenModel<OpenCartsScreenModel>()
 
         Column(modifier = Modifier.fillMaxSize().background(colors.bg)) {
             Box(
@@ -56,6 +59,11 @@ object TabsHostRoute : Screen {
                         onOpenSession = { record -> navigator.push(InviteScreen(record)) },
                         onOpenAccount = openAccount,
                     )
+                    SellerTab.Carrinhos -> OpenCartsTab(
+                        screenModel = openCartsModel,
+                        onOpenAccount = openAccount,
+                        onSessionCreated = { record -> navigator.push(InviteScreen(record)) },
+                    )
                     SellerTab.Catalogos -> CatalogLinksTab(
                         screenModel = catalogLinksModel,
                         onOpenAccount = openAccount,
@@ -66,7 +74,14 @@ object TabsHostRoute : Screen {
                         onQueryChange = clientsModel::setQuery,
                         onOpenAccount = openAccount,
                         onInviteClient = { client ->
-                            navigator.push(CatalogLinkPickerScreen(clientName = client.name))
+                            navigator.push(
+                                CatalogLinkPickerScreen(
+                                    clientName = client.name,
+                                    clientShop = client.legalName,
+                                    clientDocument = client.document,
+                                    clientEmail = client.email,
+                                ),
+                            )
                         },
                     )
                 }

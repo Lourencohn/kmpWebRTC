@@ -30,6 +30,7 @@ data class CatalogoLinkDto(
     @SerialName("vendedor_id") val vendedorId: Long? = null,
     @SerialName("nome_fantasia") val nomeFantasia: String? = null,
     @SerialName("razao_social") val razaoSocial: String? = null,
+    @SerialName("cpf_cnpj") val cpfCnpj: String? = null,
     @SerialName("e_mail") val eMail: String? = null,
     @SerialName("celular_whatsapp") val celularWhatsapp: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,

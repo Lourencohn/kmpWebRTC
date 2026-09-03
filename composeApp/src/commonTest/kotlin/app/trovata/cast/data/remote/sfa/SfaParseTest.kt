@@ -2,6 +2,7 @@ package app.trovata.cast.data.remote.sfa
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -46,6 +47,18 @@ class SfaParseTest {
         assertEquals(6L, SfaParse.parseLong("6"))
         assertNull(SfaParse.parseLong(""))
         assertNull(SfaParse.parseLong("abc"))
+    }
+
+    @Test
+    fun parseTimestampToMs_aceitaIsoEFormatoDoLaravel() {
+        val iso = SfaParse.parseTimestampToMs("2026-08-30T19:41:02Z")
+        val laravel = SfaParse.parseTimestampToMs("2026-08-30 16:41:02")
+
+        assertNotNull(iso)
+        assertNotNull(laravel)
+        assertEquals(iso, laravel)
+        assertNull(SfaParse.parseTimestampToMs(null))
+        assertNull(SfaParse.parseTimestampToMs("30/08/2026"))
     }
 
     @Test
