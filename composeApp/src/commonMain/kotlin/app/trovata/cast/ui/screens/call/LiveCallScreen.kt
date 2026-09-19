@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,31 +16,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import app.trovata.cast.ui.components.Product
 import app.trovata.cast.di.CallSession
 import app.trovata.cast.feature.call.CallSpec
 import app.trovata.cast.feature.call.CartLineUi
@@ -51,6 +45,7 @@ import app.trovata.cast.feature.call.LiveCallScreenModel
 import app.trovata.cast.feature.call.LiveCallUiState
 import app.trovata.cast.feature.call.OrderSummaryUi
 import app.trovata.cast.feature.call.newSellerPeerId
+import app.trovata.cast.platform.LiveCatalogWebView
 import app.trovata.cast.protocol.OrderLine
 import app.trovata.cast.theme.TrovataTokens
 import app.trovata.cast.ui.components.Btn
@@ -60,22 +55,19 @@ import app.trovata.cast.ui.components.IconBtn
 import app.trovata.cast.ui.components.IconBtnKind
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
-import app.trovata.cast.ui.components.ProductCard
-import app.trovata.cast.ui.components.ProductCardSize
-import app.trovata.cast.ui.components.ProductRow
-import app.trovata.cast.ui.components.ProductRowSize
 import app.trovata.cast.ui.icons.TrovataIcons
-import app.trovata.cast.ui.screens.catalog.ProductDetailScreen
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import coil3.compose.AsyncImage
 import org.koin.compose.getKoin
 import org.koin.core.parameter.parametersOf
 
 data class LiveCallScreen(
     val token: String,
     val sessionId: String,
+    val inviteUrl: String,
     val empresaSlug: String,
     val catalogoUuid: String,
     val sellerName: String,
@@ -94,6 +86,7 @@ data class LiveCallScreen(
             val spec = CallSpec(
                 token = token,
                 sessionId = sessionId,
+                inviteUrl = inviteUrl,
                 empresaSlug = empresaSlug,
                 catalogoUuid = catalogoUuid,
                 clientName = clientName,
@@ -118,25 +111,11 @@ data class LiveCallScreen(
 
         LiveCallBody(
             state = state,
-            clientName = clientName,
+            screenModel = screenModel,
             onHangup = {
                 screenModel.hangup()
                 navigator.pop()
             },
-            onToggleMute = { screenModel.toggleMute() },
-            onScroll = { ref, offset -> screenModel.publishScroll(ref, offset) },
-            onPointAt = { ref -> screenModel.publishPointAt(ref) },
-            onOpenDetail = { ref -> screenModel.openProductDetail(ref) },
-            onOpenCart = { screenModel.openCartDrawer() },
-            onDismissCart = { screenModel.dismissCartDrawer() },
-            onDismissProductSheet = { screenModel.dismissProductSheet() },
-            onConfirmOrder = { screenModel.confirmOrder() },
-            onAddToCart = { corId, units -> screenModel.addFocusedProductToCart(corId, units) },
-            onRetryCart = { screenModel.retryCart() },
-            onDismissCartError = { screenModel.clearCartError() },
-            onRetryCatalog = { screenModel.reloadVitrine() },
-            onPrevCatalogPage = { screenModel.prevCatalogPage() },
-            onNextCatalogPage = { screenModel.nextCatalogPage() },
         )
     }
 }
@@ -144,25 +123,10 @@ data class LiveCallScreen(
 @Composable
 private fun LiveCallBody(
     state: LiveCallUiState,
-    clientName: String?,
+    screenModel: LiveCallScreenModel,
     onHangup: () -> Unit,
-    onToggleMute: () -> Unit,
-    onScroll: (productId: String, offset: Float) -> Unit,
-    onPointAt: (productId: String) -> Unit,
-    onOpenDetail: (productId: String) -> Unit,
-    onOpenCart: () -> Unit,
-    onDismissCart: () -> Unit,
-    onDismissProductSheet: () -> Unit,
-    onConfirmOrder: () -> Unit,
-    onAddToCart: (complemento1Id: Long?, unitsBySize: Map<Long, Int>) -> Unit,
-    onRetryCart: () -> Unit,
-    onDismissCartError: () -> Unit,
-    onRetryCatalog: () -> Unit,
-    onPrevCatalogPage: () -> Unit,
-    onNextCatalogPage: () -> Unit,
 ) {
     val colors = TrovataTokens.colors
-    val productByRef = remember(state.products) { state.products.associateBy { it.ref } }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -171,33 +135,26 @@ private fun LiveCallBody(
         Column(modifier = Modifier.fillMaxSize()) {
             CallTopBar(state = state, modifier = Modifier.fillMaxWidth())
 
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                if (state.isLive) {
-                    CatalogPanel(
-                        products = state.products,
-                        collectionLabel = state.collectionLabel,
-                        isLoading = state.isLoadingCatalog,
-                        error = state.catalogError,
-                        page = state.catalogPage,
-                        lastPage = state.catalogLastPage,
-                        onScroll = onScroll,
-                        onPointAt = onPointAt,
-                        onOpenDetail = onOpenDetail,
-                        onRetryCatalog = onRetryCatalog,
-                        onPrevPage = onPrevCatalogPage,
-                        onNextPage = onNextCatalogPage,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    IdleHero(state = state, modifier = Modifier.fillMaxSize())
-                }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(Color.White),
+            ) {
+                LiveCatalogWebView(
+                    url = state.pageUrl,
+                    bridge = screenModel.webBridge,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
 
             CallActionBar(
                 state = state,
                 onHangup = onHangup,
-                onToggleMute = onToggleMute,
-                onOpenCart = onOpenCart,
+                onToggleMute = screenModel::toggleMute,
+                onToggleDrawing = screenModel::toggleDrawing,
+                onClearDrawing = screenModel::clearDrawing,
+                onOpenCart = screenModel::openCartDrawer,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -211,36 +168,11 @@ private fun LiveCallBody(
             )
         }
 
-        if (state.showProductSheet && state.focusedProductId != null) {
-            val product = productByRef[state.focusedProductId]
-            if (product != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(colors.bg),
-                ) {
-                    ProductDetailScreen(
-                        product = product,
-                        grade = state.focusedGrade,
-                        related = state.products.filter { it.ref != product.ref }.take(6),
-                        inCallContext = true,
-                        customerName = clientName,
-                        canSell = state.canSellToCart,
-                        isSaving = state.isSavingItem,
-                        onBack = onDismissProductSheet,
-                        onPointAt = onPointAt,
-                        onAddToCart = onAddToCart,
-                    )
-                }
-            }
-        }
-
         if (state.showCartDrawer) {
             CartDrawer(
                 state = state,
-                productByRef = productByRef,
-                onDismiss = onDismissCart,
-                onConfirmOrder = onConfirmOrder,
+                onDismiss = screenModel::dismissCartDrawer,
+                onConfirmOrder = screenModel::confirmOrder,
             )
         }
 
@@ -248,8 +180,8 @@ private fun LiveCallBody(
             CartErrorBanner(
                 message = message,
                 canRetry = state.cartStage == CartStage.Failed,
-                onRetry = onRetryCart,
-                onDismiss = onDismissCartError,
+                onRetry = screenModel::retryCart,
+                onDismiss = screenModel::clearCartError,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 116.dp, start = 16.dp, end = 16.dp),
@@ -259,7 +191,6 @@ private fun LiveCallBody(
         state.summary?.let { summary ->
             OrderSummaryOverlay(
                 summary = summary,
-                productByRef = productByRef,
                 onClose = onHangup,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -300,216 +231,12 @@ private fun CallTopBar(state: LiveCallUiState, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun CatalogPanel(
-    products: List<Product>,
-    collectionLabel: String,
-    isLoading: Boolean,
-    error: String?,
-    page: Int,
-    lastPage: Int,
-    onScroll: (productId: String, offset: Float) -> Unit,
-    onPointAt: (productId: String) -> Unit,
-    onOpenDetail: (productId: String) -> Unit,
-    onRetryCatalog: () -> Unit,
-    onPrevPage: () -> Unit,
-    onNextPage: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = TrovataTokens.colors
-    val gridState = rememberLazyGridState()
-    var pointing by remember { mutableStateOf(false) }
-    var pointedRef by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(pointedRef) {
-        if (pointedRef == null) return@LaunchedEffect
-        kotlinx.coroutines.delay(3_000)
-        pointedRef = null
-    }
-
-    LaunchedEffect(gridState, products) {
-        snapshotFlow {
-            gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
-        }.collect { (index, offsetPx) ->
-            val product = products.getOrNull(index) ?: return@collect
-            val normalized = (offsetPx.toFloat() / 320f).coerceIn(0f, 1f)
-            onScroll(product.ref, normalized)
-        }
-    }
-
-    Column(modifier = modifier) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                if (collectionLabel.isNotBlank()) {
-                    Text(
-                        text = collectionLabel.uppercase(),
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontSize = 10.5.sp,
-                        letterSpacing = 0.08.em,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-                Text(
-                    text = if (pointing) "Toque num produto para apontar" else "Mostrando para o cliente",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-            }
-            IconBtn(
-                icon = TrovataIcons.pointer,
-                onClick = { pointing = !pointing },
-                kind = if (pointing) IconBtnKind.Brand else IconBtnKind.Dark,
-                active = pointing,
-                size = 40.dp,
-                contentDescription = if (pointing) "Sair do modo apontar" else "Entrar no modo apontar",
-            )
-        }
-        Spacer(modifier = Modifier.height(10.dp))
-        if (products.isEmpty()) {
-            CatalogPlaceholder(
-                isLoading = isLoading,
-                error = error,
-                onRetry = onRetryCatalog,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
-            return@Column
-        }
-        LazyVerticalGrid(
-            state = gridState,
-            columns = GridCells.Fixed(2),
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(colors.ink),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(products, key = { it.ref }) { product ->
-                ProductCard(
-                    product = product,
-                    size = ProductCardSize.Md,
-                    pointed = pointedRef == product.ref,
-                    onClick = {
-                        if (pointing) {
-                            pointedRef = product.ref
-                            onPointAt(product.ref)
-                        } else {
-                            onOpenDetail(product.ref)
-                        }
-                    },
-                )
-            }
-        }
-        if (lastPage > 1) {
-            CatalogPager(
-                page = page,
-                lastPage = lastPage,
-                isLoading = isLoading,
-                onPrevPage = onPrevPage,
-                onNextPage = onNextPage,
-            )
-        }
-    }
-}
-
-@Composable
-private fun CatalogPlaceholder(
-    isLoading: Boolean,
-    error: String?,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = error ?: if (isLoading) "Carregando o catálogo..." else "Nenhum produto nesta vitrine",
-            color = Color.White.copy(alpha = 0.72f),
-            fontSize = 13.sp,
-        )
-        if (error != null) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Btn(text = "Tentar de novo", onClick = onRetry, kind = BtnKind.Dark, size = BtnSize.Sm)
-        }
-    }
-}
-
-@Composable
-private fun CatalogPager(
-    page: Int,
-    lastPage: Int,
-    isLoading: Boolean,
-    onPrevPage: () -> Unit,
-    onNextPage: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Btn(
-            text = "Anterior",
-            onClick = onPrevPage,
-            kind = BtnKind.Dark,
-            size = BtnSize.Sm,
-            enabled = page > 1 && !isLoading,
-        )
-        Text(
-            text = "Página $page de $lastPage",
-            color = Color.White.copy(alpha = 0.6f),
-            fontSize = 11.5.sp,
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.Center,
-        )
-        Btn(
-            text = "Próxima",
-            onClick = onNextPage,
-            kind = BtnKind.Dark,
-            size = BtnSize.Sm,
-            enabled = page < lastPage && !isLoading,
-        )
-    }
-}
-
-@Composable
-private fun IdleHero(state: LiveCallUiState, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        CallAvatar(state = state)
-        Spacer(modifier = Modifier.height(18.dp))
-        Text(
-            text = headlineFor(state),
-            color = Color.White,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = (-0.02).em,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = state.errorMessage ?: subheadlineFor(state),
-            color = Color.White.copy(alpha = 0.7f),
-            fontSize = 13.sp,
-        )
-    }
-}
-
-@Composable
 private fun CallActionBar(
     state: LiveCallUiState,
     onHangup: () -> Unit,
     onToggleMute: () -> Unit,
+    onToggleDrawing: () -> Unit,
+    onClearDrawing: () -> Unit,
     onOpenCart: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -527,6 +254,25 @@ private fun CallActionBar(
             size = 48.dp,
             contentDescription = if (state.localMuted) "Reativar microfone" else "Silenciar microfone",
         )
+        Spacer(modifier = Modifier.width(10.dp))
+        IconBtn(
+            icon = TrovataIcons.pointer,
+            onClick = onToggleDrawing,
+            kind = if (state.drawing) IconBtnKind.Brand else IconBtnKind.Dark,
+            active = state.drawing,
+            size = 48.dp,
+            contentDescription = if (state.drawing) "Parar de desenhar" else "Desenhar para o cliente",
+        )
+        if (state.drawing) {
+            Spacer(modifier = Modifier.width(10.dp))
+            IconBtn(
+                icon = TrovataIcons.trash,
+                onClick = onClearDrawing,
+                kind = IconBtnKind.Dark,
+                size = 48.dp,
+                contentDescription = "Apagar o desenho",
+            )
+        }
         Spacer(modifier = Modifier.width(10.dp))
         CartButton(count = state.cartCount, onClick = onOpenCart)
         Spacer(modifier = Modifier.width(10.dp))
@@ -588,7 +334,7 @@ private fun CartToastView(toast: CartToast, modifier: Modifier = Modifier) {
                     .background(Color.White.copy(alpha = 0.18f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                androidx.compose.material3.Icon(
+                Icon(
                     imageVector = TrovataIcons.cart,
                     contentDescription = null,
                     tint = Color.White,
@@ -609,7 +355,6 @@ private fun CartToastView(toast: CartToast, modifier: Modifier = Modifier) {
 @Composable
 private fun CartDrawer(
     state: LiveCallUiState,
-    productByRef: Map<String, Product>,
     onDismiss: () -> Unit,
     onConfirmOrder: () -> Unit,
 ) {
@@ -666,7 +411,7 @@ private fun CartDrawer(
                     modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
                 ) {
                     items(state.cart, key = { it.itemId }) { line ->
-                        CartRow(line = line, product = productByRef[line.ref])
+                        CartRow(line = line)
                     }
                 }
                 CartTotalBar(units = state.cartCount, totalCents = state.cartTotalCents)
@@ -742,9 +487,29 @@ private fun CartErrorBanner(
 }
 
 @Composable
-private fun CartRow(line: CartLineUi, product: Product?) {
+private fun CartRow(line: CartLineUi) {
     val colors = TrovataTokens.colors
-    val trailing: @Composable () -> Unit = {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        CartThumbnail(imageUrl = line.imageUrl)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = line.name,
+                color = colors.ink,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = listOfNotNull(line.ref, line.color).joinToString(" · "),
+                color = colors.ink3,
+                fontSize = 11.sp,
+            )
+        }
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = line.sizesLabel.ifBlank { "${line.units}un" },
@@ -760,29 +525,34 @@ private fun CartRow(line: CartLineUi, product: Product?) {
             )
         }
     }
-    if (product == null) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = line.name, color = colors.ink, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                Text(
-                    text = listOfNotNull(line.ref, line.color).joinToString(" · "),
-                    color = colors.ink3,
-                    fontSize = 11.sp,
-                )
-            }
-            trailing()
+}
+
+@Composable
+private fun CartThumbnail(imageUrl: String?) {
+    val colors = TrovataTokens.colors
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.surface2),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (imageUrl.isNullOrBlank()) {
+            Icon(
+                imageVector = TrovataIcons.swatch,
+                contentDescription = null,
+                tint = colors.ink3,
+                modifier = Modifier.size(18.dp),
+            )
+        } else {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
-        return
     }
-    ProductRow(
-        product = product,
-        size = ProductRowSize.Md,
-        quantity = line.units,
-        trailing = trailing,
-    )
 }
 
 @Composable
@@ -827,7 +597,7 @@ private fun EmptyCart(modifier: Modifier = Modifier) {
                 .background(colors.surface2, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            androidx.compose.material3.Icon(
+            Icon(
                 imageVector = TrovataIcons.cart,
                 contentDescription = null,
                 tint = colors.ink3,
@@ -841,7 +611,7 @@ private fun EmptyCart(modifier: Modifier = Modifier) {
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "Quando o cliente adicionar uma peça, ela aparece aqui em tempo real.",
+            text = "Quando alguém adicionar uma peça na vitrine, ela aparece aqui em tempo real.",
             color = colors.ink3,
             fontSize = 13.sp,
             modifier = Modifier.padding(horizontal = 24.dp),
@@ -851,14 +621,15 @@ private fun EmptyCart(modifier: Modifier = Modifier) {
 
 private fun headlineFor(state: LiveCallUiState): String = when {
     state.errorMessage != null -> "Falha na chamada"
-    state.isLive -> "Em chamada"
+    state.isLive && state.drawing -> "Desenhando para o cliente"
+    state.isLive -> "Mostrando para o cliente"
     state.isNegotiating -> "Cliente entrando…"
     else -> "Aguardando cliente entrar"
 }
 
 private fun subheadlineFor(state: LiveCallUiState): String = when {
     state.isLive && state.remoteMuted -> "Cliente sem áudio · token ${state.token}"
-    state.isLive -> "Áudio P2P ativo · token ${state.token}"
+    state.isLive -> "Vocês estão vendo a mesma vitrine · token ${state.token}"
     state.isNegotiating -> "Conectando o áudio · token ${state.token}"
     else -> "Compartilhe o link · token ${state.token}"
 }
@@ -880,33 +651,8 @@ private fun StatusPill(state: LiveCallUiState) {
 }
 
 @Composable
-private fun CallAvatar(state: LiveCallUiState) {
-    val colors = TrovataTokens.colors
-    val borderColor = when {
-        state.errorMessage != null -> colors.live
-        state.isLive -> colors.jade
-        else -> Color.White.copy(alpha = 0.25f)
-    }
-    Box(
-        modifier = Modifier
-            .size(140.dp)
-            .background(Color.White.copy(alpha = 0.08f), CircleShape)
-            .border(3.dp, borderColor, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "C",
-            color = Color.White,
-            fontSize = 48.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
 private fun OrderSummaryOverlay(
     summary: OrderSummaryUi,
-    productByRef: Map<String, Product>,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -951,7 +697,7 @@ private fun OrderSummaryOverlay(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(summary.lines, key = { it.productId + "/" + it.size }) { line ->
-                OrderSummaryRow(line = line, product = productByRef[line.productId])
+                OrderSummaryRow(line = line)
             }
         }
 
@@ -995,36 +741,25 @@ private fun OrderSummaryOverlay(
 }
 
 @Composable
-private fun OrderSummaryRow(line: OrderLine, product: Product?) {
+private fun OrderSummaryRow(line: OrderLine) {
     val colors = TrovataTokens.colors
-    if (product == null) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
-            text = "${line.productId} · ${line.size} · ${line.units}un",
+            text = "${line.productId} · Tam ${line.size} · ${line.units}un",
             color = colors.ink2,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(1f),
         )
-        return
+        Text(
+            text = formatBrl(line.subtotalCents),
+            color = colors.ink,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
-    ProductRow(
-        product = product,
-        size = ProductRowSize.Md,
-        quantity = line.units,
-        trailing = {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "Tam ${line.size}",
-                    color = colors.ink3,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    text = formatBrl(line.subtotalCents),
-                    color = colors.ink,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        },
-    )
 }
 
 private fun formatBrl(cents: Long): String {

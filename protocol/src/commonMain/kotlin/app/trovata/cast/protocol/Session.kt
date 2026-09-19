@@ -51,6 +51,8 @@ data class SessionInfo(
 data class ErrorResponse(val code: String, val message: String)
 
 const val LiveSessionQueryParam = "live"
+const val LiveEmbedQueryParam = "embed"
+const val LiveEmbedSellerValue = "seller"
 
 fun buildLiveInviteUrl(
     catalogBaseUrl: String,
@@ -60,4 +62,9 @@ fun buildLiveInviteUrl(
 ): String {
     val base = catalogBaseUrl.trimEnd('/')
     return "$base/catalogo-link-view/$empresaSlug/$catalogoUuid?$LiveSessionQueryParam=$token"
+}
+
+fun buildSellerEmbedUrl(inviteUrl: String): String {
+    val separator = if (inviteUrl.contains('?')) "&" else "?"
+    return "$inviteUrl$separator$LiveEmbedQueryParam=$LiveEmbedSellerValue"
 }

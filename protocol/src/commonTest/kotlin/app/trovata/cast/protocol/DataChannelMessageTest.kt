@@ -155,3 +155,145 @@ class DataChannelMessageTest {
         assertNull(decodeDataChannel("{\"type\":\"cartUpdate\",\"productId\":\"AN-104\"}"))
     }
 }
+
+class DrawMessageTest {
+
+    @Test
+    fun draw_roundtrip_anchored_on_product() {
+        val original: DataChannelMessage = DataChannelMessage.Draw(
+            strokeId = "seller-embed-7",
+            target = LiveAnchor.product(produtoPreId = 8813),
+            phase = DrawPhase.Move,
+            points = listOf(DrawPoint(0.12f, 0.4f), DrawPoint(0.5f, 0.55f)),
+            ts = 1_700_000_000_000,
+            from = "seller-embed",
+            color = "#2456E0",
+        )
+        val raw = original.encode()
+        assertEquals(original, decodeDataChannel(raw))
+        assertTrue(raw.contains("\"type\":\"draw\""))
+        assertTrue(raw.contains("\"phase\":\"move\""))
+    }
+
+    @Test
+    fun draw_points_may_leave_the_anchor_box() {
+        val original: DataChannelMessage = DataChannelMessage.Draw(
+            strokeId = "s1",
+            target = LiveAnchor.product(produtoPreId = 8813),
+            phase = DrawPhase.End,
+            points = listOf(DrawPoint(-0.3f, 1.8f)),
+            ts = 1L,
+            from = "seller-embed",
+        )
+        val decoded = decodeDataChannel(original.encode()) as DataChannelMessage.Draw
+        assertEquals(-0.3f, decoded.points.single().x)
+        assertEquals(1.8f, decoded.points.single().y)
+        assertNull(decoded.color)
+    }
+
+    @Test
+    fun draw_can_fall_back_to_viewport_anchor() {
+        val original: DataChannelMessage = DataChannelMessage.Draw(
+            strokeId = "s2",
+            target = LiveAnchor.viewport(),
+            phase = DrawPhase.Start,
+            points = listOf(DrawPoint(0.5f, 0.5f)),
+            ts = 1L,
+            from = "buyer-1",
+        )
+        val decoded = decodeDataChannel(original.encode()) as DataChannelMessage.Draw
+        assertTrue(LiveAnchor.isViewport(decoded.target))
+        assertNull(LiveAnchor.produtoPreIdOf(decoded.target))
+    }
+
+    @Test
+    fun product_modal_anchor_still_resolves_the_product() {
+        val target = LiveAnchor.productModal(8813)
+        assertEquals("produto:8813:modal", target)
+        assertTrue(LiveAnchor.isProductModal(target))
+        assertEquals(8813L, LiveAnchor.produtoPreIdOf(target))
+        assertTrue(!LiveAnchor.isProductModal(LiveAnchor.product(8813, complemento1Id = 44)))
+    }
+
+    @Test
+    fun image_anchor_keeps_the_source_url_intact() {
+        val src = "https://cdn.example.com/empresa_97/PRATO_00.jpg?w=800"
+        val target = LiveAnchor.image(src)
+        assertEquals("imagem:$src", target)
+        assertEquals(src, LiveAnchor.imageSrcOf(target))
+        assertNull(LiveAnchor.imageSrcOf(LiveAnchor.product(8813)))
+        assertNull(LiveAnchor.produtoPreIdOf(target))
+    }
+
+    @Test
+    fun drawClear_defaults_to_everything() {
+        val original: DataChannelMessage = DataChannelMessage.DrawClear(ts = 1L, from = "seller-embed")
+        val raw = original.encode()
+        val decoded = decodeDataChannel(raw) as DataChannelMessage.DrawClear
+        assertNull(decoded.strokeId)
+        assertTrue(raw.contains("\"type\":\"drawClear\""))
+    }
+
+    @Test
+    fun drawClear_can_target_one_stroke() {
+        val original: DataChannelMessage = DataChannelMessage.DrawClear(
+            ts = 1L,
+            from = "seller-embed",
+            strokeId = "s1",
+        )
+        assertEquals(original, decodeDataChannel(original.encode()))
+    }
+
+    @Test
+    fun draw_from_the_web_side_decodes_without_optional_fields() {
+        val raw = """{"type":"draw","strokeId":"s9","target":"produto:8813","phase":"start","points":[{"x":0.1,"y":0.2}],"ts":5,"from":"seller-embed"}"""
+        val decoded = decodeDataChannel(raw) as DataChannelMessage.Draw
+        assertEquals("s9", decoded.strokeId)
+        assertEquals(DrawPhase.Start, decoded.phase)
+        assertEquals(1, decoded.points.size)
+    }
+}
+
+class QuantityDraftTest {
+
+    @Test
+    fun quantityDraft_roundtrip() {
+        val original: DataChannelMessage = DataChannelMessage.QuantityDraft(
+            produtoPreId = 4933,
+            gradeKey = "0:77:12",
+            units = 2,
+            ts = 1_700_000_000_000,
+            from = "seller-embed",
+        )
+        val raw = original.encode()
+        assertEquals(original, decodeDataChannel(raw))
+        assertTrue(raw.contains("\"type\":\"quantityDraft\""))
+    }
+
+    @Test
+    fun quantityDraft_from_the_web_side_decodes() {
+        val raw = """{"type":"quantityDraft","produtoPreId":4933,"gradeKey":"0:77:12","units":0,"ts":5,"from":"buyer-1"}"""
+        val decoded = decodeDataChannel(raw) as DataChannelMessage.QuantityDraft
+        assertEquals(0, decoded.units)
+        assertEquals("0:77:12", decoded.gradeKey)
+    }
+}
+
+class DataChannelEnvelopeTest {
+
+    @Test
+    fun unknown_type_with_envelope_fields_is_still_an_envelope() {
+        val raw = """{"type":"somethingNewer","payload":{"x":1},"ts":5,"from":"buyer-1"}"""
+        assertTrue(isDataChannelEnvelope(raw))
+        assertNull(decodeDataChannel(raw))
+    }
+
+    @Test
+    fun envelope_requires_type_from_and_numeric_ts() {
+        assertTrue(!isDataChannelEnvelope("""{"type":"mute","muted":true}"""))
+        assertTrue(!isDataChannelEnvelope("""{"type":"","ts":1,"from":"a"}"""))
+        assertTrue(!isDataChannelEnvelope("""{"type":"mute","ts":"x","from":"a"}"""))
+        assertTrue(!isDataChannelEnvelope("not json"))
+        assertTrue(!isDataChannelEnvelope("[1,2]"))
+    }
+}

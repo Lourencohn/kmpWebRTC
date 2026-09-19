@@ -101,6 +101,7 @@ data class InviteScreen(
                     LiveCallScreen(
                         token = record.token,
                         sessionId = record.sessionId,
+                        inviteUrl = record.url,
                         empresaSlug = record.empresaSlug,
                         catalogoUuid = record.catalogoUuid,
                         sellerName = record.sellerName,

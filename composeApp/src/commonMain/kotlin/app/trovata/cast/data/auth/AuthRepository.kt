@@ -11,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 
 class AuthRepository(
-    private val store: AuthStore,
+    private val store: AuthStorage,
     private val keycloak: KeycloakAuthService,
     private val account: AccountApi,
     private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
@@ -90,12 +90,17 @@ class AuthRepository(
                     tokens = refreshed.value
                     return refreshed.value.accessToken
                 }
-                is SfaApiResult.Fail -> { clearSession(); return null }
+                is SfaApiResult.Fail -> {
+                    if (refreshed.isRejectedByServer()) clearSession()
+                    return null
+                }
             }
         }
         clearSession()
         return null
     }
+
+    private fun SfaApiResult.Fail.isRejectedByServer(): Boolean = status in 400..499
 
     fun logout() = clearSession()
 

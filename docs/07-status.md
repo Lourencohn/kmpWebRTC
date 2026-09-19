@@ -30,6 +30,7 @@
 | Integração Catálogo Link — Fase 0 (contrato) | ✅ concluído | (sem commit ainda) | `SessionCreateRequest` por identidade do catálogo link, `CatalogRoute`+`ViewState`, `Scroll` ancorado, `CartInvalidated`/`OrderPlaced`, URL de convite no `sfa_front`. Ver `prompt.md` e `docs/10-integracao-catalogo-link.md` |
 | Release de demonstração (app enxugado para televenda) | ✅ concluído | (sem commit ainda) | Três abas (Sessões, Catálogos, Clientes), catálogo local e painéis sem fonte de dados removidos, telas do protótipo aposentadas |
 | Carrinhos abertos (item 1 de `docs/12-proximas-telas.md`) | ✅ concluído | (sem commit ainda) | Quarta aba sobre `GET empresa/{slug}/carrinhos`, com "Chamar ao vivo" reaproveitando o caminho de convite |
+| Espelho e desenho (Frentes A e B de `prompt-espelho-e-desenho.md`) | 🟡 código pronto, aparelho pendente | (sem commit ainda) | WebView da vitrine com a ponte `TrovataLive` no lugar da grade Compose; `draw`/`drawClear` ancorados a produto ou modal, capturados e renderizados na página nos dois lados. Verificado entre duas páginas em Chrome headless; a chamada real no Moto G22 ficou pendente (aparelho bloqueado, token vencido). Ver `docs/13-espelho-e-desenho.md` |
 
 ---
 
@@ -962,6 +963,14 @@ Esse número é a observação seguinte, e é de produto, não de bug: o primeir
 
 ---
 
+## Espelho e desenho: a vitrine embutida e o traço compartilhado
+
+Registro completo em `docs/13-espelho-e-desenho.md`. Em resumo: a chamada do vendedor passou a abrir a vitrine do Catálogo Link numa WebView (`?live=<token>&embed=seller`), com o app fazendo o relay entre `window.TrovataLive` e o DataChannel; o desenho viaja como `draw`/`drawClear` ancorado ao elemento onde o traço começou (`produto:<id>`, `produto:<id>:modal`, `viewport` como último recurso), com pontos em proporção do retângulo do elemento, lote a cada 50 ms. A grade Compose, o painel de produto e o modo apontar saíram da chamada; a gaveta do carrinho ficou porque o fechamento é rota privada do vendedor.
+
+Verificado: 35 testes no `protocol`, 95 no `composeApp`, `vue-tsc` e eslint no `sfa_front`, e o fluxo inteiro (navegar, desenhar, apagar, abrir e fechar modal, rolar) entre duas páginas reais de staging em Chrome headless com a ponte simulada. Não verificado: a chamada no aparelho e o `actual` iOS. Descoberto no caminho: o bundle de `staging.trovata.app.br` não contém `src/live`, então a branch de televenda do `sfa_front` precisa ser publicada antes de qualquer teste fora do Vite local.
+
+---
+
 ## Histórico
 
 | Data | Marco |
@@ -989,4 +998,5 @@ Esse número é a observação seguinte, e é de produto, não de bug: o primeir
 | 2026-08-30 | Integração Catálogo Link — Fase 5 fechada: `clientEmail`/`catalogoLinkId` propagados até a chamada (migração SQLDelight v2), carrinho do cliente aberto por e-mail, quantidade por tamanho no detalhe, gaveta lendo `itens-para-rota-publica` e fechamento por "pronto para envio"; `CartRepository` removido · 64 testes no composeApp |
 | 2026-09-02 | Release de demonstração: app reduzido a três abas (Sessões, Catálogos, Clientes), catálogo local e painéis sem fonte removidos, `data/sample` extinto, sync de login limitado a clientes · 64 testes no composeApp |
 | 2026-09-02 | Carrinhos abertos: quarta aba sobre `GET empresa/{slug}/carrinhos` com "Chamar ao vivo", filtro por situação e ordem, `OpenCartsApi`/`OpenCartsScreenModel`, parser de data do Laravel. Descoberto que o `login` só retoma carrinho em situação `D` · 82 testes no composeApp |
+| 2026-09-07 | Espelho e desenho: WebView da vitrine com ponte `TrovataLive` (`LiveWebBridge`, `LiveCatalogWebView` Android/iOS), `Draw`/`DrawClear` no `protocol/` e em `src/live/protocol.ts`, `LiveDrawLayer.vue` e âncoras DOM no `sfa_front`, seller publicando `scroll` e `navigate` com foco · 35 testes protocol + 95 composeApp; fluxo verificado página a página em Chrome headless, aparelho pendente |
 | 2026-09-02 | Sync destravado: `SfaApi` apontado para `/v2/empresas/...` depois de descobrir que a v1 pública não existe em `api-int-staging` (404 em todas as 13 entidades). `ClientEntity` foi de 0 para 36.798 no Moto G22 |

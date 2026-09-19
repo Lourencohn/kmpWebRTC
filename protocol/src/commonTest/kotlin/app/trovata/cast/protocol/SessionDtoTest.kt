@@ -62,3 +62,26 @@ class SessionDtoTest {
         assertTrue(raw.contains("\"catalogoUuid\":\"5f6c1d2e-8a41-4f0b-9c3d-77b2a0e14c9f\""))
     }
 }
+
+class LiveUrlTest {
+
+    @Test
+    fun sellerEmbedUrlAppendsToInviteQuery() {
+        val invite = buildLiveInviteUrl(
+            catalogBaseUrl = "https://staging.trovata.app.br/",
+            empresaSlug = "buba",
+            catalogoUuid = "5f6c1d2e",
+            token = "tok123",
+        )
+        assertEquals("https://staging.trovata.app.br/catalogo-link-view/buba/5f6c1d2e?live=tok123", invite)
+        assertEquals("$invite&embed=seller", buildSellerEmbedUrl(invite))
+    }
+
+    @Test
+    fun sellerEmbedUrlStartsQueryWhenInviteHasNone() {
+        assertEquals(
+            "https://staging.trovata.app.br/catalogo-link-view/buba/uuid?embed=seller",
+            buildSellerEmbedUrl("https://staging.trovata.app.br/catalogo-link-view/buba/uuid"),
+        )
+    }
+}

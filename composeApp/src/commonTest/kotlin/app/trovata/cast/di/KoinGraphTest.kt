@@ -32,6 +32,7 @@ class KoinGraphTest {
         val spec = CallSpec(
             token = "tok-test",
             sessionId = "sess-test",
+            inviteUrl = "https://staging.trovata.app.br/catalogo-link-view/buba-teste/uuid-test?live=tok-test",
             empresaSlug = "buba-teste",
             catalogoUuid = "uuid-test",
             clientName = "Cliente",

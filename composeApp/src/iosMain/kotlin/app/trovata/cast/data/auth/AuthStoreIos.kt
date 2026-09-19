@@ -2,12 +2,12 @@ package app.trovata.cast.data.auth
 
 import platform.Foundation.NSUserDefaults
 
-actual class AuthStore {
+actual class AuthStore : AuthStorage {
     private val defaults: NSUserDefaults = NSUserDefaults.standardUserDefaults
 
-    actual fun get(key: String): String? = defaults.stringForKey(key)
+    actual override fun get(key: String): String? = defaults.stringForKey(key)
 
-    actual fun put(key: String, value: String?) {
+    actual override fun put(key: String, value: String?) {
         if (value == null) {
             defaults.removeObjectForKey(key)
         } else {

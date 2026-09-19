@@ -3,24 +3,15 @@ package app.trovata.cast.feature.call
 import app.trovata.cast.data.local.OrderRepository
 import app.trovata.cast.data.remote.sfa.CarrinhoApi
 import app.trovata.cast.data.remote.sfa.CarrinhoItemLinha
-import app.trovata.cast.data.remote.sfa.ContextoComercial
-import app.trovata.cast.data.remote.sfa.ItemParaCarrinho
 import app.trovata.cast.data.remote.sfa.SfaApiResult
-import app.trovata.cast.data.remote.sfa.ProdutoGrade
-import app.trovata.cast.data.remote.sfa.VitrineApi
-import app.trovata.cast.ui.components.Product
+import app.trovata.cast.data.remote.sfa.SfaConfig
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.SignalingState
-import app.trovata.cast.protocol.CartChangeHint
 import app.trovata.cast.protocol.CartChangeReason
-import app.trovata.cast.protocol.CatalogRoute
 import app.trovata.cast.protocol.DataChannelMessage
-import app.trovata.cast.protocol.LiveAnchor
 import app.trovata.cast.protocol.OrderLine
 import app.trovata.cast.protocol.PeerRole
-import app.trovata.cast.protocol.ProductFocus
-import app.trovata.cast.protocol.ScrollAnchor
-import app.trovata.cast.protocol.ViewState
+import app.trovata.cast.protocol.decodeDataChannel
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +34,7 @@ data class CartLineUi(
     val ref: String,
     val name: String,
     val color: String?,
+    val imageUrl: String?,
     val units: Int,
     val totalCents: Long,
     val sizes: List<CartSizeUi>,
@@ -75,27 +67,16 @@ data class LiveCallUiState(
     val peer: PeerSessionState = PeerSessionState.Idle,
     val token: String,
     val role: PeerRole,
+    val pageUrl: String,
     val localMuted: Boolean = false,
     val remoteMuted: Boolean = false,
+    val drawing: Boolean = false,
     val cart: List<CartLineUi> = emptyList(),
     val cartStage: CartStage = CartStage.Idle,
     val cartError: String? = null,
     val carrinhoId: Long? = null,
     val cartClientName: String? = null,
-    val isSavingItem: Boolean = false,
     val isFinishingCart: Boolean = false,
-    val products: List<Product> = emptyList(),
-    val isLoadingCatalog: Boolean = true,
-    val catalogError: String? = null,
-    val focusedGrade: ProdutoGrade? = null,
-    val isLoadingGrade: Boolean = false,
-    val gradeError: String? = null,
-    val catalogPage: Int = 1,
-    val catalogLastPage: Int = 1,
-    val catalogTotal: Int = 0,
-    val collectionLabel: String = "",
-    val focusedProductId: String? = null,
-    val showProductSheet: Boolean = false,
     val showCartDrawer: Boolean = false,
     val toast: CartToast? = null,
     val summary: OrderSummaryUi? = null,
@@ -111,7 +92,6 @@ data class LiveCallUiState(
     }
     val cartCount: Int get() = cart.sumOf { it.units }
     val cartTotalCents: Long get() = cart.sumOf { it.totalCents }
-    val canSellToCart: Boolean get() = cartStage == CartStage.Ready && carrinhoId != null
 }
 
 class LiveCallScreenModel(
@@ -119,7 +99,6 @@ class LiveCallScreenModel(
     private val signaling: SignalingClient,
     private val peer: PeerSession,
     private val orderRepository: OrderRepository,
-    private val vitrineApi: VitrineApi,
     private val carrinhoApi: CarrinhoApi,
     private val callScope: Scope,
 ) : ScreenModel {
@@ -129,35 +108,33 @@ class LiveCallScreenModel(
     private val clientName = spec.clientName
     private val clientEmail = spec.clientEmail
     private val catalogoLinkId = spec.catalogoLinkId
-    private val collectionLabel = spec.collectionLabel
     private val sellerName = spec.sellerName
     private val clientShop = spec.clientShop
     private val empresaSlug = spec.empresaSlug
     private val catalogoUuid = spec.catalogoUuid
 
-    private var contexto: ContextoComercial? = null
-    private var prazoId: Long = 0
+    val webBridge = LiveWebBridge(onPageMessage = ::handlePageMessage)
 
     private val _state = MutableStateFlow(
         LiveCallUiState(
             token = token,
             role = PeerRole.Seller,
-            collectionLabel = collectionLabel,
+            pageUrl = sellerPageUrl(spec.inviteUrl, SfaConfig.catalogWebBaseUrlOverride),
             carrinhoId = spec.carrinhoId,
         ),
     )
     val state: StateFlow<LiveCallUiState> = _state.asStateFlow()
 
     init {
-        screenModelScope.launch {
-            openCart()
-            loadVitrine()
-        }
+        screenModelScope.launch { openCart() }
         screenModelScope.launch {
             signaling.state.collect { s -> _state.update { it.copy(signaling = s) } }
         }
         screenModelScope.launch {
-            peer.state.collect { p -> _state.update { it.copy(peer = p) } }
+            peer.state.collect { p ->
+                _state.update { it.copy(peer = p) }
+                webBridge.updateStatus(p.toBridgeStatus())
+            }
         }
         screenModelScope.launch {
             peer.localMuted.collect { m -> _state.update { it.copy(localMuted = m) } }
@@ -166,19 +143,25 @@ class LiveCallScreenModel(
             peer.remoteMuted.collect { m -> _state.update { it.copy(remoteMuted = m) } }
         }
         screenModelScope.launch {
-            peer.remoteNavigate.collect { msg ->
-                val ref = refOf(msg.view.focus?.produtoPreId) ?: return@collect
-                _state.update { it.copy(focusedProductId = ref, showProductSheet = true) }
-            }
+            peer.incomingRaw.collect { payload -> webBridge.deliverRaw(payload) }
         }
         screenModelScope.launch {
-            peer.remoteCartInvalidated.collect { msg -> handleRemoteCartInvalidated(msg) }
+            peer.incoming.collect { message -> handleRemoteMessage(message) }
         }
-        screenModelScope.launch {
-            peer.remoteOrderPlaced.collect {
-                _state.update { it.copy(showProductSheet = false, showCartDrawer = false) }
-            }
+    }
+
+    private fun handleRemoteMessage(message: DataChannelMessage) {
+        when (message) {
+            is DataChannelMessage.CartInvalidated -> handleRemoteCartInvalidated(message)
+            is DataChannelMessage.OrderPlaced -> _state.update { it.copy(showCartDrawer = false) }
+            else -> Unit
         }
+    }
+
+    private fun handlePageMessage(payload: String) {
+        if (!peer.publishRaw(payload)) return
+        val message = decodeDataChannel(payload) ?: return
+        if (message is DataChannelMessage.CartInvalidated) handleOwnCartChange(message)
     }
 
     private suspend fun openCart() {
@@ -199,32 +182,21 @@ class LiveCallScreenModel(
                 _state.update { it.copy(cartStage = CartStage.Failed, cartError = sessao.message) }
                 return
             }
-            is SfaApiResult.Ok -> {
-                prazoId = sessao.value.prazoId ?: 0
-                _state.update {
-                    it.copy(carrinhoId = sessao.value.id, cartClientName = sessao.value.clienteNome)
-                }
+            is SfaApiResult.Ok -> _state.update {
+                it.copy(
+                    carrinhoId = sessao.value.id,
+                    cartClientName = sessao.value.clienteNome,
+                    cartStage = CartStage.Ready,
+                    cartError = null,
+                )
             }
         }
-
-        when (val resolved = carrinhoApi.contextoComercial(empresaSlug, catalogoUuid)) {
-            is SfaApiResult.Fail -> {
-                _state.update { it.copy(cartStage = CartStage.Failed, cartError = resolved.message) }
-                return
-            }
-            is SfaApiResult.Ok -> contexto = resolved.value
-        }
-
-        _state.update { it.copy(cartStage = CartStage.Ready, cartError = null) }
         refreshCart()
     }
 
     fun retryCart() {
         if (_state.value.cartStage == CartStage.Opening) return
-        screenModelScope.launch {
-            openCart()
-            loadVitrine(_state.value.catalogPage)
-        }
+        screenModelScope.launch { openCart() }
     }
 
     private suspend fun refreshCart() {
@@ -235,51 +207,6 @@ class LiveCallScreenModel(
                 it.copy(cart = result.value.map { linha -> linha.toCartLineUi() }, cartError = null)
             }
         }
-    }
-
-    private suspend fun loadVitrine(page: Int = 1) {
-        _state.update { it.copy(isLoadingCatalog = true) }
-        when (
-            val result = vitrineApi.produtos(
-                empresaSlug = empresaSlug,
-                catalogoUuid = catalogoUuid,
-                page = page,
-                carrinhoId = _state.value.carrinhoId,
-            )
-        ) {
-            is SfaApiResult.Fail -> _state.update {
-                it.copy(isLoadingCatalog = false, catalogError = result.message)
-            }
-            is SfaApiResult.Ok -> {
-                val produtos = result.value.produtos
-                _state.update { current ->
-                    current.copy(
-                        isLoadingCatalog = false,
-                        catalogError = null,
-                        products = produtos.map { produto -> produto.toUiProduct() },
-                        catalogPage = result.value.currentPage,
-                        catalogLastPage = result.value.lastPage,
-                        catalogTotal = result.value.total,
-                    )
-                }
-            }
-        }
-    }
-
-    fun reloadVitrine() {
-        screenModelScope.launch { loadVitrine(_state.value.catalogPage) }
-    }
-
-    fun nextCatalogPage() {
-        val snapshot = _state.value
-        if (snapshot.catalogPage >= snapshot.catalogLastPage) return
-        screenModelScope.launch { loadVitrine(snapshot.catalogPage + 1) }
-    }
-
-    fun prevCatalogPage() {
-        val snapshot = _state.value
-        if (snapshot.catalogPage <= 1) return
-        screenModelScope.launch { loadVitrine(snapshot.catalogPage - 1) }
     }
 
     fun start() {
@@ -293,134 +220,14 @@ class LiveCallScreenModel(
         peer.setLocalMuted(!_state.value.localMuted)
     }
 
-    fun publishScroll(productId: String, offset: Float) {
-        peer.publishScroll(
-            ScrollAnchor(
-                produtoPreId = produtoPreIdOf(productId),
-                itemOffsetRatio = offset,
-            ),
-        )
+    fun toggleDrawing() {
+        val enabled = !_state.value.drawing
+        _state.update { it.copy(drawing = enabled) }
+        webBridge.setDrawing(enabled)
     }
 
-    fun publishPointAt(productId: String) {
-        val id = produtoPreIdOf(productId) ?: return
-        peer.publishPointAt(LiveAnchor.product(id))
-    }
-
-    fun openProductDetail(productId: String) {
-        _state.update {
-            it.copy(
-                focusedProductId = productId,
-                showProductSheet = true,
-                focusedGrade = null,
-                gradeError = null,
-            )
-        }
-        val id = produtoPreIdOf(productId) ?: return
-        loadGrade(id)
-        peer.publishNavigate(
-            ViewState(
-                route = CatalogRoute.Todos,
-                focus = ProductFocus(produtoPreId = id),
-            ),
-        )
-    }
-
-    private fun loadGrade(produtoPreId: Long) {
-        _state.update { it.copy(isLoadingGrade = true, gradeError = null) }
-        screenModelScope.launch {
-            when (
-                val result = vitrineApi.grade(
-                    empresaSlug = empresaSlug,
-                    catalogoUuid = catalogoUuid,
-                    produtoPreId = produtoPreId,
-                    carrinhoId = _state.value.carrinhoId,
-                )
-            ) {
-                is SfaApiResult.Fail -> _state.update {
-                    it.copy(isLoadingGrade = false, gradeError = result.message)
-                }
-                is SfaApiResult.Ok -> _state.update {
-                    if (produtoPreIdOf(it.focusedProductId.orEmpty()) != produtoPreId) it
-                    else it.copy(isLoadingGrade = false, focusedGrade = result.value, gradeError = null)
-                }
-            }
-        }
-    }
-
-    fun addFocusedProductToCart(complemento1Id: Long?, unitsBySize: Map<Long, Int>) {
-        val snapshot = _state.value
-        val carrinhoId = snapshot.carrinhoId
-        val contextoComercial = contexto
-        val produtoPreId = snapshot.focusedGrade?.produtoPreId
-            ?: produtoPreIdOf(snapshot.focusedProductId.orEmpty())
-        if (carrinhoId == null || contextoComercial == null || produtoPreId == null) {
-            _state.update { it.copy(cartError = "O carrinho do cliente ainda não está pronto") }
-            return
-        }
-        if (complemento1Id == null) {
-            _state.update { it.copy(cartError = "Escolha uma cor para lançar no pedido") }
-            return
-        }
-        val quantidades = unitsBySize.filterValues { it > 0 }
-        if (quantidades.isEmpty()) {
-            _state.update { it.copy(cartError = "Informe a quantidade de ao menos um tamanho") }
-            return
-        }
-        if (snapshot.isSavingItem) return
-        _state.update { it.copy(isSavingItem = true, cartError = null) }
-
-        screenModelScope.launch {
-            val result = carrinhoApi.salvarItem(
-                empresaSlug = empresaSlug,
-                catalogoUuid = catalogoUuid,
-                carrinhoId = carrinhoId,
-                contexto = contextoComercial,
-                prazoId = prazoId,
-                item = ItemParaCarrinho(
-                    produtoPreId = produtoPreId,
-                    complemento1Id = complemento1Id,
-                    quantidadePorTamanho = quantidades,
-                ),
-            )
-            when (result) {
-                is SfaApiResult.Fail -> _state.update {
-                    it.copy(isSavingItem = false, cartError = result.message)
-                }
-                is SfaApiResult.Ok -> {
-                    val units = quantidades.values.sum()
-                    val label = refOf(produtoPreId)
-                    peer.publishCartInvalidated(
-                        carrinhoId = carrinhoId,
-                        reason = CartChangeReason.ItemAdded,
-                        hint = CartChangeHint(
-                            produtoPreId = produtoPreId,
-                            unitsDelta = units,
-                            label = label,
-                        ),
-                    )
-                    _state.update {
-                        it.copy(
-                            isSavingItem = false,
-                            cartError = null,
-                            toast = CartToast(
-                                text = "${units}un de ${label ?: "produto"} no pedido",
-                                createdAtMs = Clock.System.now().toEpochMilliseconds(),
-                            ),
-                        )
-                    }
-                    syncCartState()
-                }
-            }
-        }
-    }
-
-    private fun produtoPreIdOf(ref: String): Long? =
-        _state.value.products.firstOrNull { it.ref == ref }?.produtoPreId
-
-    private fun refOf(produtoPreId: Long?): String? {
-        if (produtoPreId == null) return null
-        return _state.value.products.firstOrNull { it.produtoPreId == produtoPreId }?.ref
+    fun clearDrawing() {
+        webBridge.clearDrawing()
     }
 
     fun openCartDrawer() {
@@ -430,11 +237,6 @@ class LiveCallScreenModel(
 
     fun dismissCartDrawer() {
         _state.update { it.copy(showCartDrawer = false) }
-    }
-
-    fun dismissProductSheet() {
-        _state.update { it.copy(showProductSheet = false, focusedGrade = null) }
-        peer.publishNavigate(ViewState(route = CatalogRoute.Todos))
     }
 
     fun dismissToast() {
@@ -469,7 +271,14 @@ class LiveCallScreenModel(
                     val lines = current.cart.flatMap { it.toOrderLines() }
                     val totalCents = current.cartTotalCents
                     val orderId = "CAR-$carrinhoId"
-                    peer.publishOrderPlaced(carrinhoId = carrinhoId, pedidoId = orderId)
+                    val placed = DataChannelMessage.OrderPlaced(
+                        carrinhoId = carrinhoId,
+                        ts = ts,
+                        from = spec.sellerPeerId,
+                        pedidoId = orderId,
+                    )
+                    peer.publish(placed)
+                    webBridge.deliver(placed)
                     persistOrder(
                         orderId = orderId,
                         ts = ts,
@@ -488,7 +297,6 @@ class LiveCallScreenModel(
                                 confirmedByMe = true,
                             ),
                             showCartDrawer = false,
-                            showProductSheet = false,
                         )
                     }
                 }
@@ -519,44 +327,65 @@ class LiveCallScreenModel(
     }
 
     fun hangup() {
+        webBridge.updateStatus(LiveWebBridge.STATUS_CLOSED)
         screenModelScope.launch {
             peer.close("hangup")
             signaling.stop("hangup")
         }
     }
 
-    private fun handleRemoteCartInvalidated(msg: DataChannelMessage.CartInvalidated) {
-        val who = clientName?.split(' ')?.firstOrNull() ?: "Cliente"
-        val name = msg.hint?.label
-            ?: msg.hint?.produtoPreId?.let { refOf(it) }
-            ?: "o carrinho"
+    private fun handleOwnCartChange(msg: DataChannelMessage.CartInvalidated) {
         val units = msg.hint?.unitsDelta ?: 0
         val text = when (msg.reason) {
             CartChangeReason.ItemAdded ->
-                if (units > 0) "$who adicionou ${units}un de $name" else "$who atualizou $name"
-            CartChangeReason.ItemRemoved -> "$who removeu $name"
-            CartChangeReason.QuantityChanged -> "$who ajustou $name"
+                if (units > 0) "${units}un lançadas no pedido" else "Pedido atualizado"
+            CartChangeReason.ItemRemoved -> "Item removido do pedido"
+            CartChangeReason.QuantityChanged -> "Quantidade ajustada no pedido"
+            CartChangeReason.PrazoChanged -> "Prazo do pedido alterado"
+            CartChangeReason.Cleared -> "Pedido esvaziado"
+            CartChangeReason.Finalized -> "Pedido finalizado"
+        }
+        showToast(text)
+        screenModelScope.launch { refreshCart() }
+    }
+
+    private fun handleRemoteCartInvalidated(msg: DataChannelMessage.CartInvalidated) {
+        val who = clientName?.split(' ')?.firstOrNull() ?: "Cliente"
+        val name = msg.hint?.label
+        val units = msg.hint?.unitsDelta ?: 0
+        val text = when (msg.reason) {
+            CartChangeReason.ItemAdded -> when {
+                units > 0 && name != null -> "$who adicionou ${units}un de $name"
+                units > 0 -> "$who adicionou ${units}un ao carrinho"
+                else -> "$who atualizou o carrinho"
+            }
+            CartChangeReason.ItemRemoved -> "$who removeu ${name ?: "um item"}"
+            CartChangeReason.QuantityChanged -> "$who ajustou ${name ?: "o carrinho"}"
             CartChangeReason.PrazoChanged -> "$who mudou o prazo"
             CartChangeReason.Cleared -> "$who esvaziou o carrinho"
             CartChangeReason.Finalized -> "$who finalizou o carrinho"
         }
+        showToast(text)
+        screenModelScope.launch { refreshCart() }
+    }
+
+    private fun showToast(text: String) {
         _state.update {
             it.copy(toast = CartToast(text = text, createdAtMs = Clock.System.now().toEpochMilliseconds()))
         }
-        screenModelScope.launch { syncCartState() }
-    }
-
-    private suspend fun syncCartState() {
-        refreshCart()
-        loadVitrine(_state.value.catalogPage)
-        val focused = _state.value.focusedGrade?.produtoPreId
-            ?: produtoPreIdOf(_state.value.focusedProductId.orEmpty())
-        if (focused != null) loadGrade(focused)
     }
 
     override fun onDispose() {
         callScope.close()
     }
+}
+
+private fun PeerSessionState.toBridgeStatus(): String = when (this) {
+    PeerSessionState.Idle -> LiveWebBridge.STATUS_IDLE
+    PeerSessionState.Negotiating -> LiveWebBridge.STATUS_NEGOTIATING
+    PeerSessionState.Connected -> LiveWebBridge.STATUS_CONNECTED
+    is PeerSessionState.Failed -> LiveWebBridge.STATUS_FAILED
+    PeerSessionState.Closed -> LiveWebBridge.STATUS_CLOSED
 }
 
 fun CarrinhoItemLinha.toCartLineUi(): CartLineUi = CartLineUi(
@@ -565,6 +394,7 @@ fun CarrinhoItemLinha.toCartLineUi(): CartLineUi = CartLineUi(
     ref = ref,
     name = nome,
     color = cor,
+    imageUrl = imageUrl,
     units = quantidade,
     totalCents = totalCents ?: 0L,
     sizes = tamanhos.map { CartSizeUi(it.complemento2Id, it.label, it.quantidade) },

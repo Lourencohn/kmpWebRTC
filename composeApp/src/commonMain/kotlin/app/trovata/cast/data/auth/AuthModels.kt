@@ -5,7 +5,11 @@ data class AuthTokens(
     val refreshToken: String,
     val accessExpiresAtMs: Long,
     val refreshExpiresAtMs: Long,
-)
+) {
+    companion object {
+        const val NEVER_EXPIRES: Long = Long.MAX_VALUE
+    }
+}
 
 data class AuthUser(
     val id: Long,

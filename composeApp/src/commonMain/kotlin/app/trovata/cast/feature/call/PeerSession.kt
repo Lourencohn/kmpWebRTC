@@ -4,12 +4,15 @@ import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.protocol.CartChangeHint
 import app.trovata.cast.protocol.CartChangeReason
 import app.trovata.cast.protocol.DataChannelMessage
+import app.trovata.cast.protocol.DrawPhase
+import app.trovata.cast.protocol.DrawPoint
 import app.trovata.cast.protocol.PeerRole
 import app.trovata.cast.protocol.ScrollAnchor
 import app.trovata.cast.protocol.SignalingMessage
 import app.trovata.cast.protocol.ViewState
 import app.trovata.cast.protocol.decodeDataChannel
 import app.trovata.cast.protocol.encode
+import app.trovata.cast.protocol.isDataChannelEnvelope
 import co.touchlab.kermit.Logger
 import com.shepeliev.webrtckmp.DataChannel
 import com.shepeliev.webrtckmp.DataChannelState
@@ -98,6 +101,12 @@ class PeerSession(
 
     private val _remoteOrderPlaced = MutableSharedFlow<DataChannelMessage.OrderPlaced>(extraBufferCapacity = 4)
     val remoteOrderPlaced: SharedFlow<DataChannelMessage.OrderPlaced> = _remoteOrderPlaced.asSharedFlow()
+
+    private val _incoming = MutableSharedFlow<DataChannelMessage>(extraBufferCapacity = 64)
+    val incoming: SharedFlow<DataChannelMessage> = _incoming.asSharedFlow()
+
+    private val _incomingRaw = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    val incomingRaw: SharedFlow<String> = _incomingRaw.asSharedFlow()
 
     private val _outgoingScroll = MutableStateFlow<DataChannelMessage.Scroll?>(null)
 
@@ -291,14 +300,21 @@ class PeerSession(
         collectorJobs += scope.launch {
             channel.onMessage.collect { bytes ->
                 val payload = bytes.decodeToString()
-                when (val parsed = decodeDataChannel(payload)) {
+                if (!isDataChannelEnvelope(payload)) return@collect
+                _incomingRaw.tryEmit(payload)
+                val parsed = decodeDataChannel(payload) ?: return@collect
+                _incoming.tryEmit(parsed)
+                when (parsed) {
                     is DataChannelMessage.Mute -> _remoteMuted.value = parsed.muted
                     is DataChannelMessage.Scroll -> _remoteScroll.tryEmit(parsed)
                     is DataChannelMessage.PointAt -> _remotePointAt.tryEmit(parsed)
                     is DataChannelMessage.Navigate -> _remoteNavigate.tryEmit(parsed)
                     is DataChannelMessage.CartInvalidated -> _remoteCartInvalidated.tryEmit(parsed)
                     is DataChannelMessage.OrderPlaced -> _remoteOrderPlaced.tryEmit(parsed)
-                    null -> Unit
+                    is DataChannelMessage.Draw,
+                    is DataChannelMessage.DrawClear,
+                    is DataChannelMessage.QuantityDraft,
+                    -> Unit
                 }
             }
         }
@@ -376,6 +392,42 @@ class PeerSession(
             ts = Clock.System.now().toEpochMilliseconds(),
             from = selfPeerId,
             pedidoId = pedidoId,
+        ),
+    )
+
+    fun publish(message: DataChannelMessage): Boolean = send(message)
+
+    fun publishRaw(payload: String): Boolean {
+        if (!isDataChannelEnvelope(payload)) return false
+        val channel = dc ?: return false
+        if (channel.readyState != DataChannelState.Open) return false
+        channel.send(payload.encodeToByteArray())
+        return true
+    }
+
+    fun publishDraw(
+        strokeId: String,
+        target: String,
+        phase: DrawPhase,
+        points: List<DrawPoint>,
+        color: String? = null,
+    ) = send(
+        DataChannelMessage.Draw(
+            strokeId = strokeId,
+            target = target,
+            phase = phase,
+            points = points,
+            ts = Clock.System.now().toEpochMilliseconds(),
+            from = selfPeerId,
+            color = color,
+        ),
+    )
+
+    fun publishDrawClear(strokeId: String? = null) = send(
+        DataChannelMessage.DrawClear(
+            ts = Clock.System.now().toEpochMilliseconds(),
+            from = selfPeerId,
+            strokeId = strokeId,
         ),
     )
 
