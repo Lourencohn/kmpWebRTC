@@ -7,6 +7,7 @@ import app.trovata.cast.data.remote.sfa.SfaApiResult
 import app.trovata.cast.data.remote.sfa.SfaConfig
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.SignalingState
+import app.trovata.cast.platform.CallAudioController
 import app.trovata.cast.protocol.CartChangeReason
 import app.trovata.cast.protocol.DataChannelMessage
 import app.trovata.cast.protocol.OrderLine
@@ -100,6 +101,7 @@ class LiveCallScreenModel(
     private val peer: PeerSession,
     private val orderRepository: OrderRepository,
     private val carrinhoApi: CarrinhoApi,
+    private val callAudio: CallAudioController,
     private val callScope: Scope,
 ) : ScreenModel {
 
@@ -134,6 +136,7 @@ class LiveCallScreenModel(
             peer.state.collect { p ->
                 _state.update { it.copy(peer = p) }
                 webBridge.updateStatus(p.toBridgeStatus())
+                if (p is PeerSessionState.Connected) callAudio.activate()
             }
         }
         screenModelScope.launch {
@@ -210,6 +213,7 @@ class LiveCallScreenModel(
     }
 
     fun start() {
+        callAudio.activate()
         screenModelScope.launch {
             peer.start()
             signaling.start()
@@ -327,6 +331,7 @@ class LiveCallScreenModel(
     }
 
     fun hangup() {
+        callAudio.release()
         webBridge.updateStatus(LiveWebBridge.STATUS_CLOSED)
         screenModelScope.launch {
             peer.close("hangup")
@@ -376,6 +381,7 @@ class LiveCallScreenModel(
     }
 
     override fun onDispose() {
+        callAudio.release()
         callScope.close()
     }
 }

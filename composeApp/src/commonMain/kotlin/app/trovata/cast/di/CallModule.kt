@@ -58,6 +58,7 @@ val callModule = module {
                 peer = get { parametersOf(spec) },
                 orderRepository = get(),
                 carrinhoApi = get(),
+                callAudio = get(),
                 callScope = this,
             )
         }

@@ -1,6 +1,7 @@
 package app.trovata.cast.di
 
 import app.trovata.cast.data.auth.AuthStore
+import app.trovata.cast.platform.CallAudioController
 import app.trovata.cast.platform.DatabaseDriverFactory
 import app.trovata.cast.platform.ShareController
 import org.koin.core.module.Module
@@ -10,4 +11,5 @@ actual fun platformModule(): Module = module {
     single { DatabaseDriverFactory() }
     single { AuthStore() }
     single { ShareController() }
+    single { CallAudioController() }
 }

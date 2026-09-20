@@ -179,6 +179,20 @@ O PR #12 do `sfa_front` foi mesclado na `staging` e publicado. O app, com `catal
 
 ---
 
+## 5.4 Áudio da chamada no Android (20/09/2026)
+
+Relato do teste manual: a voz do vendedor (app) chegava baixa no cliente, e a do cliente saía alta no aparelho.
+
+O que o código mostrava: `PeerSession` pede `getUserMedia(audio = true)` e o app nunca tocava no `AudioManager`. A lib `webrtc-kmp` não define módulo de áudio, então vale o padrão do WebRTC Android, que grava pela fonte `VOICE_COMMUNICATION` com o processamento de voz do aparelho. Esse caminho é calibrado para o telefone em `MODE_IN_COMMUNICATION`, e o `dumpsys audio` mostrava `mModeOwnerPid: 0`, ou seja, a chamada inteira acontecia em modo normal.
+
+A correção é `platform/CallAudio.kt` (`expect`/`actual`): no Android, `CallAudioController` pede foco de áudio de voz, coloca o aparelho em `MODE_IN_COMMUNICATION` e escolhe o viva-voz como dispositivo de comunicação, a menos que haja fone com fio, USB ou Bluetooth; ao encerrar, devolve tudo como estava. O `actual` do iOS é vazio de propósito: lá o WebRTC já administra a `AVAudioSession`, e não há Mac para verificar uma mudança.
+
+Um detalhe do Android 12 em diante apareceu no teste: o sistema retira o modo de quem não está gravando nem tocando áudio de chamada por cerca de 6 segundos (`setMode(MODE_NORMAL) from package=android`), e o vendedor sempre espera o cliente entrar por mais que isso. Por isso o controlador é reaplicado quando a conexão fica viva (`PeerSessionState.Connected`). Log do aparelho com a chamada real: modo assumido às 20:42:31, retirado pelo sistema às 20:42:37, reassumido pelo app às 20:43:06 com o cliente conectado e mantido dali em diante, com `setCommunicationDevice` no viva-voz.
+
+**Limite da evidência**: isso prova que o Android passou a tratar o app como chamada. Não prova o ganho percebido no cliente, que depende de alguém falando no aparelho; fica para o teste de ouvido. Se continuar baixo, os próximos candidatos são desligar o cancelamento de eco por hardware (`JavaAudioDeviceModule` com AEC e supressão de ruído por software) e um ganho no áudio remoto do lado web.
+
+---
+
 ## 6. Limitações conhecidas
 
 - A página do seller segue `navigate` do cliente como o cliente segue o seller. É co-presença simétrica, e pode puxar o vendedor de rota. Se incomodar, o filtro é por `role` em `handleMessage`.
