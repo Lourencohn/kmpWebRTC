@@ -19,7 +19,7 @@ private val supportRows = listOf(
     SupportRow("Central de ajuda", TrovataIcons.msg),
     SupportRow("Termos de uso", TrovataIcons.lock),
     SupportRow("Política de privacidade", TrovataIcons.eye),
-    SupportRow("Versão", TrovataIcons.star, value = "0.1.0"),
+    SupportRow("Versão", TrovataIcons.star, value = "0.2.0"),
 )
 
 data class AccountUiState(

@@ -85,7 +85,7 @@ fun AuthWelcomeScreen(
                     )
                 }
                 Text(
-                    text = "v0.1.0",
+                    text = "v0.2.0",
                     color = colors.ink4,
                     style = TrovataTokens.type.mono.copy(fontSize = 11.sp),
                 )
