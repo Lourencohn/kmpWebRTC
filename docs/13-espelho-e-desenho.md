@@ -200,3 +200,4 @@ Um detalhe do Android 12 em diante apareceu no teste: o sistema retira o modo de
 - Traço com âncora `viewport` só coincide se as duas janelas tiverem a mesma proporção. É o último recurso, para páginas sem produto na tela.
 - O cliente não tem como apagar um desenho do vendedor. Ele some quando o vendedor apaga ou muda de rota.
 - Sem TURN, a chamada continua falhando em NAT simétrico, como antes.
+- No celular do cliente, as teclas de volume controlam o fluxo de chamada do Android, que tem piso 1 e nunca zera. O controle de volume dentro da página ficou registrado como pendência na seção 12 de `prompt-espelho-e-desenho.md`.
