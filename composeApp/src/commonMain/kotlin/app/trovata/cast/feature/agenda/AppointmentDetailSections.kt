@@ -325,7 +325,13 @@ private fun CartBlock(
                 modifier = Modifier.size(16.dp),
             )
         }
-        if (expanded) CartItems(items = state.cartItems[cart.carrinhoId], loading = state.loadingItemsFor == cart.carrinhoId)
+        if (expanded) {
+            CartItems(
+                items = state.cartItems[cart.carrinhoId],
+                loading = state.loadingItemsFor == cart.carrinhoId,
+                totalItems = cart.itemCount,
+            )
+        }
         when {
             !canCall -> Unit
             blockReason == null -> Btn(
@@ -343,7 +349,7 @@ private fun CartBlock(
 }
 
 @Composable
-private fun CartItems(items: List<CartItemLine>?, loading: Boolean) {
+private fun CartItems(items: List<CartItemLine>?, loading: Boolean, totalItems: Int) {
     val colors = TrovataTokens.colors
     val shape = RoundedCornerShape(10.dp)
     Column(
@@ -384,8 +390,9 @@ private fun CartItems(items: List<CartItemLine>?, loading: Boolean) {
                         }
                     }
                 }
-                if (items.size > CartItemsPreview) {
-                    Text(text = "e mais ${items.size - CartItemsPreview} produtos", color = colors.ink4, fontSize = 11.5.sp)
+                val remaining = maxOf(totalItems, items.size) - minOf(items.size, CartItemsPreview)
+                if (remaining > 0) {
+                    Text(text = "e mais $remaining ${if (remaining == 1) "produto" else "produtos"}", color = colors.ink4, fontSize = 11.5.sp)
                 }
             }
         }

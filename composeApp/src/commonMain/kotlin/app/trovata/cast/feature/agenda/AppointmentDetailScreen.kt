@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.data.local.Appointment
@@ -148,7 +149,7 @@ private fun AppointmentDetailBody(state: AppointmentDetailUiState, actions: Deta
                 ) {
                     item {
                         DetailTopBar(
-                            title = appointment.clientName.split(' ').first(),
+                            title = appointment.clientName,
                             subtitle = relativeDayLabel(localDateAt(appointment.startsAtMs, state.timeZone), localDateAt(state.nowMs, state.timeZone)),
                             canEdit = appointment.status == AppointmentStatus.Scheduled,
                             onBack = actions.onBack,
@@ -200,9 +201,19 @@ private fun DetailTopBar(title: String, subtitle: String?, canEdit: Boolean, onB
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         IconBtn(icon = TrovataIcons.back, onClick = onBack, kind = IconBtnKind.Line, contentDescription = "Voltar")
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             subtitle?.let { Text(text = "Chamada · $it", color = colors.ink4, fontSize = 12.sp, fontWeight = FontWeight.Medium) }
-            Text(text = title, color = colors.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = title,
+                color = colors.ink,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         if (canEdit) {
             IconBtn(icon = TrovataIcons.edit, onClick = onEdit, kind = IconBtnKind.Line, contentDescription = "Editar compromisso")
@@ -223,7 +234,7 @@ private fun DetailBottomBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(colors.surface.copy(alpha = 0.97f))
+            .background(colors.surface)
             .border(1.dp, colors.line, RoundedCornerShape(0.dp))
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .padding(bottom = 18.dp),

@@ -141,7 +141,7 @@ internal fun CancelSheet(clientName: String, onConfirm: () -> Unit, onDismiss: (
             letterSpacing = (-0.02).em,
         )
         Text(
-            text = "Ela sai da agenda, mas continua no histórico do cliente como cancelada.",
+            text = "Ela continua na agenda, riscada, e no histórico do cliente.",
             color = colors.ink3,
             fontSize = 13.sp,
             lineHeight = 18.sp,

@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.data.local.AppointmentPriority
@@ -224,8 +225,20 @@ private fun FormTopBar(title: String, subtitle: String?, onBack: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         IconBtn(icon = TrovataIcons.back, onClick = onBack, kind = IconBtnKind.Line, contentDescription = "Voltar")
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            subtitle?.let { Text(text = it, color = colors.ink4, fontSize = 12.sp, fontWeight = FontWeight.Medium) }
+        Column(
+            modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            subtitle?.let {
+                Text(
+                    text = it,
+                    color = colors.ink4,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(text = title, color = colors.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
         Box(modifier = Modifier.size(38.dp))
@@ -239,7 +252,7 @@ private fun SaveBar(state: AppointmentFormUiState, onSave: () -> Unit, modifier:
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(colors.surface.copy(alpha = 0.97f))
+            .background(colors.surface)
             .border(1.dp, colors.line, RoundedCornerShape(0.dp))
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .padding(bottom = 18.dp),
