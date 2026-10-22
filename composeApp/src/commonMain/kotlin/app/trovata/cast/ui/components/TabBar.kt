@@ -28,6 +28,7 @@ import app.trovata.cast.ui.theme.TrovataTokens
 
 enum class SellerTab(val id: String, val label: String, val icon: ImageVector) {
     Sessions("sessoes", "Sessões", TrovataIcons.video),
+    Agenda("agenda", "Agenda", TrovataIcons.calendar),
     Carts("carrinhos", "Carrinhos", TrovataIcons.cart),
     Catalogs("catalogos", "Catálogos", TrovataIcons.grid),
     Recordings("gravacoes", "Gravações", TrovataIcons.record),

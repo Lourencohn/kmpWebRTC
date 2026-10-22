@@ -33,6 +33,7 @@ data class OpenCart(
     val totalQuantity: Int,
     val totalCents: Long?,
     val updatedAtMs: Long?,
+    val clienteId: Long? = null,
 ) {
     val hasItems: Boolean get() = itemCount > 0
 

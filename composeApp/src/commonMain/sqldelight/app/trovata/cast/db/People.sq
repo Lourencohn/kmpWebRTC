@@ -44,3 +44,6 @@ LIMIT ?;
 
 deleteClientsByIds:
 DELETE FROM ClientEntity WHERE id IN ?;
+
+selectClientById:
+SELECT * FROM ClientEntity WHERE id = ? AND deletedAt IS NULL;

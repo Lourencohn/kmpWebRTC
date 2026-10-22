@@ -1,5 +1,6 @@
 package app.trovata.cast.di
 
+import app.trovata.cast.data.local.AppointmentsRepository
 import app.trovata.cast.data.local.ClientsRepository
 import app.trovata.cast.data.local.OrderRepository
 import app.trovata.cast.data.local.PresentationsRepository
@@ -11,4 +12,5 @@ val repositoryModule = module {
     single { OrderRepository(get()) }
     single { ClientsRepository(get()) }
     single { PresentationsRepository(get()) }
+    single { AppointmentsRepository(get()) }
 }

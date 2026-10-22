@@ -11,6 +11,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import app.trovata.cast.data.auth.AuthRepository
 import app.trovata.cast.feature.account.AccountRoute
+import app.trovata.cast.feature.agenda.AgendaActions
+import app.trovata.cast.feature.agenda.AgendaScreenModel
+import app.trovata.cast.feature.agenda.AgendaTab
+import app.trovata.cast.feature.agenda.AgendaTodaySection
+import app.trovata.cast.feature.agenda.AppointmentDetailRoute
+import app.trovata.cast.feature.agenda.AppointmentFormRoute
 import app.trovata.cast.feature.carts.OpenCartsScreenModel
 import app.trovata.cast.feature.carts.OpenCartsTab
 import app.trovata.cast.feature.catalog.CatalogLinkPickerRoute
@@ -52,6 +58,14 @@ object TabsHostRoute : Screen {
         val catalogLinksModel = koinScreenModel<CatalogLinkPickerScreenModel> { parametersOf(ClientDraft()) }
         val openCartsModel = koinScreenModel<OpenCartsScreenModel>()
         val recordingsModel = koinScreenModel<RecordingsScreenModel>()
+        val agendaModel = koinScreenModel<AgendaScreenModel>()
+        val agendaState by agendaModel.state.collectAsState()
+        val agendaActions = AgendaActions(
+            onNewAppointment = { date, minute -> navigator.push(AppointmentFormRoute.forDay(date, minute)) },
+            onOpenAppointment = { appointment -> navigator.push(AppointmentDetailRoute(appointment.appointmentId)) },
+            onScheduleFollowUp = { appointment -> navigator.push(AppointmentFormRoute(followUpOfId = appointment.appointmentId)) },
+            onScheduleCart = { cart -> navigator.push(AppointmentFormRoute.forCart(cart)) },
+        )
 
         Column(modifier = Modifier.fillMaxSize().background(colors.bg)) {
             Box(
@@ -66,6 +80,20 @@ object TabsHostRoute : Screen {
                         onInviteClient = { navigator.push(CatalogLinkPickerRoute()) },
                         onOpenSession = { record -> navigator.push(InviteRoute(record)) },
                         onOpenAccount = openAccount,
+                        agenda = {
+                            AgendaTodaySection(
+                                state = agendaState,
+                                onOpenAgenda = { viewModel.selectTab(SellerTab.Agenda) },
+                                onOpenAppointment = agendaActions.onOpenAppointment,
+                                onNewAppointment = { agendaActions.onNewAppointment(null, null) },
+                            )
+                        },
+                    )
+                    SellerTab.Agenda -> AgendaTab(
+                        accountName = accountName,
+                        screenModel = agendaModel,
+                        onOpenAccount = openAccount,
+                        actions = agendaActions,
                     )
                     SellerTab.Carts -> OpenCartsTab(
                         accountName = accountName,
@@ -100,6 +128,7 @@ object TabsHostRoute : Screen {
                                 ),
                             )
                         },
+                        onScheduleClient = { client -> navigator.push(AppointmentFormRoute.forClient(client)) },
                     )
                 }
             }
