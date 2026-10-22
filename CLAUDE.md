@@ -98,7 +98,7 @@ Para apontar o app para serviços locais, sobrescreva qualquer chave no `local.p
 
 A versão (`trovata.versionName`, `trovata.versionCode`) fica no `gradle.properties`.
 
-O servidor lê `PORT`, `PUBLIC_CATALOG_URL`, `SFA_API_URL`, `STATIC_DIR`, `ICE_STUN_URLS`, `ICE_TURN_URLS`, `ICE_TURN_USERNAME`, `ICE_TURN_CREDENTIAL` e `PRESENTATION_S3_*`. Para gravar apresentações localmente, `signalingServer/dev/storage-local.sh` sobe um S3 compatível em Docker. O deploy do servidor é no Fly.io (`fly.toml`, `Dockerfile` na raiz), e o do `webBuyer` é no Cloudflare Pages pelo workflow do GitHub Actions.
+O servidor lê `PORT`, `PUBLIC_CATALOG_URL`, `SFA_API_URL`, `STATIC_DIR`, `ICE_STUN_URLS`, `ICE_TURN_URLS`, `ICE_TURN_USERNAME`, `ICE_TURN_CREDENTIAL`, `ICE_CLOUDFLARE_TURN_KEY_ID`, `ICE_CLOUDFLARE_TURN_API_TOKEN` e `PRESENTATION_S3_*`. Com a chave TURN da Cloudflare configurada, cada sessão recebe uma credencial TURN temporária gerada na hora, e se a Cloudflare falhar a sessão segue só com STUN. Para gravar apresentações localmente, `signalingServer/dev/storage-local.sh` sobe um S3 compatível em Docker. O deploy do servidor é no Fly.io (`fly.toml`, `Dockerfile` na raiz), e o do `webBuyer` é no Cloudflare Pages pelo workflow do GitHub Actions.
 
 ---
 

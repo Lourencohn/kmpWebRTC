@@ -146,7 +146,7 @@ class SessionRoutesTest {
             sessionRoutes(
                 store = SessionStore(),
                 catalogBaseUrl = "https://trovata.app.br",
-                iceServers = listOf(turn),
+                iceServers = IceServersProvider { listOf(turn) },
             )
         }
         val client = createClient {
