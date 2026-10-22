@@ -1,0 +1,50 @@
+name: iosApp
+options:
+  bundleIdPrefix: app.trovata.cast
+  developmentLanguage: pt-BR
+  deploymentTarget:
+    iOS: "15.0"
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: U85FWGJMNC
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.10"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    JAVA_HOME: /Applications/Android Studio.app/Contents/jbr/Contents/Home
+
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: iosApp
+    info:
+      path: iosApp/Info.plist
+      properties:
+        CFBundleDisplayName: TrovataCast
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSMicrophoneUsageDescription: "TrovataCast usa o microfone para chamadas com clientes."
+        NSLocalNetworkUsageDescription: "TrovataCast conecta ao servidor local durante o desenvolvimento."
+        ITSAppUsesNonExemptEncryption: false
+        CADisableMinimumFrameDurationOnPhone: true
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.trovata.cast
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_DEBUG_DYLIB: NO
+        ENABLE_PREVIEWS: NO
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(inherited)"
+        OTHER_LDFLAGS: "$(inherited) -framework ComposeApp -lsqlite3"

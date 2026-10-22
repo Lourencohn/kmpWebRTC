@@ -1,0 +1,49 @@
+package app.trovata.cast.di
+
+import app.trovata.cast.feature.call.CallSpec
+import app.trovata.cast.feature.call.newSellerPeerId
+import app.trovata.cast.webrtc.PeerSession
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlinx.coroutines.CoroutineScope
+import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
+import org.koin.core.parameter.parametersOf
+
+class KoinGraphTest {
+
+    @AfterTest
+    fun tearDown() {
+        stopKoin()
+    }
+
+    @Test
+    fun modulesLoadWithoutConflicts() {
+        val koin = startKoin { modules(appModules()) }.koin
+        assertTrue(appModules().isNotEmpty())
+        assertNotNull(koin.get<CoroutineScope>(AppScope))
+    }
+
+    @Test
+    fun callScopeWiresSignalingGraph() {
+        val koin = startKoin { modules(appModules()) }.koin
+        val spec = CallSpec(
+            token = "tok-test",
+            sessionId = "sess-test",
+            inviteUrl = "https://staging.trovata.app.br/catalogo-link-view/buba-teste/uuid-test?live=tok-test",
+            empresaSlug = "buba-teste",
+            catalogoUuid = "uuid-test",
+            clientName = "Cliente",
+            clientEmail = "cliente@loja.com.br",
+            catalogoLinkId = 811,
+            sellerName = "Vendedor",
+            sellerPeerId = newSellerPeerId(),
+        )
+        val scope = koin.createScope<CallSession>(spec.sellerPeerId)
+        val peer = scope.get<PeerSession> { parametersOf(spec) }
+        assertNotNull(peer)
+        scope.close()
+    }
+}

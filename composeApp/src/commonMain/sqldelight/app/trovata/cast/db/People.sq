@@ -1,0 +1,46 @@
+CREATE TABLE IF NOT EXISTS ClientEntity (
+    id INTEGER NOT NULL PRIMARY KEY,
+    idErp TEXT,
+    vendedorIdErp TEXT,
+    cidadeIdErp TEXT,
+    situacao TEXT,
+    nomeFantasia TEXT,
+    razaoSocial TEXT,
+    cpfCnpj TEXT,
+    endereco TEXT,
+    bairro TEXT,
+    cep TEXT,
+    telefone TEXT,
+    celular TEXT,
+    email TEXT,
+    contato TEXT,
+    tabelaPrecoId INTEGER,
+    prazoId INTEGER,
+    percDesconto REAL,
+    updatedAt TEXT,
+    updatedAtMs INTEGER,
+    deletedAt TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_iderp ON ClientEntity(idErp);
+CREATE INDEX IF NOT EXISTS idx_client_vendedor ON ClientEntity(vendedorIdErp);
+
+upsertClient:
+INSERT OR REPLACE INTO ClientEntity(id, idErp, vendedorIdErp, cidadeIdErp, situacao, nomeFantasia, razaoSocial, cpfCnpj, endereco, bairro, cep, telefone, celular, email, contato, tabelaPrecoId, prazoId, percDesconto, updatedAt, updatedAtMs, deletedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+countClients:
+SELECT count(*) FROM ClientEntity WHERE deletedAt IS NULL;
+
+firstClients:
+SELECT * FROM ClientEntity WHERE deletedAt IS NULL ORDER BY nomeFantasia ASC LIMIT ?;
+
+searchClients:
+SELECT * FROM ClientEntity
+WHERE deletedAt IS NULL
+  AND (nomeFantasia LIKE ? OR razaoSocial LIKE ? OR cidadeIdErp LIKE ? OR cpfCnpj LIKE ?)
+ORDER BY nomeFantasia ASC
+LIMIT ?;
+
+deleteClientsByIds:
+DELETE FROM ClientEntity WHERE id IN ?;

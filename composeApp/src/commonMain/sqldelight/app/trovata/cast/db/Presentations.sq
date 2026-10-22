@@ -1,0 +1,25 @@
+CREATE TABLE IF NOT EXISTS PresentationEntity (
+    presentationId TEXT NOT NULL PRIMARY KEY,
+    shareUrl TEXT NOT NULL,
+    empresaSlug TEXT NOT NULL,
+    catalogoUuid TEXT NOT NULL,
+    catalogoNome TEXT NOT NULL,
+    sellerId TEXT NOT NULL,
+    sellerName TEXT NOT NULL,
+    recordedAtMs INTEGER NOT NULL,
+    durationMs INTEGER NOT NULL,
+    eventCount INTEGER NOT NULL,
+    uploadedAtMs INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_presentation_empresa ON PresentationEntity(empresaSlug, recordedAtMs);
+
+insertPresentation:
+INSERT OR REPLACE INTO PresentationEntity(presentationId, shareUrl, empresaSlug, catalogoUuid, catalogoNome, sellerId, sellerName, recordedAtMs, durationMs, eventCount, uploadedAtMs)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectPresentationsForCompany:
+SELECT * FROM PresentationEntity WHERE empresaSlug = ? ORDER BY recordedAtMs DESC;
+
+deletePresentation:
+DELETE FROM PresentationEntity WHERE presentationId = ?;

@@ -1,0 +1,11 @@
+{
+  "identities": [
+    {
+      "name": "trovatacast-local",
+      "credentials": [
+        { "accessKey": "trovatacast-local", "secretKey": "trovatacast-local-secret" }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

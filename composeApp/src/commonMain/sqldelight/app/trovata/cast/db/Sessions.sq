@@ -1,0 +1,25 @@
+CREATE TABLE IF NOT EXISTS SessionEntity (
+    sessionId TEXT NOT NULL PRIMARY KEY,
+    token TEXT NOT NULL UNIQUE,
+    url TEXT NOT NULL,
+    sellerName TEXT NOT NULL,
+    empresaSlug TEXT NOT NULL,
+    catalogoUuid TEXT NOT NULL,
+    catalogoNome TEXT,
+    clientName TEXT,
+    clientShop TEXT,
+    scheduledFor TEXT,
+    createdAtMs INTEGER NOT NULL,
+    expiresAtMs INTEGER NOT NULL,
+    clientEmail TEXT,
+    catalogoLinkId INTEGER
+);
+
+insertSession:
+INSERT INTO SessionEntity(sessionId, token, url, sellerName, empresaSlug, catalogoUuid, catalogoNome, clientName, clientShop, scheduledFor, createdAtMs, expiresAtMs, clientEmail, catalogoLinkId)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAllSessions:
+SELECT sessionId, token, url, sellerName, empresaSlug, catalogoUuid, catalogoNome, clientName, clientEmail, clientShop, catalogoLinkId, scheduledFor, createdAtMs, expiresAtMs
+FROM SessionEntity
+ORDER BY createdAtMs DESC;

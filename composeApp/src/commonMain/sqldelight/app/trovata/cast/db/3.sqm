@@ -1,0 +1,26 @@
+DROP TABLE IF EXISTS AssetEntity;
+DROP TABLE IF EXISTS ProductEntity;
+DROP TABLE IF EXISTS CommercialProductEntity;
+DROP TABLE IF EXISTS CategoriaEntity;
+DROP TABLE IF EXISTS ColecaoEntity;
+DROP TABLE IF EXISTS MarcaEntity;
+DROP TABLE IF EXISTS GrupoProdutoEntity;
+DROP TABLE IF EXISTS GeneroEntity;
+DROP TABLE IF EXISTS LinhaEntity;
+DROP TABLE IF EXISTS FamiliaComercialEntity;
+DROP TABLE IF EXISTS NichoEntity;
+DROP TABLE IF EXISTS EspecieEntity;
+DROP TABLE IF EXISTS TipoProdutoEntity;
+DROP TABLE IF EXISTS Complemento1Entity;
+DROP TABLE IF EXISTS Complemento2Entity;
+DROP TABLE IF EXISTS Complemento3Entity;
+DROP TABLE IF EXISTS GradePadraoEntity;
+DROP TABLE IF EXISTS PriceTableEntity;
+DROP TABLE IF EXISTS ProductPriceEntity;
+DROP TABLE IF EXISTS PrazoEntity;
+DROP TABLE IF EXISTS SaleTypeEntity;
+DROP TABLE IF EXISTS SellerEntity;
+DROP TABLE IF EXISTS SellerClientEntity;
+DROP TABLE IF EXISTS SelectedProductEntity;
+
+DELETE FROM SyncStateEntity WHERE entity <> 'clientes';

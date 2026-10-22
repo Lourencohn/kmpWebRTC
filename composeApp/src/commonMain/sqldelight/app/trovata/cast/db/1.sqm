@@ -1,0 +1,5 @@
+ALTER TABLE SessionEntity ADD COLUMN clientEmail TEXT;
+
+ALTER TABLE SessionEntity ADD COLUMN catalogoLinkId INTEGER;
+
+DROP TABLE IF EXISTS CartLineEntity;
