@@ -54,8 +54,9 @@ fun Application.module() {
     val sfaApiUrl = System.getenv("SFA_API_URL")?.takeIf { it.isNotBlank() }
     val store = SessionStore()
     val rooms = RoomManager()
+    val httpClient = HttpClient(OkHttp)
     val catalogValidator = sfaApiUrl
-        ?.let { SfaCatalogLinkValidator(HttpClient(OkHttp), it) }
+        ?.let { SfaCatalogLinkValidator(httpClient, it) }
         ?: DisabledCatalogLinkValidator
 
     routing {
@@ -64,7 +65,7 @@ fun Application.module() {
             call.respond(Version(name = "trovatacast-signaling", version = "0.1.0"))
         }
     }
-    sessionRoutes(store, catalogBaseUrl, catalogValidator, IceConfig.fromEnv())
+    sessionRoutes(store, catalogBaseUrl, catalogValidator, IceConfig.providerFromEnv(httpClient))
     presentationRoutes(PresentationStorageConfig.fromEnv()?.presigner(), catalogBaseUrl, catalogValidator)
     signalingRoutes(rooms, store)
 

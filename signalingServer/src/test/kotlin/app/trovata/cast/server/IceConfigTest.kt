@@ -1,5 +1,13 @@
 package app.trovata.cast.server
 
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -43,6 +51,57 @@ class IceConfigTest {
         val servers = IceConfig.fromEnv(env(mapOf("ICE_STUN_URLS" to "stun:stun.trovata.app.br:3478")))
 
         assertEquals(listOf("stun:stun.trovata.app.br:3478"), servers.single().urls)
+    }
+
+    @Test
+    fun providerWithoutCloudflareKeepsFixedServersAndCallsNothing() = runBlocking {
+        var calls = 0
+        val client = HttpClient(MockEngine { calls++; respondError(HttpStatusCode.InternalServerError) })
+
+        val servers = IceConfig.providerFromEnv(client, env(emptyMap())).current()
+
+        assertEquals(IceConfig.fromEnv(env(emptyMap())), servers)
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun providerAppendsCloudflareTurnToFixedServers() = runBlocking {
+        val client = HttpClient(
+            MockEngine {
+                respond(
+                    content = """{"iceServers":[{"urls":["turns:turn.cloudflare.com:443?transport=tcp"],"username":"u","credential":"c"}]}""",
+                    status = HttpStatusCode.Created,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            },
+        )
+        val vars = env(
+            mapOf(
+                "ICE_CLOUDFLARE_TURN_KEY_ID" to "chave-turn",
+                "ICE_CLOUDFLARE_TURN_API_TOKEN" to "token-api",
+            ),
+        )
+
+        val servers = IceConfig.providerFromEnv(client, vars).current()
+
+        assertEquals(2, servers.size)
+        assertTrue(servers.first().urls.all { it.startsWith("stun:") })
+        assertEquals("c", servers.last().credential)
+    }
+
+    @Test
+    fun providerKeepsFixedServersWhenCloudflareFails() = runBlocking {
+        val client = HttpClient(MockEngine { respondError(HttpStatusCode.ServiceUnavailable) })
+        val vars = env(
+            mapOf(
+                "ICE_CLOUDFLARE_TURN_KEY_ID" to "chave-turn",
+                "ICE_CLOUDFLARE_TURN_API_TOKEN" to "token-api",
+            ),
+        )
+
+        val servers = IceConfig.providerFromEnv(client, vars).current()
+
+        assertEquals(IceConfig.fromEnv(vars), servers)
     }
 
     @Test

@@ -1,7 +1,6 @@
 package app.trovata.cast.server
 
 import app.trovata.cast.protocol.ErrorResponse
-import app.trovata.cast.protocol.IceServerConfig
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
 import app.trovata.cast.protocol.buildLiveInviteUrl
@@ -20,7 +19,7 @@ fun Application.sessionRoutes(
     store: SessionStore,
     catalogBaseUrl: String,
     validator: CatalogLinkValidator = DisabledCatalogLinkValidator,
-    iceServers: List<IceServerConfig> = emptyList(),
+    iceServers: IceServersProvider = IceServersProvider { emptyList() },
 ) {
     routing {
         route("/session") {
@@ -34,7 +33,7 @@ private suspend fun ApplicationCall.createSession(
     store: SessionStore,
     catalogBaseUrl: String,
     validator: CatalogLinkValidator,
-    iceServers: List<IceServerConfig>,
+    iceServers: IceServersProvider,
 ) {
     val request = try {
         receive<SessionCreateRequest>()
@@ -71,7 +70,7 @@ private suspend fun ApplicationCall.createSession(
                 token = stored.token,
             ),
             expiresAtMs = stored.expiresAtMs,
-            iceServers = iceServers,
+            iceServers = iceServers.current(),
         ),
     )
 }
@@ -91,7 +90,7 @@ private fun SessionCreateRequest.validationError(): ErrorResponse? = when {
 
 private suspend fun ApplicationCall.fetchSession(
     store: SessionStore,
-    iceServers: List<IceServerConfig>,
+    iceServers: IceServersProvider,
 ) {
     val token = parameters["token"].orEmpty()
     val stored = store.get(token)
@@ -99,5 +98,5 @@ private suspend fun ApplicationCall.fetchSession(
         respond(HttpStatusCode.NotFound, ErrorResponse("not_found", "Sessão não encontrada ou expirada"))
         return
     }
-    respond(stored.toInfo().copy(iceServers = iceServers))
+    respond(stored.toInfo().copy(iceServers = iceServers.current()))
 }
