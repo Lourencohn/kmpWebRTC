@@ -163,6 +163,9 @@ kotlin {
             implementation(libs.koin.test)
             implementation(libs.ktor.client.mock)
         }
+        androidUnitTest.dependencies {
+            implementation(libs.sqldelight.sqlite.driver)
+        }
     }
 }
 

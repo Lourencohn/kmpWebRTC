@@ -52,6 +52,7 @@ fun SellerHomeScreen(
     onInviteClient: () -> Unit = {},
     onOpenSession: (StoredSessionRecord) -> Unit = {},
     onOpenAccount: () -> Unit = {},
+    agenda: @Composable () -> Unit = {},
 ) {
     val state by viewModel.home.collectAsState()
     val colors = TrovataTokens.colors
@@ -75,6 +76,8 @@ fun SellerHomeScreen(
             }
 
             item { PrimaryAction(onClick = onInviteClient) }
+
+            item { agenda() }
 
             if (state.closedToday.isNotEmpty()) {
                 item { ClosedTodaySection(state.closedToday) }

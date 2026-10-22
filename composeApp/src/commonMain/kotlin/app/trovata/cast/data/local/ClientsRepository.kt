@@ -37,6 +37,10 @@ class ClientsRepository(private val db: TrovataDatabase) {
         rows.map { it.toDomain() }
     }
 
+    suspend fun findById(id: Long): CatalogClient? = withContext(Dispatchers.Default) {
+        people.selectClientById(id).executeAsOneOrNull()?.toDomain()
+    }
+
     suspend fun count(): Long = withContext(Dispatchers.Default) {
         people.countClients().executeAsOne()
     }

@@ -61,4 +61,7 @@ object TrovataIcons {
     val arrowRight = strokeIcon("arrowRight", "M5 12h14M13 5l7 7-7 7")
     val signal = strokeIcon("signal", "M2 12h2M6 9v6M10 6v12M14 9v6M18 12h2")
     val refresh = strokeIcon("refresh", "M20 12a8 8 0 1 1-2.3-5.7M20 3v5h-5")
+    val calendar = strokeIcon("calendar", "M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM4 10h16M8 3v4M16 3v4")
+    val edit = strokeIcon("edit", "M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4")
+    val alert = strokeIcon("alert", "M12 4l9 16H3l9-16zM12 10v4M12 17h.01")
 }

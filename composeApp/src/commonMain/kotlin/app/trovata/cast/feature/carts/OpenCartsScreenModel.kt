@@ -53,6 +53,23 @@ data class OpenCartsUiState(
         get() = resumable.sumOf { it.totalCents ?: 0L }
 }
 
+fun liveCartSessionRequest(
+    cart: OpenCart,
+    catalogoUuid: String,
+    empresaSlug: String,
+    seller: SellerIdentity,
+): SessionCreateRequest = SessionCreateRequest(
+    empresaSlug = empresaSlug,
+    catalogoUuid = catalogoUuid,
+    sellerId = seller.id,
+    sellerName = seller.name,
+    catalogoNome = cart.catalogName,
+    catalogoLinkId = cart.catalogoLinkId,
+    carrinhoId = cart.carrinhoId,
+    clientName = cart.clientName,
+    clientEmail = cart.clientEmail,
+)
+
 typealias LoadOpenCartsFn = suspend (
     empresaSlug: String,
     situacao: CartStatus?,
@@ -156,18 +173,7 @@ class OpenCartsScreenModel(
         val catalogoUuid = cart.catalogoUuid ?: return
         _state.update { it.copy(callingCartId = cart.carrinhoId, error = null) }
 
-        val seller = sellerProvider()
-        val request = SessionCreateRequest(
-            empresaSlug = empresaSlugProvider(),
-            catalogoUuid = catalogoUuid,
-            sellerId = seller.id,
-            sellerName = seller.name,
-            catalogoNome = cart.catalogName,
-            catalogoLinkId = cart.catalogoLinkId,
-            carrinhoId = cart.carrinhoId,
-            clientName = cart.clientName,
-            clientEmail = cart.clientEmail,
-        )
+        val request = liveCartSessionRequest(cart, catalogoUuid, empresaSlugProvider(), sellerProvider())
         val notes = SessionClientNotes(shop = cart.clientName)
         screenModelScope.launch {
             when (val result = createSession(request)) {

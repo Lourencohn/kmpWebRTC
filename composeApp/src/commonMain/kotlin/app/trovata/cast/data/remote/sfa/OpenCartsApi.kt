@@ -105,5 +105,6 @@ fun CarrinhoListagemDto.toOpenCart(): OpenCart {
         totalCents = valorTotal?.let { (it * 100).roundToLong() },
         updatedAtMs = SfaParse.parseTimestampToMs(updatedAt)
             ?: SfaParse.parseTimestampToMs(createdAt),
+        clienteId = clienteId ?: cliente?.id,
     )
 }

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.trovata.cast.data.local.AppointmentsRepository
 import app.trovata.cast.feature.invite.InviteRoute
 import app.trovata.cast.ui.components.IconBtn
 import app.trovata.cast.ui.components.IconBtnKind
@@ -27,6 +28,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 
 data class CatalogLinkPickerRoute(
@@ -35,11 +37,13 @@ data class CatalogLinkPickerRoute(
     val scheduledFor: String? = null,
     val clientDocument: String? = null,
     val clientEmail: String? = null,
+    val appointmentId: String? = null,
 ) : Screen {
 
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
+        val appointments = koinInject<AppointmentsRepository>()
         val initial = remember(clientName, clientShop, scheduledFor, clientDocument, clientEmail) {
             ClientDraft(clientName, clientShop, scheduledFor, clientDocument, clientEmail)
         }
@@ -49,6 +53,7 @@ data class CatalogLinkPickerRoute(
         LaunchedEffect(state.createdSession?.sessionId) {
             val record = state.createdSession ?: return@LaunchedEffect
             screenModel.consumeCreatedSession()
+            appointmentId?.let { appointments.linkSession(it, record.sessionId, record.createdAtMs) }
             navigator.push(InviteRoute(record))
         }
 

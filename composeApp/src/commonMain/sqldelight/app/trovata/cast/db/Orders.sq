@@ -41,3 +41,6 @@ SELECT * FROM OrderEntity WHERE createdAtMs >= ? AND createdAtMs < ? ORDER BY cr
 
 selectOrderLines:
 SELECT productId, size, units, unitPriceCents FROM OrderLineEntity WHERE orderId = ? ORDER BY rowid ASC;
+
+selectOrdersForSessions:
+SELECT * FROM OrderEntity WHERE sessionId IN ? ORDER BY createdAtMs DESC;

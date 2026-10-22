@@ -31,6 +31,8 @@ import app.trovata.cast.ui.components.Avatar
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind
 import app.trovata.cast.ui.components.BtnSize
+import app.trovata.cast.ui.components.IconBtn
+import app.trovata.cast.ui.components.IconBtnKind
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
 import app.trovata.cast.ui.components.SectionLabel
@@ -47,6 +49,7 @@ fun ClientsScreen(
     onQueryChange: (String) -> Unit = {},
     onOpenAccount: () -> Unit = {},
     onInviteClient: (CatalogClient) -> Unit = {},
+    onScheduleClient: (CatalogClient) -> Unit = {},
 ) {
     val colors = TrovataTokens.colors
 
@@ -86,7 +89,7 @@ fun ClientsScreen(
                         state.results.isEmpty() && state.query.isBlank() ->
                             EmptyState(text = if (state.syncing) "Sincronizando clientes..." else "Nenhum cliente sincronizado para esta empresa")
                         state.results.isEmpty() -> EmptyState(text = "Nenhum cliente encontrado")
-                        else -> ClientList(clients = state.results, onInvite = onInviteClient)
+                        else -> ClientList(clients = state.results, onInvite = onInviteClient, onSchedule = onScheduleClient)
                     }
                 }
             }
@@ -146,12 +149,16 @@ private fun EmptyState(text: String) {
 }
 
 @Composable
-private fun ClientList(clients: List<CatalogClient>, onInvite: (CatalogClient) -> Unit) {
+private fun ClientList(
+    clients: List<CatalogClient>,
+    onInvite: (CatalogClient) -> Unit,
+    onSchedule: (CatalogClient) -> Unit,
+) {
     val colors = TrovataTokens.colors
     TrovataCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
         Column {
             clients.forEachIndexed { index, client ->
-                ClientRow(client = client, onInvite = onInvite)
+                ClientRow(client = client, onInvite = onInvite, onSchedule = onSchedule)
                 if (index < clients.lastIndex) {
                     Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(colors.line))
                 }
@@ -161,7 +168,11 @@ private fun ClientList(clients: List<CatalogClient>, onInvite: (CatalogClient) -
 }
 
 @Composable
-private fun ClientRow(client: CatalogClient, onInvite: (CatalogClient) -> Unit) {
+private fun ClientRow(
+    client: CatalogClient,
+    onInvite: (CatalogClient) -> Unit,
+    onSchedule: (CatalogClient) -> Unit,
+) {
     val colors = TrovataTokens.colors
     val secondary = client.legalName?.takeIf { it != client.name } ?: client.document ?: client.contact
     Row(
@@ -204,6 +215,13 @@ private fun ClientRow(client: CatalogClient, onInvite: (CatalogClient) -> Unit) 
                 )
             }
         }
+        IconBtn(
+            icon = TrovataIcons.calendar,
+            onClick = { onSchedule(client) },
+            kind = IconBtnKind.Line,
+            size = 32.dp,
+            contentDescription = "Agendar chamada com ${client.name}",
+        )
         Btn(
             text = "Convidar",
             onClick = { onInvite(client) },

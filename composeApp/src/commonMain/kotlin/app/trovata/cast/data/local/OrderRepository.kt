@@ -74,6 +74,12 @@ class OrderRepository(private val db: TrovataDatabase) {
             .mapToList(Dispatchers.Default)
             .map { rows -> rows.map { it.toStoredOrder() } }
 
+    fun observeForSessions(sessionIds: Collection<String>): Flow<List<StoredOrder>> =
+        db.ordersQueries.selectOrdersForSessions(sessionIds)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { rows -> rows.map { it.toStoredOrder() } }
+
     suspend fun get(orderId: String): StoredOrder? = withContext(Dispatchers.Default) {
         db.ordersQueries.selectOrderById(orderId).executeAsOneOrNull()?.toStoredOrder()
     }

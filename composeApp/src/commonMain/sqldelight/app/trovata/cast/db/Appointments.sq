@@ -1,0 +1,52 @@
+CREATE TABLE IF NOT EXISTS AppointmentEntity (
+    appointmentId TEXT NOT NULL PRIMARY KEY,
+    empresaSlug TEXT NOT NULL,
+    sellerId TEXT NOT NULL,
+    clienteId INTEGER,
+    clientName TEXT NOT NULL,
+    clientShop TEXT,
+    clientDocument TEXT,
+    clientEmail TEXT,
+    clientPhone TEXT,
+    startsAtMs INTEGER NOT NULL,
+    durationMinutes INTEGER NOT NULL,
+    objective TEXT,
+    notes TEXT,
+    priority TEXT NOT NULL,
+    status TEXT NOT NULL,
+    outcome TEXT,
+    outcomeNotes TEXT,
+    nextStep TEXT,
+    prepDone TEXT NOT NULL DEFAULT '',
+    carrinhoId INTEGER,
+    sessionId TEXT,
+    followUpOfId TEXT,
+    rescheduleCount INTEGER NOT NULL DEFAULT 0,
+    createdAtMs INTEGER NOT NULL,
+    updatedAtMs INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_appointment_owner_start ON AppointmentEntity(empresaSlug, sellerId, startsAtMs);
+CREATE INDEX IF NOT EXISTS idx_appointment_session ON AppointmentEntity(sessionId);
+
+CREATE VIEW IF NOT EXISTS AppointmentWithOrder AS
+SELECT a.*, latest.orderId AS orderId, latest.totalCents AS orderTotalCents
+FROM AppointmentEntity a
+LEFT JOIN (
+    SELECT sessionId, orderId, totalCents, max(createdAtMs) AS lastOrderAtMs
+    FROM OrderEntity
+    WHERE sessionId IS NOT NULL
+    GROUP BY sessionId
+) latest ON latest.sessionId = a.sessionId;
+
+upsertAppointment:
+INSERT OR REPLACE INTO AppointmentEntity(appointmentId, empresaSlug, sellerId, clienteId, clientName, clientShop, clientDocument, clientEmail, clientPhone, startsAtMs, durationMinutes, objective, notes, priority, status, outcome, outcomeNotes, nextStep, prepDone, carrinhoId, sessionId, followUpOfId, rescheduleCount, createdAtMs, updatedAtMs)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectAppointmentsForOwner:
+SELECT * FROM AppointmentWithOrder
+WHERE empresaSlug = ? AND sellerId = ?
+ORDER BY startsAtMs ASC;
+
+linkAppointmentSession:
+UPDATE AppointmentEntity SET sessionId = ?, updatedAtMs = ? WHERE appointmentId = ?;
