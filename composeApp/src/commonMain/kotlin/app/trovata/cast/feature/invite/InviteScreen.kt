@@ -19,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,9 +49,11 @@ import app.trovata.cast.ui.components.TrovataCard
 import app.trovata.cast.ui.icons.TrovataIcons
 import app.trovata.cast.ui.theme.TrovataTokens
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.koin.koinScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import org.koin.compose.koinInject
+import org.koin.core.parameter.parametersOf
 
 data class InviteRoute(
     val sessionId: String,
@@ -90,26 +94,34 @@ data class InviteRoute(
                 expiresAtMs = expiresAtMs,
             )
         }
+        val screenModel = koinScreenModel<InviteScreenModel> { parametersOf(record) }
+        val state by screenModel.state.collectAsState()
+
+        LaunchedEffect(state.callReady) {
+            if (!state.callReady) return@LaunchedEffect
+            screenModel.consumeCallReady()
+            navigator.push(
+                LiveCallRoute(
+                    token = record.token,
+                    sessionId = record.sessionId,
+                    inviteUrl = record.url,
+                    empresaSlug = record.empresaSlug,
+                    catalogoUuid = record.catalogoUuid,
+                    sellerName = record.sellerName,
+                    clientName = record.clientName,
+                    clientEmail = record.clientEmail,
+                    catalogoLinkId = record.catalogoLinkId,
+                ),
+            )
+        }
+
         InviteBody(
             record = record,
+            state = state,
             share = share,
             onBack = { navigator.pop() },
             onClose = { navigator.popUntilRoot() },
-            onStartCall = {
-                navigator.push(
-                    LiveCallRoute(
-                        token = record.token,
-                        sessionId = record.sessionId,
-                        inviteUrl = record.url,
-                        empresaSlug = record.empresaSlug,
-                        catalogoUuid = record.catalogoUuid,
-                        sellerName = record.sellerName,
-                        clientName = record.clientName,
-                        clientEmail = record.clientEmail,
-                        catalogoLinkId = record.catalogoLinkId,
-                    ),
-                )
-            },
+            onStartCall = screenModel::startCall,
         )
     }
 }
@@ -134,6 +146,7 @@ fun InviteRoute(record: StoredSessionRecord): InviteRoute = InviteRoute(
 @Composable
 private fun InviteBody(
     record: StoredSessionRecord,
+    state: InviteUiState,
     share: ShareController,
     onBack: () -> Unit,
     onClose: () -> Unit,
@@ -313,7 +326,7 @@ private fun InviteBody(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth(),
         ) {
-            StickyClose(onClose = onClose, onStartCall = onStartCall)
+            StickyClose(state = state, onClose = onClose, onStartCall = onStartCall)
         }
     }
 }
@@ -461,16 +474,25 @@ private fun NextStepRow(index: Int, title: String, detail: String) {
 }
 
 @Composable
-private fun StickyClose(onClose: () -> Unit, onStartCall: () -> Unit) {
+private fun StickyClose(state: InviteUiState, onClose: () -> Unit, onStartCall: () -> Unit) {
     val colors = TrovataTokens.colors
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface.copy(alpha = 0.96f))
             .border(1.dp, colors.line, RoundedCornerShape(0.dp))
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .padding(bottom = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        state.error?.let { error ->
+            Text(
+                text = error,
+                color = colors.live,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -484,11 +506,12 @@ private fun StickyClose(onClose: () -> Unit, onStartCall: () -> Unit) {
                 modifier = Modifier.weight(1f),
             )
             Btn(
-                text = "Iniciar chamada",
+                text = if (state.isCheckingSession) "Conferindo…" else "Iniciar chamada",
                 onClick = onStartCall,
                 kind = BtnKind.Jade,
                 size = BtnSize.Md,
                 icon = TrovataIcons.video,
+                enabled = !state.isCheckingSession,
                 modifier = Modifier.weight(1f),
             )
         }
