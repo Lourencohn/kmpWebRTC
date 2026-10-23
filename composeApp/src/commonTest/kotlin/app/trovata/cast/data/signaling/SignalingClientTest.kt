@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -24,7 +25,9 @@ class SignalingClientTest {
         val sent = mutableListOf<String>()
         val incoming = Channel<String>(capacity = Channel.UNLIMITED)
         var connected = false
-        var closeReason: String? = null
+        var clientCloseReason: String? = null
+        var serverCloseReason: String? = null
+        var sendFailure: Throwable? = null
         var failOnConnect: Boolean = false
 
         override suspend fun connect() {
@@ -33,18 +36,36 @@ class SignalingClientTest {
         }
 
         override suspend fun send(raw: String) {
+            sendFailure?.let { throw it }
             sent += raw
         }
 
         override suspend fun close(reason: String?) {
-            closeReason = reason
+            clientCloseReason = reason
             incoming.close()
         }
 
         override suspend fun listen(onMessage: suspend (String) -> Unit) {
             for (raw in incoming) onMessage(raw)
         }
+
+        override suspend fun closeReason(): String? = serverCloseReason
+
+        fun closeFromServer(reason: String?) {
+            serverCloseReason = reason
+            incoming.close()
+        }
+
+        fun rejectBeforeHello(reason: String) {
+            serverCloseReason = reason
+            sendFailure = CancellationException("WebSocket session closed with code VIOLATED_POLICY.")
+        }
     }
+
+    private fun roomState() = SignalingMessage.RoomState(
+        peers = listOf(PeerSummary("p1", PeerRole.Seller, "Atelier")),
+        youAre = PeerSummary("p1", PeerRole.Seller, "Atelier"),
+    ).encode()
 
     private fun makeClient(
         transport: FakeTransport,
@@ -130,6 +151,112 @@ class SignalingClientTest {
         val state = client.state.value
         assertIs<SignalingState.Failed>(state)
         assertEquals("transport_failed", state.code)
+    }
+
+    @Test
+    fun helloRejectedForUnknownTokenTellsSellerToCreateNewInvite() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeTransport().apply { rejectBeforeHello("unknown_token") }
+        val client = makeClient(transport, backgroundScope)
+        client.start()
+        val state = client.state.value
+        assertIs<SignalingState.Failed>(state)
+        assertEquals("unknown_token", state.code)
+        assertEquals("Esse convite não vale mais. Crie um novo convite para o cliente.", state.message)
+    }
+
+    @Test
+    fun serverClosingWithUnknownTokenAfterHelloFails() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeTransport()
+        val client = makeClient(transport, backgroundScope)
+        client.start()
+        transport.closeFromServer("unknown_token")
+        runCurrent()
+        val state = client.state.value
+        assertIs<SignalingState.Failed>(state)
+        assertEquals("unknown_token", state.code)
+        assertEquals("Esse convite não vale mais. Crie um novo convite para o cliente.", state.message)
+    }
+
+    @Test
+    fun serverClosingWithRoomFullFails() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeTransport()
+        val client = makeClient(transport, backgroundScope)
+        client.start()
+        transport.incoming.send(SignalingMessage.ProtocolError("room_full", "Já há dois participantes.").encode())
+        transport.closeFromServer("room_full")
+        runCurrent()
+        val state = client.state.value
+        assertIs<SignalingState.Failed>(state)
+        assertEquals("room_full", state.code)
+        assertEquals(
+            "Essa sessão já tem duas pessoas conectadas. Encerre a outra chamada ou crie um novo convite.",
+            state.message,
+        )
+    }
+
+    @Test
+    fun serverClosingWithRoleTakenFails() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeTransport()
+        val client = makeClient(transport, backgroundScope)
+        client.start()
+        transport.closeFromServer("role_taken")
+        runCurrent()
+        val state = client.state.value
+        assertIs<SignalingState.Failed>(state)
+        assertEquals("role_taken", state.code)
+        assertEquals(
+            "Essa sessão já tem um vendedor conectado. Encerre a outra chamada ou espere um pouco e tente de novo.",
+            state.message,
+        )
+    }
+
+    @Test
+    fun socketClosedWithoutReasonBeforeRoomStateFails() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeTransport()
+        val client = makeClient(transport, backgroundScope)
+        client.start()
+        transport.closeFromServer(null)
+        runCurrent()
+        val state = client.state.value
+        assertIs<SignalingState.Failed>(state)
+        assertEquals("connection_closed", state.code)
+        assertEquals("A conexão com a sessão caiu antes de abrir. Desligue e tente de novo.", state.message)
+    }
+
+    @Test
+    fun listenErrorBeforeRoomStateFails() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeTransport()
+        val client = makeClient(transport, backgroundScope)
+        client.start()
+        transport.incoming.close(IllegalStateException("socket reset"))
+        runCurrent()
+        val state = client.state.value
+        assertIs<SignalingState.Failed>(state)
+        assertEquals("connection_closed", state.code)
+    }
+
+    @Test
+    fun socketClosedAfterRoomStateKeepsConnected() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeTransport()
+        val client = makeClient(transport, backgroundScope)
+        client.start()
+        transport.incoming.send(roomState())
+        transport.closeFromServer(null)
+        runCurrent()
+        assertIs<SignalingState.Connected>(client.state.value)
+    }
+
+    @Test
+    fun stopWhileConnectingNeverReportsFailure() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeTransport()
+        val client = makeClient(transport, backgroundScope)
+        val seen = mutableListOf<SignalingState>()
+        backgroundScope.launch { client.state.collect { seen += it } }
+        client.start()
+        client.stop("hangup")
+        runCurrent()
+        assertEquals(SignalingState.Disconnected, client.state.value)
+        assertTrue(seen.none { it is SignalingState.Failed })
     }
 
     @Test

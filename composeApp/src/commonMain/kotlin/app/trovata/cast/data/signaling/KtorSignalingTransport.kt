@@ -8,6 +8,9 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import io.ktor.websocket.send
+import kotlinx.coroutines.withTimeoutOrNull
+
+private const val CLOSE_REASON_WAIT_MS = 1_000L
 
 class KtorSignalingTransport(
     private val httpClient: HttpClient,
@@ -34,6 +37,14 @@ class KtorSignalingTransport(
         for (frame in active.incoming) {
             if (frame is Frame.Text) onMessage(frame.readText())
         }
+    }
+
+    override suspend fun closeReason(): String? {
+        val active = session ?: return null
+        val reason = withTimeoutOrNull(CLOSE_REASON_WAIT_MS) {
+            runCatching { active.closeReason.await() }.getOrNull()
+        }
+        return reason?.message?.takeIf { it.isNotBlank() }
     }
 }
 

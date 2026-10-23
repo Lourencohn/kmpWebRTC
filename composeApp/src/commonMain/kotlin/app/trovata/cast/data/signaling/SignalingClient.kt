@@ -5,6 +5,7 @@ import app.trovata.cast.protocol.SignalingMessage
 import app.trovata.cast.protocol.decodeSignaling
 import app.trovata.cast.protocol.encode
 import co.touchlab.kermit.Logger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +32,20 @@ interface SignalingTransport {
     suspend fun send(raw: String)
     suspend fun close(reason: String?)
     suspend fun listen(onMessage: suspend (String) -> Unit)
+    suspend fun closeReason(): String?
 }
+
+private const val CONNECTION_CLOSED = "connection_closed"
+private const val CONNECTION_CLOSED_MESSAGE = "A conexão com a sessão caiu antes de abrir. Desligue e tente de novo."
+
+private val failureMessages = mapOf(
+    "unknown_token" to "Esse convite não vale mais. Crie um novo convite para o cliente.",
+    "room_full" to "Essa sessão já tem duas pessoas conectadas. Encerre a outra chamada ou crie um novo convite.",
+    "role_taken" to "Essa sessão já tem um vendedor conectado. Encerre a outra chamada ou espere um pouco e tente de novo.",
+)
+
+private fun failureFor(code: String, fallbackMessage: String = CONNECTION_CLOSED_MESSAGE): SignalingState.Failed =
+    SignalingState.Failed(code, failureMessages[code] ?: fallbackMessage)
 
 class SignalingClient(
     private val transport: SignalingTransport,
@@ -59,15 +73,35 @@ class SignalingClient(
             transport.send(SignalingMessage.Hello(role = role, peerId = peerId, displayName = displayName).encode())
         }.onFailure { err ->
             log.e(err) { "transport connect failed" }
-            _state.value = SignalingState.Failed("transport_failed", err.message ?: "unknown")
+            _state.value = transport.closeReason()?.let(::failureFor)
+                ?: SignalingState.Failed("transport_failed", err.message ?: "unknown")
             return
         }
         log.i { "connected, hello sent" }
         listenerJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            listenUntilClosed()
+            failIfStillConnecting()
+        }
+    }
+
+    private suspend fun listenUntilClosed() {
+        try {
             transport.listen { raw ->
                 val parsed = runCatching { decodeSignaling(raw) }.getOrNull() ?: return@listen
                 handleIncoming(parsed)
             }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (err: Throwable) {
+            log.w(err) { "transport listen failed" }
+        }
+    }
+
+    private suspend fun failIfStillConnecting() {
+        if (_state.value != SignalingState.Connecting) return
+        val failure = failureFor(transport.closeReason() ?: CONNECTION_CLOSED)
+        if (_state.compareAndSet(SignalingState.Connecting, failure)) {
+            log.w { "closed before room_state code=${failure.code}" }
         }
     }
 
@@ -81,7 +115,7 @@ class SignalingClient(
                 )
             }
             is SignalingMessage.ProtocolError -> {
-                _state.value = SignalingState.Failed(message.code, message.message)
+                _state.value = failureFor(message.code, message.message)
             }
             else -> Unit
         }
@@ -96,8 +130,8 @@ class SignalingClient(
         runCatching {
             transport.send(SignalingMessage.Bye(from = peerId, reason = reason).encode())
         }
-        runCatching { transport.close(reason) }
         listenerJob?.cancel()
+        runCatching { transport.close(reason) }
         _state.value = SignalingState.Disconnected
     }
 

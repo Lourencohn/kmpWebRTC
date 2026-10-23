@@ -8,6 +8,7 @@ import app.trovata.cast.data.local.ClientsRepository
 import app.trovata.cast.data.local.OrderRepository
 import app.trovata.cast.data.local.PresentationsRepository
 import app.trovata.cast.data.local.SessionsRepository
+import app.trovata.cast.data.local.StoredSessionRecord
 import app.trovata.cast.data.local.appointmentOwnerOf
 import app.trovata.cast.data.remote.PresentationsApi
 import app.trovata.cast.data.remote.SessionsApi
@@ -24,6 +25,7 @@ import app.trovata.cast.feature.carts.OpenCartsScreenModel
 import app.trovata.cast.feature.catalog.CatalogLinkPickerScreenModel
 import app.trovata.cast.feature.catalog.ClientDraft
 import app.trovata.cast.feature.clients.ClientsScreenModel
+import app.trovata.cast.feature.invite.InviteScreenModel
 import app.trovata.cast.feature.presentation.PresentationRecorderScreenModel
 import app.trovata.cast.feature.presentation.PresentationSpec
 import app.trovata.cast.feature.presentation.RecordingsScreenModel
@@ -89,6 +91,9 @@ val screenModelModule = module {
             upload = api::upload,
             persist = presentations::save,
         )
+    }
+    factory { (record: StoredSessionRecord) ->
+        InviteScreenModel(record = record, fetchSession = get<SessionsApi>()::fetchSession)
     }
     factory { (initial: ClientDraft) ->
         val sessionsApi = get<SessionsApi>()
