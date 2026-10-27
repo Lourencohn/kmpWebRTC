@@ -63,10 +63,12 @@ class InviteScreenModelTest {
     private fun model(
         stored: StoredSessionRecord = record,
         fetchSession: FetchSessionFn = { ApiResult.Ok(sessionInfo) },
+        findClientPhone: suspend (String?) -> String? = { null },
     ) = InviteScreenModel(
         record = stored,
         fetchSession = fetchSession,
         nowMs = { now },
+        findClientPhone = findClientPhone,
     )
 
     @Test
@@ -144,5 +146,29 @@ class InviteScreenModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(1, calls)
+    }
+
+    @Test
+    fun whatsAppOpensTheChatOfTheStoredPhone() = runTest(dispatcher) {
+        val sm = model(
+            stored = record.copy(clientPhone = "(11) 98888-7777"),
+            findClientPhone = { error("not called") },
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("5511988887777", sm.state.value.whatsAppNumber)
+    }
+
+    @Test
+    fun whatsAppFallsBackToTheClientRegistryByEmail() = runTest(dispatcher) {
+        val emails = mutableListOf<String?>()
+        val sm = model(findClientPhone = { email ->
+            emails += email
+            "21 97777-6666"
+        })
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf<String?>("compras@bella.com.br"), emails)
+        assertEquals("5521977776666", sm.state.value.whatsAppNumber)
     }
 }

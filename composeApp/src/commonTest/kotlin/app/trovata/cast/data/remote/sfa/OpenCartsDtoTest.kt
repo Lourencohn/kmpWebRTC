@@ -138,6 +138,7 @@ class OpenCartsDtoTest {
         assertEquals("Outono 26", cart.catalogName)
         assertEquals("Loja Bella", cart.clientName)
         assertEquals("compras@bella.com.br", cart.clientEmail)
+        assertEquals("51999998888", cart.clientPhone)
         assertEquals(CartStatus.Editing, cart.status)
         assertEquals(12, cart.itemCount)
         assertEquals(48, cart.totalQuantity)

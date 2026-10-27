@@ -18,6 +18,8 @@ import app.trovata.cast.feature.carts.liveCartSessionRequest
 import app.trovata.cast.feature.catalog.CreateSessionFn
 import app.trovata.cast.feature.catalog.PersistSessionFn
 import app.trovata.cast.feature.presentation.minuteClock
+import app.trovata.cast.ui.format.whatsAppNumberOf
+import app.trovata.cast.ui.format.whatsAppUrl
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -78,6 +80,8 @@ data class AppointmentDetailUiState(
     val notFound: Boolean get() = !isLoading && appointment == null
 
     val status: AgendaStatus? get() = appointment?.agendaStatus(nowMs)
+
+    val whatsAppNumber: String? get() = whatsAppNumberOf(client?.phone ?: appointment?.clientPhone)
 
     val openCarts: List<OpenCart> get() = carts.filter { it.status == CartStatus.Editing && it.hasItems }
 
@@ -272,6 +276,7 @@ class AppointmentDetailScreenModel(
         val notes = SessionClientNotes(
             shop = appointment.clientShop ?: cart.clientName,
             scheduledFor = scheduledForOf(appointment),
+            phone = appointment.clientPhone ?: _state.value.client?.phone ?: cart.clientPhone,
         )
         screenModelScope.launch {
             when (val result = createSession(request)) {
@@ -383,6 +388,14 @@ class AppointmentDetailScreenModel(
 
     fun clearError() {
         _state.update { it.copy(error = null) }
+    }
+
+    fun whatsAppLink(): String? {
+        val snapshot = _state.value
+        val appointment = snapshot.appointment ?: return null
+        val number = snapshot.whatsAppNumber ?: return null
+        val message = appointmentReminderMessage(appointment, sellerProvider().name, nowMs(), timeZone)
+        return whatsAppUrl(number, message)
     }
 }
 

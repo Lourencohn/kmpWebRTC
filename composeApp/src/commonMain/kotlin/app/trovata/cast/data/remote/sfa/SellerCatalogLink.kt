@@ -13,6 +13,7 @@ data class SellerCatalogLink(
     val validityLabel: String?,
     val cartCount: Int,
     val viewCount: Int,
+    val clientWhatsapp: String? = null,
 ) {
     val isAvailable: Boolean get() = active && !expired
 

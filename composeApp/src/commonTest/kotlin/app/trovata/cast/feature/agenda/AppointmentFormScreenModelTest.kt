@@ -4,6 +4,7 @@ import app.trovata.cast.data.local.Appointment
 import app.trovata.cast.data.local.AppointmentOwner
 import app.trovata.cast.data.local.AppointmentPriority
 import app.trovata.cast.data.local.AppointmentStatus
+import app.trovata.cast.data.local.CallInterest
 import app.trovata.cast.data.local.CatalogClient
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -54,12 +55,14 @@ class AppointmentFormScreenModelTest {
         existing: List<Appointment> = emptyList(),
         saved: MutableList<Appointment> = mutableListOf(),
         owner: AppointmentOwner? = this.owner,
+        interests: Map<String, List<CallInterest>> = emptyMap(),
     ) = AppointmentFormScreenModel(
         spec = spec,
         ownerProvider = { owner },
         loadAppointments = { existing },
         searchClients = { query -> if (query.isBlank() || "bella" in query.lowercase()) listOf(bella) else emptyList() },
         saveAppointment = { saved += it },
+        loadCallInterests = { sessionId -> interests[sessionId].orEmpty() },
         newId = { "apt-new" },
         nowMs = { now },
         timeZone = SaoPaulo,
@@ -226,5 +229,50 @@ class AppointmentFormScreenModelTest {
 
         assertTrue(saved.isEmpty())
         assertEquals("Selecione uma empresa para agendar chamadas.", sm.state.value.problem)
+    }
+
+    @Test
+    fun followUpOfACallListsWhatWasLeftOut() = runTest(dispatcher) {
+        val previous = appointment("prev", at(Wednesday, 9), sessionId = "ses_old")
+        val leftOut = CallInterest(
+            produtoPreId = 77,
+            clientOpens = 2,
+            sellerShows = 0,
+            draftUnits = 0,
+            cartUnits = 0,
+            ref = "AN-104",
+            name = "Vestido Midi",
+            imageUrl = null,
+            firstAtMs = 0,
+            lastAtMs = 0,
+        )
+        val saved = mutableListOf<Appointment>()
+        val sm = model(
+            spec = AppointmentFormSpec(followUpOfId = "prev"),
+            existing = listOf(previous),
+            saved = saved,
+            interests = mapOf("ses_old" to listOf(leftOut)),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val expected = "Ficou de fora do pedido na última chamada:\n- Vestido Midi · ref. AN-104 · abriu 2 vezes"
+        assertEquals(expected, sm.state.value.notes)
+
+        sm.save()
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(expected, saved.single().notes)
+    }
+
+    @Test
+    fun notesFromTheSpecArePrefilledAndWin() = runTest(dispatcher) {
+        val previous = appointment("prev", at(Wednesday, 9), sessionId = "ses_old")
+        val sm = model(
+            spec = AppointmentFormSpec(followUpOfId = "prev", notes = "Levar a tabela nova"),
+            existing = listOf(previous),
+            interests = mapOf("ses_old" to emptyList()),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Levar a tabela nova", sm.state.value.notes)
     }
 }

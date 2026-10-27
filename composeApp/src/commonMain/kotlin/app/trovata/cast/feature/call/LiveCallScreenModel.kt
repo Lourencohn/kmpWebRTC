@@ -31,6 +31,7 @@ class LiveCallScreenModel(
     private val cartApi: CartApi,
     private val callAudio: CallAudioController,
     private val callScope: Scope,
+    private val interestTracker: CallInterestTracker,
 ) : ScreenModel {
 
     private val token = spec.token
@@ -62,7 +63,7 @@ class LiveCallScreenModel(
         }
         screenModelScope.launch {
             peer.state.collect { p ->
-                _state.update { it.copy(peer = p) }
+                _state.update { it.copy(peer = p, wasLive = it.wasLive || p is PeerSessionState.Connected) }
                 webBridge.updateStatus(p.toBridgeStatus())
                 if (p is PeerSessionState.Connected) callAudio.activate()
             }
@@ -82,6 +83,7 @@ class LiveCallScreenModel(
     }
 
     private fun handleRemoteMessage(message: DataChannelMessage) {
+        interestTracker.onClientMessage(message)
         when (message) {
             is DataChannelMessage.CartInvalidated -> handleRemoteCartInvalidated(message)
             is DataChannelMessage.OrderPlaced -> _state.update { it.copy(showCartDrawer = false) }
@@ -92,6 +94,7 @@ class LiveCallScreenModel(
     private fun handlePageMessage(payload: String) {
         if (!peer.publishRaw(payload)) return
         val message = decodeDataChannel(payload) ?: return
+        interestTracker.onSellerMessage(message)
         if (message is DataChannelMessage.CartInvalidated) handleOwnCartChange(message)
     }
 
@@ -259,6 +262,7 @@ class LiveCallScreenModel(
     }
 
     fun hangup() {
+        if (_state.value.wasLive) interestTracker.onCallEnded(_state.value.cart)
         callAudio.release()
         webBridge.updateStatus(LiveWebBridge.STATUS_CLOSED)
         screenModelScope.launch {

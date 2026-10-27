@@ -106,5 +106,6 @@ fun CarrinhoListagemDto.toOpenCart(): OpenCart {
         updatedAtMs = SfaParse.parseTimestampToMs(updatedAt)
             ?: SfaParse.parseTimestampToMs(createdAt),
         clienteId = clienteId ?: cliente?.id,
+        clientPhone = cliente?.celular?.takeIf { it.isNotBlank() } ?: cliente?.telefone?.takeIf { it.isNotBlank() },
     )
 }

@@ -95,6 +95,7 @@ class CatalogLinkDtoTest {
         assertEquals("Outono 26", link.name)
         assertEquals("Trama Multimarcas", link.clientName)
         assertEquals("Marina Prado", link.sellerName)
+        assertEquals("51999998888", link.clientWhatsapp)
         assertEquals("2026-12-31", link.validityLabel)
         assertTrue(link.active)
         assertFalse(link.expired)

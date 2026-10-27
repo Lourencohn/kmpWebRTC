@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,8 @@ import app.trovata.cast.ui.components.PillTone
 import app.trovata.cast.ui.components.QrCard
 import app.trovata.cast.ui.components.SectionLabel
 import app.trovata.cast.ui.components.TrovataCard
+import app.trovata.cast.ui.format.formatWhatsAppNumber
+import app.trovata.cast.ui.format.whatsAppUrl
 import app.trovata.cast.ui.icons.TrovataIcons
 import app.trovata.cast.ui.theme.TrovataTokens
 import cafe.adriel.voyager.core.screen.Screen
@@ -70,6 +73,7 @@ data class InviteRoute(
     val scheduledFor: String?,
     val createdAtMs: Long,
     val expiresAtMs: Long,
+    val clientPhone: String? = null,
 ) : Screen {
 
     @Composable
@@ -92,6 +96,7 @@ data class InviteRoute(
                 scheduledFor = scheduledFor,
                 createdAtMs = createdAtMs,
                 expiresAtMs = expiresAtMs,
+                clientPhone = clientPhone,
             )
         }
         val screenModel = koinScreenModel<InviteScreenModel> { parametersOf(record) }
@@ -141,6 +146,7 @@ fun InviteRoute(record: StoredSessionRecord): InviteRoute = InviteRoute(
     scheduledFor = record.scheduledFor,
     createdAtMs = record.createdAtMs,
     expiresAtMs = record.expiresAtMs,
+    clientPhone = record.clientPhone,
 )
 
 @Composable
@@ -154,6 +160,7 @@ private fun InviteBody(
 ) {
     val colors = TrovataTokens.colors
     val clipboard = LocalClipboardManager.current
+    val uriHandler = LocalUriHandler.current
     var copied by remember { mutableStateOf(false) }
 
     val shareSubject = "Catálogo TrovataCast"
@@ -277,7 +284,14 @@ private fun InviteBody(
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Btn(
                             text = "WhatsApp",
-                            onClick = { share.share(whatsappText, shareSubject) },
+                            onClick = {
+                                val number = state.whatsAppNumber
+                                if (number != null) {
+                                    uriHandler.openUri(whatsAppUrl(number, whatsappText))
+                                } else {
+                                    share.share(whatsappText, shareSubject)
+                                }
+                            },
                             kind = BtnKind.Jade,
                             size = BtnSize.Md,
                             icon = TrovataIcons.send,
@@ -290,6 +304,14 @@ private fun InviteBody(
                             size = BtnSize.Md,
                             icon = TrovataIcons.share,
                             modifier = Modifier.weight(1f),
+                        )
+                    }
+                    state.whatsAppNumber?.let { number ->
+                        Text(
+                            text = "O WhatsApp abre direto na conversa com ${formatWhatsAppNumber(number)}",
+                            color = colors.ink4,
+                            fontSize = 11.5.sp,
+                            modifier = Modifier.padding(top = 8.dp),
                         )
                     }
                 }

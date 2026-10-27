@@ -4,6 +4,7 @@ import app.trovata.cast.data.local.Appointment
 import app.trovata.cast.data.local.AppointmentOwner
 import app.trovata.cast.data.local.AppointmentPriority
 import app.trovata.cast.data.local.AppointmentStatus
+import app.trovata.cast.data.local.CallInterest
 import app.trovata.cast.data.local.CatalogClient
 import app.trovata.cast.data.remote.sfa.OpenCart
 import cafe.adriel.voyager.core.model.ScreenModel
@@ -82,6 +83,7 @@ data class AppointmentFormSpec(
     val objective: String? = null,
     val epochDay: Int? = null,
     val minuteOfDay: Int? = null,
+    val notes: String? = null,
 )
 
 enum class FormMode(val title: String, val saveLabel: String) {
@@ -176,6 +178,7 @@ class AppointmentFormScreenModel(
     private val loadAppointments: suspend (AppointmentOwner) -> List<Appointment>,
     private val searchClients: suspend (String) -> List<CatalogClient>,
     private val saveAppointment: suspend (Appointment) -> Unit,
+    private val loadCallInterests: suspend (sessionId: String) -> List<CallInterest> = { emptyList() },
     private val newId: () -> String = ::newAppointmentId,
     private val nowMs: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
@@ -190,6 +193,7 @@ class AppointmentFormScreenModel(
             clientLocked = spec.client != null && spec.carrinhoId != null,
             carrinhoId = spec.carrinhoId,
             objective = spec.objective.orEmpty(),
+            notes = spec.notes.orEmpty(),
             nowMs = nowMs(),
             timeZone = timeZone,
         ),
@@ -213,6 +217,9 @@ class AppointmentFormScreenModel(
         val original = spec.appointmentId?.let { id -> all.firstOrNull { it.appointmentId == id } }
         val previous = spec.followUpOfId?.let { id -> all.firstOrNull { it.appointmentId == id } }
         val others = all.filter { it.appointmentId != original?.appointmentId }
+        val leftOutFromLastCall = previous?.sessionId
+            ?.takeIf { spec.notes == null }
+            ?.let { leftOutNotes(loadCallInterests(it)) }
         _state.update { current ->
             when {
                 original != null -> current.copy(
@@ -236,6 +243,7 @@ class AppointmentFormScreenModel(
                     minuteOfDay = minuteOfDayAt(previous.startsAtMs, timeZone),
                     durationMinutes = previous.durationMinutes,
                     objective = previous.nextStep ?: previous.objective.orEmpty(),
+                    notes = leftOutFromLastCall ?: current.notes,
                     priority = previous.priority,
                     carrinhoId = previous.carrinhoId,
                     followUpOf = previous,

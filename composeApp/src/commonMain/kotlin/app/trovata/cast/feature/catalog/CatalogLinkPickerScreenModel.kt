@@ -24,6 +24,7 @@ data class ClientDraft(
     val scheduledFor: String? = null,
     val document: String? = null,
     val email: String? = null,
+    val phone: String? = null,
 ) {
     val isIdentified: Boolean get() = !document.isNullOrBlank() || !email.isNullOrBlank()
 }
@@ -223,6 +224,7 @@ class CatalogLinkPickerScreenModel(
         val notes = SessionClientNotes(
             shop = snapshot.client.shop ?: link.clientName,
             scheduledFor = snapshot.client.scheduledFor,
+            phone = snapshot.client.phone ?: link.clientWhatsapp.takeIf { linkBelongsTo(snapshot.client, link) },
         )
         screenModelScope.launch {
             when (val result = createSession(request)) {
@@ -243,6 +245,9 @@ class CatalogLinkPickerScreenModel(
         else -> "Esse catálogo não está disponível."
     }
 }
+
+private fun linkBelongsTo(client: ClientDraft, link: SellerCatalogLink): Boolean =
+    client.name == null || recipientMatches(client, link) == true
 
 private fun digitsOnly(raw: String?): String? =
     raw?.filter { it.isDigit() }?.takeIf { it.isNotEmpty() }
