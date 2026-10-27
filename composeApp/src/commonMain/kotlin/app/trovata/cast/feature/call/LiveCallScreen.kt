@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.trovata.cast.di.CallSession
+import app.trovata.cast.feature.aftercall.AfterCallRoute
 import app.trovata.cast.platform.LiveCatalogWebView
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind
@@ -91,8 +92,10 @@ data class LiveCallRoute(
             state = state,
             screenModel = screenModel,
             onHangup = {
+                val review = state.hasSomethingToReview
+                val carrinhoId = state.carrinhoId
                 screenModel.hangup()
-                navigator.pop()
+                if (review) navigator.replace(AfterCallRoute(sessionId, carrinhoId)) else navigator.pop()
             },
         )
     }

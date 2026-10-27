@@ -33,6 +33,8 @@ import app.trovata.cast.ui.components.Avatar
 import app.trovata.cast.ui.components.Btn
 import app.trovata.cast.ui.components.BtnKind
 import app.trovata.cast.ui.components.BtnSize
+import app.trovata.cast.ui.components.IconBtn
+import app.trovata.cast.ui.components.IconBtnKind
 import app.trovata.cast.ui.components.Pill
 import app.trovata.cast.ui.components.PillTone
 import app.trovata.cast.ui.components.SectionLabel
@@ -67,6 +69,14 @@ internal fun HeroCard(state: AppointmentDetailUiState, appointment: Appointment,
                         letterSpacing = (-0.01).em,
                     )
                     appointment.clientShop?.let { Text(text = it, color = colors.ink3, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+                if (state.whatsAppNumber != null) {
+                    IconBtn(
+                        icon = TrovataIcons.msg,
+                        onClick = actions.onWhatsApp,
+                        kind = IconBtnKind.Jade,
+                        contentDescription = "Mandar mensagem no WhatsApp",
+                    )
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

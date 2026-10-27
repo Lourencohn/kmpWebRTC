@@ -38,14 +38,15 @@ data class CatalogLinkPickerRoute(
     val clientDocument: String? = null,
     val clientEmail: String? = null,
     val appointmentId: String? = null,
+    val clientPhone: String? = null,
 ) : Screen {
 
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val appointments = koinInject<AppointmentsRepository>()
-        val initial = remember(clientName, clientShop, scheduledFor, clientDocument, clientEmail) {
-            ClientDraft(clientName, clientShop, scheduledFor, clientDocument, clientEmail)
+        val initial = remember(clientName, clientShop, scheduledFor, clientDocument, clientEmail, clientPhone) {
+            ClientDraft(clientName, clientShop, scheduledFor, clientDocument, clientEmail, clientPhone)
         }
         val screenModel = koinScreenModel<CatalogLinkPickerScreenModel> { parametersOf(initial) }
         val state by screenModel.state.collectAsState()

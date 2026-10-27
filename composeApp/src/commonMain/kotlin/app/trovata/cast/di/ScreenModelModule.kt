@@ -4,6 +4,8 @@ import app.trovata.cast.config.AppConfig
 import app.trovata.cast.data.auth.AuthRepository
 import app.trovata.cast.data.auth.sellerIdentityOf
 import app.trovata.cast.data.local.AppointmentsRepository
+import app.trovata.cast.data.local.CallInterestRecorder
+import app.trovata.cast.data.local.CallInterestRepository
 import app.trovata.cast.data.local.ClientsRepository
 import app.trovata.cast.data.local.OrderRepository
 import app.trovata.cast.data.local.PresentationsRepository
@@ -14,8 +16,11 @@ import app.trovata.cast.data.remote.PresentationsApi
 import app.trovata.cast.data.remote.SessionsApi
 import app.trovata.cast.data.remote.sfa.CartApi
 import app.trovata.cast.data.remote.sfa.CatalogLinksApi
+import app.trovata.cast.data.remote.sfa.CatalogProductsApi
 import app.trovata.cast.data.remote.sfa.OpenCartsApi
 import app.trovata.cast.feature.account.AccountScreenModel
+import app.trovata.cast.feature.aftercall.AfterCallScreenModel
+import app.trovata.cast.feature.aftercall.AfterCallSpec
 import app.trovata.cast.feature.agenda.AgendaScreenModel
 import app.trovata.cast.feature.agenda.AppointmentDetailScreenModel
 import app.trovata.cast.feature.agenda.AppointmentFormScreenModel
@@ -93,7 +98,12 @@ val screenModelModule = module {
         )
     }
     factory { (record: StoredSessionRecord) ->
-        InviteScreenModel(record = record, fetchSession = get<SessionsApi>()::fetchSession)
+        val clients = get<ClientsRepository>()
+        InviteScreenModel(
+            record = record,
+            fetchSession = get<SessionsApi>()::fetchSession,
+            findClientPhone = { email -> clients.findByEmail(email)?.phone },
+        )
     }
     factory { (initial: ClientDraft) ->
         val sessionsApi = get<SessionsApi>()
@@ -131,6 +141,7 @@ val screenModelModule = module {
             loadAppointments = appointments::listForOwner,
             searchClients = { query -> clients.search(query) },
             saveAppointment = appointments::save,
+            loadCallInterests = get<CallInterestRepository>()::listForSession,
         )
     }
     factory { (appointmentId: String) ->
@@ -154,6 +165,24 @@ val screenModelModule = module {
             createSession = get<SessionsApi>()::createSession,
             persistSession = sessionsRepository::persistCreated,
             sellerProvider = { sellerIdentityOf(auth.user.value, auth.activeCompany.value) },
+        )
+    }
+    factory { (spec: AfterCallSpec) ->
+        val recorder = get<CallInterestRecorder>()
+        val clients = get<ClientsRepository>()
+        val cartApi = get<CartApi>()
+        AfterCallScreenModel(
+            spec = spec,
+            findSession = get<SessionsRepository>()::findById,
+            findAppointment = get<AppointmentsRepository>()::findBySession,
+            findClientByEmail = clients::findByEmail,
+            observeInterests = get<CallInterestRepository>()::observeForSession,
+            observeOrders = get<OrderRepository>()::observeForSessions,
+            loadCartItems = { slug, catalogoUuid, carrinhoId -> cartApi.items(slug, catalogoUuid, carrinhoId) },
+            loadProductLabel = get<CatalogProductsApi>()::label,
+            recordCart = { products, atMs -> recorder.recordCart(spec.sessionId, products, atMs) },
+            recordName = { event -> recorder.record(spec.sessionId, event) },
+            catalogWebUrl = AppConfig.catalogWebUrlOverride ?: AppConfig.catalogWebUrl,
         )
     }
 }

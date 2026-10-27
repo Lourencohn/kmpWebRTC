@@ -261,6 +261,43 @@ class AppointmentDetailScreenModelTest {
         assertNull(sm.state.value.expandedCartId)
     }
 
+    @Test
+    fun whatsAppRemindsTheClientOfTheCall() = runTest(dispatcher) {
+        val withPhone = current.copy(clientPhone = "(11) 98888-7777")
+        val sm = model(Harness(), appointments = listOf(withPhone, previous))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("5511988887777", sm.state.value.whatsAppNumber)
+        assertEquals(
+            "https://wa.me/5511988887777?text=" +
+                "Oi%2C%20Loja%21%20Aqui%20%C3%A9%20Louren%C3%A7o.%20Combinamos%20de%20conversar%20hoje%20%C3%A0s%2014%3A00." +
+                "%20Na%20hora%20eu%20te%20mando%20o%20link%20do%20cat%C3%A1logo%2C%20%C3%A9%20s%C3%B3%20abrir%20no%20celular.",
+            sm.whatsAppLink(),
+        )
+    }
+
+    @Test
+    fun withoutPhoneThereIsNoWhatsApp() = runTest(dispatcher) {
+        val sm = model(Harness())
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(sm.state.value.whatsAppNumber)
+        assertNull(sm.whatsAppLink())
+    }
+
+    @Test
+    fun sessionOpenedFromTheAppointmentKeepsTheClientPhone() = runTest(dispatcher) {
+        val harness = Harness()
+        val withPhone = current.copy(clientPhone = "(11) 98888-7777")
+        val sm = model(harness, appointments = listOf(withPhone, previous))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.callWithCart(linkedCart)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("(11) 98888-7777", harness.notes.single().phone)
+    }
+
     private fun response(request: SessionCreateRequest) = SessionCreateResponse(
         sessionId = "ses_kP3xq9",
         token = "kP3xq9",

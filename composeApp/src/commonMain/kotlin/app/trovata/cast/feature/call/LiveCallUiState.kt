@@ -64,8 +64,10 @@ data class LiveCallUiState(
     val showCartDrawer: Boolean = false,
     val toast: CartToast? = null,
     val summary: OrderSummaryUi? = null,
+    val wasLive: Boolean = false,
 ) {
     val isLive: Boolean get() = peer is PeerSessionState.Connected
+    val hasSomethingToReview: Boolean get() = wasLive || summary != null
     val isNegotiating: Boolean get() =
         signaling is SignalingState.Connecting ||
         peer is PeerSessionState.Negotiating

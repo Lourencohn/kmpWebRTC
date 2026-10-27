@@ -41,6 +41,13 @@ class ClientsRepository(private val db: TrovataDatabase) {
         people.selectClientById(id).executeAsOneOrNull()?.toDomain()
     }
 
+    suspend fun findByEmail(email: String?): CatalogClient? {
+        val normalized = email?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return null
+        return withContext(Dispatchers.Default) {
+            people.selectClientByEmail(normalized).executeAsOneOrNull()?.toDomain()
+        }
+    }
+
     suspend fun count(): Long = withContext(Dispatchers.Default) {
         people.countClients().executeAsOne()
     }

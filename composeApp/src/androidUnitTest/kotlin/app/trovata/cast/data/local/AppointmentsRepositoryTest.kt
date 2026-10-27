@@ -27,11 +27,10 @@ class AppointmentsRepositoryTest {
         driver.execute(null, "DROP VIEW AppointmentWithOrder", 0)
         driver.execute(null, "DROP TABLE AppointmentEntity", 0)
 
-        TrovataDatabase.Schema.migrate(driver, PREVIOUS_VERSION, TrovataDatabase.Schema.version)
+        TrovataDatabase.Schema.migrate(driver, PREVIOUS_VERSION, PREVIOUS_VERSION + 1)
         val repository = AppointmentsRepository(TrovataDatabase(driver))
         repository.save(appointment("apt-1"))
 
-        assertEquals(PREVIOUS_VERSION + 1, TrovataDatabase.Schema.version)
         assertEquals(listOf("apt-1"), repository.listForOwner(owner).map { it.appointmentId })
     }
 
@@ -93,6 +92,17 @@ class AppointmentsRepositoryTest {
         }
         assertEquals(LinkedOrder("CAR-9021", 420_000), linked.linkedOrder)
         assertEquals("ses_live", linked.sessionId)
+    }
+
+    @Test
+    fun appointmentIsFoundByTheSessionItOpened() = runBlocking {
+        val repository = freshRepository()
+        repository.save(appointment("apt-1"))
+        repository.save(appointment("apt-2"))
+        repository.linkSession("apt-2", "ses_live", atMs = 2_000)
+
+        assertEquals("apt-2", repository.findBySession("ses_live")?.appointmentId)
+        assertNull(repository.findBySession("ses_unknown"))
     }
 
     private fun freshRepository(): AppointmentsRepository {

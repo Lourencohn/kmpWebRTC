@@ -1,0 +1,16 @@
+ALTER TABLE SessionEntity ADD COLUMN clientPhone TEXT;
+
+CREATE TABLE IF NOT EXISTS CallInterestEntity (
+    sessionId TEXT NOT NULL,
+    produtoPreId INTEGER NOT NULL,
+    clientOpens INTEGER NOT NULL DEFAULT 0,
+    sellerShows INTEGER NOT NULL DEFAULT 0,
+    draftUnits INTEGER NOT NULL DEFAULT 0,
+    cartUnits INTEGER NOT NULL DEFAULT 0,
+    ref TEXT,
+    name TEXT,
+    imageUrl TEXT,
+    firstAtMs INTEGER NOT NULL,
+    lastAtMs INTEGER NOT NULL,
+    PRIMARY KEY (sessionId, produtoPreId)
+);

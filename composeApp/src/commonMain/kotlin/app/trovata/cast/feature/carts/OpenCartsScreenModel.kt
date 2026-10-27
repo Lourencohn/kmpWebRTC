@@ -174,7 +174,7 @@ class OpenCartsScreenModel(
         _state.update { it.copy(callingCartId = cart.carrinhoId, error = null) }
 
         val request = liveCartSessionRequest(cart, catalogoUuid, empresaSlugProvider(), sellerProvider())
-        val notes = SessionClientNotes(shop = cart.clientName)
+        val notes = SessionClientNotes(shop = cart.clientName, phone = cart.clientPhone)
         screenModelScope.launch {
             when (val result = createSession(request)) {
                 is ApiResult.Ok -> {

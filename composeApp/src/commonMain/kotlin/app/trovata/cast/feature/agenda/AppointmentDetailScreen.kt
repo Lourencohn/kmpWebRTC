@@ -20,6 +20,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +49,7 @@ data class AppointmentDetailRoute(val appointmentId: String) : Screen {
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
+        val uriHandler = LocalUriHandler.current
         val screenModel = koinScreenModel<AppointmentDetailScreenModel> { parametersOf(appointmentId) }
         val state by screenModel.state.collectAsState()
 
@@ -79,6 +81,7 @@ data class AppointmentDetailRoute(val appointmentId: String) : Screen {
                     onNewContact = { navigator.push(AppointmentFormRoute(followUpOfId = appointmentId)) },
                     onRequestCancel = screenModel::requestCancel,
                     onDismissError = screenModel::clearError,
+                    onWhatsApp = { screenModel.whatsAppLink()?.let(uriHandler::openUri) },
                 ),
             )
 
@@ -112,6 +115,7 @@ private fun catalogPickerFor(appointment: Appointment) = CatalogLinkPickerRoute(
     clientDocument = appointment.clientDocument,
     clientEmail = appointment.clientEmail,
     appointmentId = appointment.appointmentId,
+    clientPhone = appointment.clientPhone,
 )
 
 internal class DetailActions(
@@ -127,6 +131,7 @@ internal class DetailActions(
     val onNewContact: () -> Unit,
     val onRequestCancel: () -> Unit,
     val onDismissError: () -> Unit,
+    val onWhatsApp: () -> Unit,
 )
 
 @Composable

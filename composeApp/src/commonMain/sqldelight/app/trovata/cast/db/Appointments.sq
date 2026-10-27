@@ -50,3 +50,9 @@ ORDER BY startsAtMs ASC;
 
 linkAppointmentSession:
 UPDATE AppointmentEntity SET sessionId = ?, updatedAtMs = ? WHERE appointmentId = ?;
+
+selectAppointmentBySession:
+SELECT * FROM AppointmentWithOrder
+WHERE sessionId = ?
+ORDER BY updatedAtMs DESC
+LIMIT 1;

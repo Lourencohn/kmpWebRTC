@@ -1,0 +1,51 @@
+CREATE TABLE IF NOT EXISTS CallInterestEntity (
+    sessionId TEXT NOT NULL,
+    produtoPreId INTEGER NOT NULL,
+    clientOpens INTEGER NOT NULL DEFAULT 0,
+    sellerShows INTEGER NOT NULL DEFAULT 0,
+    draftUnits INTEGER NOT NULL DEFAULT 0,
+    cartUnits INTEGER NOT NULL DEFAULT 0,
+    ref TEXT,
+    name TEXT,
+    imageUrl TEXT,
+    firstAtMs INTEGER NOT NULL,
+    lastAtMs INTEGER NOT NULL,
+    PRIMARY KEY (sessionId, produtoPreId)
+);
+
+insertInterestIfAbsent:
+INSERT OR IGNORE INTO CallInterestEntity(sessionId, produtoPreId, firstAtMs, lastAtMs)
+VALUES (?, ?, ?, ?);
+
+addClientOpen:
+UPDATE CallInterestEntity
+SET clientOpens = clientOpens + 1, lastAtMs = :atMs
+WHERE sessionId = :sessionId AND produtoPreId = :produtoPreId;
+
+addSellerShow:
+UPDATE CallInterestEntity
+SET sellerShows = sellerShows + 1, lastAtMs = :atMs
+WHERE sessionId = :sessionId AND produtoPreId = :produtoPreId;
+
+raiseDraftUnits:
+UPDATE CallInterestEntity
+SET draftUnits = CASE WHEN :units > draftUnits THEN :units ELSE draftUnits END, lastAtMs = :atMs
+WHERE sessionId = :sessionId AND produtoPreId = :produtoPreId;
+
+clearCartUnits:
+UPDATE CallInterestEntity SET cartUnits = 0 WHERE sessionId = ?;
+
+setCartUnits:
+UPDATE CallInterestEntity
+SET cartUnits = :units
+WHERE sessionId = :sessionId AND produtoPreId = :produtoPreId;
+
+nameProduct:
+UPDATE CallInterestEntity
+SET ref = coalesce(:ref, ref), name = coalesce(:name, name), imageUrl = coalesce(:imageUrl, imageUrl)
+WHERE sessionId = :sessionId AND produtoPreId = :produtoPreId;
+
+selectInterestForSession:
+SELECT * FROM CallInterestEntity
+WHERE sessionId = ?
+ORDER BY clientOpens DESC, draftUnits DESC, sellerShows DESC, firstAtMs ASC;

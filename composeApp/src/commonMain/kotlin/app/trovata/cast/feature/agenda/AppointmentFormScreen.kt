@@ -56,6 +56,7 @@ data class AppointmentFormRoute(
     val objective: String? = null,
     val epochDay: Int? = null,
     val minuteOfDay: Int? = null,
+    val notes: String? = null,
 ) : Screen {
 
     @Composable
@@ -106,6 +107,7 @@ data class AppointmentFormRoute(
         objective = objective,
         epochDay = epochDay,
         minuteOfDay = minuteOfDay,
+        notes = notes,
     )
 
     companion object {

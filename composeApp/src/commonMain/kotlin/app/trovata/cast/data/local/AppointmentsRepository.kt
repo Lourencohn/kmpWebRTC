@@ -54,6 +54,10 @@ class AppointmentsRepository(private val db: TrovataDatabase) {
         )
     }
 
+    suspend fun findBySession(sessionId: String): Appointment? = withContext(Dispatchers.Default) {
+        queries.selectAppointmentBySession(sessionId).executeAsOneOrNull()?.toAppointment()
+    }
+
     suspend fun linkSession(appointmentId: String, sessionId: String, atMs: Long) = withContext(Dispatchers.Default) {
         queries.linkAppointmentSession(sessionId = sessionId, updatedAtMs = atMs, appointmentId = appointmentId)
     }

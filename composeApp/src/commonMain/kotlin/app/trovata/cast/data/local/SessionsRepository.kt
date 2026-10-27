@@ -2,6 +2,7 @@ package app.trovata.cast.data.local
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
+import app.trovata.cast.db.SessionEntity
 import app.trovata.cast.db.TrovataDatabase
 import app.trovata.cast.protocol.SessionCreateRequest
 import app.trovata.cast.protocol.SessionCreateResponse
@@ -25,6 +26,7 @@ data class StoredSessionRecord(
     val scheduledFor: String?,
     val createdAtMs: Long,
     val expiresAtMs: Long,
+    val clientPhone: String? = null,
 ) {
     val catalogLabel: String get() = catalogoNome.orEmpty()
 }
@@ -35,26 +37,11 @@ class SessionsRepository(private val db: TrovataDatabase) {
         db.sessionsQueries.selectAllSessions()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { rows ->
-                rows.map {
-                    StoredSessionRecord(
-                        sessionId = it.sessionId,
-                        token = it.token,
-                        url = it.url,
-                        sellerName = it.sellerName,
-                        empresaSlug = it.empresaSlug,
-                        catalogoUuid = it.catalogoUuid,
-                        catalogoNome = it.catalogoNome,
-                        catalogoLinkId = it.catalogoLinkId,
-                        clientName = it.clientName,
-                        clientEmail = it.clientEmail,
-                        clientShop = it.clientShop,
-                        scheduledFor = it.scheduledFor,
-                        createdAtMs = it.createdAtMs,
-                        expiresAtMs = it.expiresAtMs,
-                    )
-                }
-            }
+            .map { rows -> rows.map { it.toRecord() } }
+
+    suspend fun findById(sessionId: String): StoredSessionRecord? = withContext(Dispatchers.Default) {
+        db.sessionsQueries.selectSessionById(sessionId).executeAsOneOrNull()?.toRecord()
+    }
 
     suspend fun persistCreated(
         request: SessionCreateRequest,
@@ -78,6 +65,7 @@ class SessionsRepository(private val db: TrovataDatabase) {
                 expiresAtMs = response.expiresAtMs,
                 clientEmail = request.clientEmail,
                 catalogoLinkId = request.catalogoLinkId,
+                clientPhone = client.phone,
             )
             StoredSessionRecord(
                 sessionId = response.sessionId,
@@ -94,12 +82,32 @@ class SessionsRepository(private val db: TrovataDatabase) {
                 scheduledFor = client.scheduledFor,
                 createdAtMs = createdAtMs,
                 expiresAtMs = response.expiresAtMs,
+                clientPhone = client.phone,
             )
         }
     }
 }
 
+private fun SessionEntity.toRecord(): StoredSessionRecord = StoredSessionRecord(
+    sessionId = sessionId,
+    token = token,
+    url = url,
+    sellerName = sellerName,
+    empresaSlug = empresaSlug,
+    catalogoUuid = catalogoUuid,
+    catalogoNome = catalogoNome,
+    catalogoLinkId = catalogoLinkId,
+    clientName = clientName,
+    clientEmail = clientEmail,
+    clientShop = clientShop,
+    scheduledFor = scheduledFor,
+    createdAtMs = createdAtMs,
+    expiresAtMs = expiresAtMs,
+    clientPhone = clientPhone,
+)
+
 data class SessionClientNotes(
     val shop: String? = null,
     val scheduledFor: String? = null,
+    val phone: String? = null,
 )

@@ -435,4 +435,66 @@ class CatalogLinkPickerScreenModelTest {
         sm.consumeCreatedSession()
         assertNull(sm.state.value.createdSession)
     }
+
+    @Test
+    fun catalogWhatsAppGoesWithTheSessionOfItsOwnClient() = runTest(dispatcher) {
+        val notes = mutableListOf<SessionClientNotes>()
+        val sm = model(
+            links = listOf(activeLink.copy(clientWhatsapp = "(11) 98888-7777")),
+            createSession = { ApiResult.Ok(response()) },
+            persistSession = { request, r, createdAt, clientNotes ->
+                notes += clientNotes
+                record(request, r, createdAt, clientNotes)
+            },
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.select(activeLink)
+        sm.generateLink()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("(11) 98888-7777", notes.single().phone)
+    }
+
+    @Test
+    fun catalogWhatsAppIsNotUsedForAnotherClient() = runTest(dispatcher) {
+        val notes = mutableListOf<SessionClientNotes>()
+        val sm = model(
+            links = listOf(activeLink.copy(clientWhatsapp = "(11) 98888-7777")),
+            createSession = { ApiResult.Ok(response()) },
+            persistSession = { request, r, createdAt, clientNotes ->
+                notes += clientNotes
+                record(request, r, createdAt, clientNotes)
+            },
+            initialClient = ClientDraft(name = "Loja Bella", email = "compras@bella.com.br"),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.select(activeLink)
+        sm.generateLink()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(notes.single().phone)
+    }
+
+    @Test
+    fun phoneOfTheChosenClientWins() = runTest(dispatcher) {
+        val notes = mutableListOf<SessionClientNotes>()
+        val sm = model(
+            links = listOf(activeLink.copy(clientWhatsapp = "(11) 98888-7777")),
+            createSession = { ApiResult.Ok(response()) },
+            persistSession = { request, r, createdAt, clientNotes ->
+                notes += clientNotes
+                record(request, r, createdAt, clientNotes)
+            },
+            initialClient = ClientDraft(name = "Loja Bella", email = "compras@bella.com.br", phone = "21 97777-6666"),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        sm.select(activeLink)
+        sm.generateLink()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("21 97777-6666", notes.single().phone)
+    }
 }

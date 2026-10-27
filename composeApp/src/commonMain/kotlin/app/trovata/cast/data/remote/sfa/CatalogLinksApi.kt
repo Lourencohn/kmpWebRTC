@@ -104,5 +104,6 @@ fun CatalogoLinkDto.toSellerCatalogLink(): SellerCatalogLink {
         validityLabel = dataValidade?.take(10),
         cartCount = totalCarrinhos,
         viewCount = totalVisualizacoes,
+        clientWhatsapp = celularWhatsapp?.takeIf { it.isNotBlank() },
     )
 }

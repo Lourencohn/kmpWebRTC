@@ -1,11 +1,13 @@
 package app.trovata.cast.di
 
 import app.trovata.cast.config.AppConfig
+import app.trovata.cast.data.local.CallInterestRecorder
 import app.trovata.cast.data.remote.SessionsApi
 import app.trovata.cast.data.remote.iceServersFor
 import app.trovata.cast.data.signaling.KtorSignalingTransport
 import app.trovata.cast.data.signaling.SignalingClient
 import app.trovata.cast.data.signaling.signalingUrlFor
+import app.trovata.cast.feature.call.CallInterestTracker
 import app.trovata.cast.feature.call.CallSpec
 import app.trovata.cast.feature.call.LiveCallScreenModel
 import app.trovata.cast.protocol.PeerRole
@@ -52,6 +54,7 @@ val callModule = module {
         } onClose { it?.dispose() }
 
         scoped { (spec: CallSpec) ->
+            val recorder = get<CallInterestRecorder>()
             LiveCallScreenModel(
                 spec = spec,
                 signaling = get { parametersOf(spec) },
@@ -60,6 +63,10 @@ val callModule = module {
                 cartApi = get(),
                 callAudio = get(),
                 callScope = this,
+                interestTracker = CallInterestTracker(
+                    record = { event -> recorder.record(spec.sessionId, event) },
+                    recordCart = { products, atMs -> recorder.recordCart(spec.sessionId, products, atMs) },
+                ),
             )
         }
     }
