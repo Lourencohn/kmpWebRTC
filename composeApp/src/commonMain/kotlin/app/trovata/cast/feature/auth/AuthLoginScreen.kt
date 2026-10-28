@@ -17,11 +17,15 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -199,6 +203,7 @@ private fun AuthField(
 ) {
     val colors = TrovataTokens.colors
     val shape = RoundedCornerShape(14.dp)
+    var passwordVisible by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -209,29 +214,41 @@ private fun AuthField(
             letterSpacing = 0.08.em,
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
         )
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(colors.surface, shape)
                 .border(1.5.dp, colors.line, shape)
                 .height(54.dp)
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.CenterStart,
+                .padding(start = 16.dp, end = if (isPassword) 4.dp else 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (value.isEmpty()) {
-                Text(text = placeholder, color = colors.ink5, fontSize = 15.sp)
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    Text(text = placeholder, color = colors.ink5, fontSize = 15.sp)
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = TextStyle(color = colors.ink, fontSize = 15.sp, fontWeight = FontWeight.Medium),
+                    cursorBrush = SolidColor(colors.brand),
+                    visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
+                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+                    keyboardActions = KeyboardActions(onDone = { onImeAction() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
-                textStyle = TextStyle(color = colors.ink, fontSize = 15.sp, fontWeight = FontWeight.Medium),
-                cursorBrush = SolidColor(colors.brand),
-                visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
-                keyboardActions = KeyboardActions(onDone = { onImeAction() }),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (isPassword) {
+                IconButton(onClick = { passwordVisible = !passwordVisible }, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        imageVector = if (passwordVisible) TrovataIcons.eyeOff else TrovataIcons.eye,
+                        contentDescription = if (passwordVisible) "Ocultar senha" else "Mostrar senha",
+                        tint = colors.ink3,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
         }
     }
 }

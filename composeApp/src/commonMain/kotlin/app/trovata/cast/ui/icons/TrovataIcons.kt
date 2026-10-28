@@ -24,6 +24,8 @@ private fun strokeIcon(name: String, pathData: String, strokeWidth: Float = 1.6f
     ).build()
 
 object TrovataIcons {
+    val home = strokeIcon("home", "M3 10l9-7 9 7M5 9v12h5v-7h4v7h5V9")
+    val more = strokeIcon("more", "M5 12h.01M12 12h.01M19 12h.01", strokeWidth = 3f)
     val plus = strokeIcon("plus", "M12 5v14M5 12h14")
     val search = strokeIcon("search", "M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm6-2l4 4")
     val back = strokeIcon("back", "M15 6l-6 6 6 6")
@@ -54,6 +56,7 @@ object TrovataIcons {
     val star = strokeIcon("star", "M12 2l3 6.5 7 .9-5 5 1.4 7L12 18l-6.4 3.4L7 14.4l-5-5 7-.9z")
     val layers = strokeIcon("layers", "M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 18l9 5 9-5")
     val swatch = strokeIcon("swatch", "M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z")
+    val eyeOff = strokeIcon("eyeOff", "M3 3l18 18M10.6 5.2A11 11 0 0 1 12 5c6 0 10 7 10 7a19 19 0 0 1-3.2 3.8M6.1 6.1A23 23 0 0 0 2 12s4 7 10 7a12 12 0 0 0 5.9-1.9M9.9 9.9a3 3 0 0 0 4.2 4.2")
     val eye = strokeIcon("eye", "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z")
     val msg = strokeIcon("msg", "M21 12a8 8 0 0 1-8 8H7l-4 3v-11a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z")
     val lock = strokeIcon("lock", "M6 11h12v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-9zm2 0V7a4 4 0 0 1 8 0v4")
