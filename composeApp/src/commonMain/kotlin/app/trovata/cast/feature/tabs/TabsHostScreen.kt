@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import app.trovata.cast.data.auth.AuthRepository
@@ -49,6 +50,7 @@ object TabsHostRoute : Screen {
         val user by koinInject<AuthRepository>().user.collectAsState()
         val accountName = user?.name?.takeIf { it.isNotBlank() } ?: user?.email ?: "Conta"
         val homeState by viewModel.home.collectAsState()
+        val tabStateHolder = rememberSaveableStateHolder()
         val colors = TrovataTokens.colors
         val openAccount: () -> Unit = { navigator.push(AccountRoute) }
 
@@ -73,63 +75,65 @@ object TabsHostRoute : Screen {
                     .fillMaxWidth()
                     .weight(1f),
             ) {
-                when (homeState.activeTab) {
-                    SellerTab.Sessions -> SellerHomeScreen(
-                        accountName = accountName,
-                        viewModel = viewModel,
-                        onInviteClient = { navigator.push(CatalogLinkPickerRoute()) },
-                        onOpenSession = { record -> navigator.push(InviteRoute(record)) },
-                        onOpenAccount = openAccount,
-                        agenda = {
-                            AgendaTodaySection(
-                                state = agendaState,
-                                onOpenAgenda = { viewModel.selectTab(SellerTab.Agenda) },
-                                onOpenAppointment = agendaActions.onOpenAppointment,
-                                onNewAppointment = { agendaActions.onNewAppointment(null, null) },
-                            )
-                        },
-                    )
-                    SellerTab.Agenda -> AgendaTab(
-                        accountName = accountName,
-                        screenModel = agendaModel,
-                        onOpenAccount = openAccount,
-                        actions = agendaActions,
-                    )
-                    SellerTab.Carts -> OpenCartsTab(
-                        accountName = accountName,
-                        screenModel = openCartsModel,
-                        onOpenAccount = openAccount,
-                        onSessionCreated = { record -> navigator.push(InviteRoute(record)) },
-                    )
-                    SellerTab.Catalogs -> CatalogLinksTab(
-                        accountName = accountName,
-                        screenModel = catalogLinksModel,
-                        onOpenAccount = openAccount,
-                        onSessionCreated = { record -> navigator.push(InviteRoute(record)) },
-                    )
-                    SellerTab.Recordings -> RecordingsTab(
-                        accountName = accountName,
-                        screenModel = recordingsModel,
-                        onOpenAccount = openAccount,
-                        onRecordNew = { navigator.push(PresentationCatalogPickerRoute) },
-                    )
-                    SellerTab.Clients -> ClientsScreen(
-                        accountName = accountName,
-                        state = clientsState,
-                        onQueryChange = clientsModel::setQuery,
-                        onOpenAccount = openAccount,
-                        onInviteClient = { client ->
-                            navigator.push(
-                                CatalogLinkPickerRoute(
-                                    clientName = client.name,
-                                    clientShop = client.legalName,
-                                    clientDocument = client.document,
-                                    clientEmail = client.email,
-                                ),
-                            )
-                        },
-                        onScheduleClient = { client -> navigator.push(AppointmentFormRoute.forClient(client)) },
-                    )
+                tabStateHolder.SaveableStateProvider(homeState.activeTab.id) {
+                    when (homeState.activeTab) {
+                        SellerTab.Sessions -> SellerHomeScreen(
+                            accountName = accountName,
+                            viewModel = viewModel,
+                            onInviteClient = { navigator.push(CatalogLinkPickerRoute()) },
+                            onOpenSession = { record -> navigator.push(InviteRoute(record)) },
+                            onOpenAccount = openAccount,
+                            agenda = {
+                                AgendaTodaySection(
+                                    state = agendaState,
+                                    onOpenAgenda = { viewModel.selectTab(SellerTab.Agenda) },
+                                    onOpenAppointment = agendaActions.onOpenAppointment,
+                                    onNewAppointment = { agendaActions.onNewAppointment(null, null) },
+                                )
+                            },
+                        )
+                        SellerTab.Agenda -> AgendaTab(
+                            accountName = accountName,
+                            screenModel = agendaModel,
+                            onOpenAccount = openAccount,
+                            actions = agendaActions,
+                        )
+                        SellerTab.Carts -> OpenCartsTab(
+                            accountName = accountName,
+                            screenModel = openCartsModel,
+                            onOpenAccount = openAccount,
+                            onSessionCreated = { record -> navigator.push(InviteRoute(record)) },
+                        )
+                        SellerTab.Catalogs -> CatalogLinksTab(
+                            accountName = accountName,
+                            screenModel = catalogLinksModel,
+                            onOpenAccount = openAccount,
+                            onSessionCreated = { record -> navigator.push(InviteRoute(record)) },
+                        )
+                        SellerTab.Recordings -> RecordingsTab(
+                            accountName = accountName,
+                            screenModel = recordingsModel,
+                            onOpenAccount = openAccount,
+                            onRecordNew = { navigator.push(PresentationCatalogPickerRoute) },
+                        )
+                        SellerTab.Clients -> ClientsScreen(
+                            accountName = accountName,
+                            state = clientsState,
+                            onQueryChange = clientsModel::setQuery,
+                            onOpenAccount = openAccount,
+                            onInviteClient = { client ->
+                                navigator.push(
+                                    CatalogLinkPickerRoute(
+                                        clientName = client.name,
+                                        clientShop = client.legalName,
+                                        clientDocument = client.document,
+                                        clientEmail = client.email,
+                                    ),
+                                )
+                            },
+                            onScheduleClient = { client -> navigator.push(AppointmentFormRoute.forClient(client)) },
+                        )
+                    }
                 }
             }
             TabBar(active = homeState.activeTab, onSelect = viewModel::selectTab)
