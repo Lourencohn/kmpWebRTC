@@ -59,6 +59,7 @@ data class LiveCallUiState(
     val cartStage: CartStage = CartStage.Idle,
     val cartError: String? = null,
     val carrinhoId: Long? = null,
+    val completedCarrinhoId: Long? = null,
     val cartClientName: String? = null,
     val isFinishingCart: Boolean = false,
     val showCartDrawer: Boolean = false,
@@ -66,6 +67,7 @@ data class LiveCallUiState(
     val summary: OrderSummaryUi? = null,
     val wasLive: Boolean = false,
 ) {
+    val reviewCarrinhoId: Long? get() = if (cart.isEmpty()) completedCarrinhoId ?: carrinhoId else carrinhoId
     val isLive: Boolean get() = peer is PeerSessionState.Connected
     val hasSomethingToReview: Boolean get() = wasLive || summary != null
     val isNegotiating: Boolean get() =

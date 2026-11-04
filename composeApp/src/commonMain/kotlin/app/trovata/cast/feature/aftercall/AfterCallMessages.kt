@@ -11,7 +11,7 @@ fun cartSummaryUrl(catalogWebUrl: String, empresaSlug: String, catalogoUuid: Str
 
 fun orderSummaryMessage(clientName: String?, order: StoredOrder, summaryUrl: String?): String = buildString {
     append(greetingFor(clientName))
-    append(" Seu pedido ficou pronto: ")
+    append(" Seu carrinho foi finalizado no Catálogo Link: ")
     append(order.lines.sumOf { it.units })
     append(" unidades, total de ")
     append(formatBrl(order.totalCents))

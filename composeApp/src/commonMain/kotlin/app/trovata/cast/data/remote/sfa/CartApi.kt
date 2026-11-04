@@ -18,6 +18,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CancellationException
 
 data class CartSession(
@@ -104,7 +107,7 @@ class CartApi(
         ApiResult.Ok(envelope.data.orEmpty().map { it.toCartItemLine() })
     }
 
-    suspend fun markReadyToSend(
+    suspend fun finalizeCart(
         empresaSlug: String,
         catalogoLinkId: Long,
         carrinhoId: Long,
@@ -112,12 +115,20 @@ class CartApi(
         val token = tokenProvider()
             ?: return@safeCall ApiResult.Fail("unauthenticated", "Faça login novamente", 401)
         val response = client.patch(
-            "$baseUrl/empresa/$empresaSlug/catalogos-links/$catalogoLinkId/carrinhos/$carrinhoId",
+            "$baseUrl/empresa/$empresaSlug/catalogos-links/$catalogoLinkId/carrinhos/$carrinhoId/finalizar",
         ) {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
         }
-        if (!response.status.isSuccess()) return@safeCall fail(response.status.value)
+        if (!response.status.isSuccess()) {
+            val fallback = fail(response.status.value)
+            val message = runCatching {
+                response.body<JsonObject>()["message"]?.jsonPrimitive?.contentOrNull
+            }.getOrNull()?.takeIf { it.isNotBlank() }
+            return@safeCall if (message != null && response.status.value in setOf(409, 422)) {
+                ApiResult.Fail(fallback.code, message, response.status.value)
+            } else fallback
+        }
         ApiResult.Ok(Unit)
     }
 

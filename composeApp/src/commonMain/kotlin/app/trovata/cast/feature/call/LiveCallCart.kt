@@ -143,18 +143,32 @@ internal fun CartDrawer(
                     }
                 }
                 CartTotalBar(units = state.cartCount, totalCents = state.cartTotalCents)
+                state.cartError?.let { message ->
+                    Text(
+                        text = "Não foi possível finalizar. $message",
+                        color = colors.ink2,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
+                Text(
+                    text = "Os itens ficam salvos no Catálogo Link. Após finalizar, outro carrinho fica disponível para continuar comprando.",
+                    color = colors.ink3,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
                 Spacer(modifier = Modifier.height(2.dp))
                 Btn(
                     text = if (state.isFinishingCart) {
-                        "Enviando..."
+                        "Finalizando no Catálogo Link..."
                     } else {
-                        "Marcar pronto para envio · ${formatBrl(state.cartTotalCents)}"
+                        "Finalizar carrinho · ${formatBrl(state.cartTotalCents)}"
                     },
                     onClick = onConfirmOrder,
                     kind = BtnKind.Jade,
                     size = BtnSize.Lg,
                     icon = TrovataIcons.check,
-                    enabled = !state.isFinishingCart,
+                    enabled = !state.isFinishingCart && state.cartStage == CartStage.Ready,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

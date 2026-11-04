@@ -53,7 +53,7 @@ internal fun OrderSummaryOverlay(
                 icon = TrovataIcons.check,
             )
             Text(
-                text = "Pedido pronto",
+                text = "Carrinho finalizado",
                 color = colors.ink,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -66,6 +66,12 @@ internal fun OrderSummaryOverlay(
             )
         }
 
+        Text(
+            text = "Os itens estão salvos no Catálogo Link. O envio do pedido segue o fluxo comercial da empresa.",
+            color = colors.ink3,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+        )
         Spacer(modifier = Modifier.height(18.dp))
 
         LazyColumn(
