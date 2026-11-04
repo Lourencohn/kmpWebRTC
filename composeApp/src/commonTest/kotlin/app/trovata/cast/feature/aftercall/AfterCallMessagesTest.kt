@@ -19,12 +19,12 @@ class AfterCallMessagesTest {
     @Test
     fun orderMessageCarriesUnitsTotalAndLink() {
         assertEquals(
-            "Oi, Marina! Seu pedido ficou pronto: 24 unidades, total de R$ 4.200,00. " +
+            "Oi, Marina! Seu carrinho foi finalizado no Catálogo Link: 24 unidades, total de R$ 4.200,00. " +
                 "O resumo completo está aqui: https://trovata.app.br/r",
             orderSummaryMessage("Marina Couto", order(), "https://trovata.app.br/r"),
         )
         assertEquals(
-            "Olá! Seu pedido ficou pronto: 24 unidades, total de R$ 4.200,00.",
+            "Olá! Seu carrinho foi finalizado no Catálogo Link: 24 unidades, total de R$ 4.200,00.",
             orderSummaryMessage(null, order(), null),
         )
     }

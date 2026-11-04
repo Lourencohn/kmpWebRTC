@@ -163,7 +163,7 @@ private fun OrderCard(order: StoredOrder) {
         Icon(imageVector = TrovataIcons.check, contentDescription = null, tint = colors.jade2, modifier = Modifier.size(18.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Pedido ${order.orderId} pronto",
+                text = "Carrinho ${order.orderId} finalizado",
                 color = colors.jade2,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,

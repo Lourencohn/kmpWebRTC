@@ -84,7 +84,7 @@ data class LiveCallRoute(
             screenModel = screenModel,
             onHangup = {
                 val review = state.hasSomethingToReview
-                val carrinhoId = state.carrinhoId
+                val carrinhoId = state.reviewCarrinhoId
                 screenModel.hangup()
                 if (review) navigator.replace(AfterCallRoute(sessionId, carrinhoId)) else navigator.pop()
             },

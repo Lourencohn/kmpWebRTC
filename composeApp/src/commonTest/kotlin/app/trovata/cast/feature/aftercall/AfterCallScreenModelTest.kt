@@ -110,7 +110,7 @@ class AfterCallScreenModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(
-            "Oi, Marina! Seu pedido ficou pronto: 8 unidades, total de R$ 960,00. " +
+            "Oi, Marina! Seu carrinho foi finalizado no Catálogo Link: 8 unidades, total de R$ 960,00. " +
                 "O resumo completo está aqui: https://trovata.app.br/catalogo-link-resume/buba/uuid-1/carrinho/9021",
             sm.messageForClient(),
         )

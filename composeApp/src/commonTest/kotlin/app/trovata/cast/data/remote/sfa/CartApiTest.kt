@@ -33,7 +33,8 @@ class CartApiTest {
         val engine = MockEngine { request ->
             capture += request
             if (status.value >= 400) {
-                respondError(status)
+                val body = responses.values.firstOrNull()
+                if (body != null) respond(body, status, jsonHeaders) else respondError(status)
             } else {
                 val body = responses.entries.firstOrNull { request.url.encodedPath.endsWith(it.key) }?.value
                     ?: """{"data":{"id":1}}"""
@@ -156,24 +157,45 @@ class CartApiTest {
     }
 
     @Test
-    fun markReadyUsesPrivateRouteWithBearer() = runTest {
+    fun finalizeUsesValidatedPrivateRouteWithBearer() = runTest {
         val requests = mutableListOf<HttpRequestData>()
         val api = api(capture = requests)
 
-        api.markReadyToSend(empresaSlug = "buba", catalogoLinkId = 811, carrinhoId = 907)
+        api.finalizeCart(empresaSlug = "buba", catalogoLinkId = 811, carrinhoId = 907)
 
         val request = requests.single()
         assertEquals(HttpMethod.Patch, request.method)
-        assertEquals("/api/empresa/buba/catalogos-links/811/carrinhos/907", request.url.encodedPath)
+        assertEquals("/api/empresa/buba/catalogos-links/811/carrinhos/907/finalizar", request.url.encodedPath)
         assertEquals("Bearer tok-vendedor", request.headers[HttpHeaders.Authorization])
     }
 
     @Test
-    fun markReadyRequiresAuthenticatedSession() = runTest {
+    fun finalizationPreservesBusinessValidationMessageAndDoesNotReleaseForDispatch() = runTest {
+        val requests = mutableListOf<HttpRequestData>()
+        val api = api(
+            status = HttpStatusCode.Conflict,
+            responses = mapOf("/finalizar" to """{"message":"Valor mínimo do carrinho não atingido"}"""),
+            capture = requests,
+        )
+        val fail = api.finalizeCart("buba", 811, 907) as ApiResult.Fail
+        assertEquals("Valor mínimo do carrinho não atingido", fail.message)
+        assertEquals(409, fail.status)
+        assertEquals(1, requests.size)
+        assertTrue(requests.single().url.encodedPath.endsWith("/907/finalizar"))
+    }
+
+    @Test
+    fun finalizationHandlesNonJsonServerFailureWithoutClaimingSuccess() = runTest {
+        val result = api(status = HttpStatusCode.InternalServerError).finalizeCart("buba", 811, 907)
+        assertTrue(result is ApiResult.Fail)
+    }
+
+    @Test
+    fun finalizeRequiresAuthenticatedSession() = runTest {
         val requests = mutableListOf<HttpRequestData>()
         val api = api(capture = requests, token = null)
 
-        val fail = api.markReadyToSend("buba", 811, 907) as ApiResult.Fail
+        val fail = api.finalizeCart("buba", 811, 907) as ApiResult.Fail
 
         assertEquals("unauthenticated", fail.code)
         assertTrue(requests.isEmpty())

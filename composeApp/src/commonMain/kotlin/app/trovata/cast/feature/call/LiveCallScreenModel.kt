@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import org.koin.core.scope.Scope
 
@@ -44,6 +46,9 @@ class LiveCallScreenModel(
     private val empresaSlug = spec.empresaSlug
     private val catalogoUuid = spec.catalogoUuid
 
+    private val cartMutex = Mutex()
+    private val completedCartLines = mutableMapOf<Long, CartLineUi>()
+
     val webBridge = LiveWebBridge(onPageMessage = ::handlePageMessage)
 
     private val _state = MutableStateFlow(
@@ -65,7 +70,10 @@ class LiveCallScreenModel(
             peer.state.collect { p ->
                 _state.update { it.copy(peer = p, wasLive = it.wasLive || p is PeerSessionState.Connected) }
                 webBridge.updateStatus(p.toBridgeStatus())
-                if (p is PeerSessionState.Connected) callAudio.activate()
+                if (p is PeerSessionState.Connected) {
+                    callAudio.activate()
+                    screenModelScope.launch { refreshCart() }
+                }
             }
         }
         screenModelScope.launch {
@@ -86,13 +94,13 @@ class LiveCallScreenModel(
         interestTracker.onClientMessage(message)
         when (message) {
             is DataChannelMessage.CartInvalidated -> handleRemoteCartInvalidated(message)
-            is DataChannelMessage.OrderPlaced -> _state.update { it.copy(showCartDrawer = false) }
+            is DataChannelMessage.OrderPlaced -> screenModelScope.launch { refreshCart() }
             else -> Unit
         }
     }
 
     private fun handlePageMessage(payload: String) {
-        if (!peer.publishRaw(payload)) return
+        peer.publishRaw(payload)
         val message = decodeDataChannel(payload) ?: return
         interestTracker.onSellerMessage(message)
         if (message is DataChannelMessage.CartInvalidated) handleOwnCartChange(message)
@@ -133,14 +141,38 @@ class LiveCallScreenModel(
         screenModelScope.launch { openCart() }
     }
 
-    private suspend fun refreshCart() {
-        val carrinhoId = _state.value.carrinhoId ?: return
-        when (val result = cartApi.items(empresaSlug, catalogoUuid, carrinhoId)) {
-            is ApiResult.Fail -> _state.update { it.copy(cartError = result.message) }
+    private suspend fun refreshCart() = cartMutex.withLock { refreshCartLocked() }
+
+    private suspend fun refreshCartLocked(): Boolean {
+        val carrinhoId = _state.value.carrinhoId ?: return false
+        val result = loadLiveCart(
+            carrinhoId = carrinhoId,
+            summary = { cartApi.summary(empresaSlug, catalogoUuid, it) },
+            open = { cartApi.openCart(empresaSlug, catalogoUuid, clientEmail.orEmpty()) },
+            items = { cartApi.items(empresaSlug, catalogoUuid, it) },
+        )
+        when (result) {
+            is ApiResult.Fail -> {
+                _state.update { it.copy(cartStage = CartStage.Failed, cartError = result.message) }
+                return false
+            }
             is ApiResult.Ok -> _state.update {
-                it.copy(cart = result.value.map { line -> line.toCartLineUi() }, cartError = null)
+                if (result.value.completedCarrinhoId == it.carrinhoId) {
+                    it.cart.forEach { line -> completedCartLines[line.itemId] = line }
+                }
+                val changed = it.carrinhoId != result.value.session.id
+                it.copy(
+                    carrinhoId = result.value.session.id,
+                    completedCarrinhoId = result.value.completedCarrinhoId ?: it.completedCarrinhoId,
+                    cartClientName = result.value.session.clientName,
+                    cart = result.value.items.map { line -> line.toCartLineUi() },
+                    cartStage = CartStage.Ready,
+                    cartError = null,
+                    showCartDrawer = it.showCartDrawer && !changed,
+                )
             }
         }
+        return true
     }
 
     fun start() {
@@ -184,7 +216,7 @@ class LiveCallScreenModel(
 
     fun confirmOrder() {
         val current = _state.value
-        if (current.summary != null || current.isFinishingCart) return
+        if (current.summary != null || current.isFinishingCart || current.cartStage != CartStage.Ready) return
         if (current.cart.isEmpty()) return
         val carrinhoId = current.carrinhoId ?: return
         val linkId = catalogoLinkId
@@ -197,42 +229,54 @@ class LiveCallScreenModel(
         _state.update { it.copy(isFinishingCart = true, cartError = null) }
 
         screenModelScope.launch {
-            when (val result = cartApi.markReadyToSend(empresaSlug, linkId, carrinhoId)) {
-                is ApiResult.Fail -> _state.update {
-                    it.copy(isFinishingCart = false, cartError = result.message)
+            cartMutex.withLock {
+                if (!refreshCartLocked() || _state.value.carrinhoId != carrinhoId || _state.value.cart.isEmpty()) {
+                    _state.update { it.copy(isFinishingCart = false) }
+                    return@withLock
                 }
-                is ApiResult.Ok -> {
-                    val ts = Clock.System.now().toEpochMilliseconds()
-                    val lines = current.cart.flatMap { it.toOrderLines() }
-                    val totalCents = current.cartTotalCents
-                    val orderId = "CAR-$carrinhoId"
-                    val placed = DataChannelMessage.OrderPlaced(
-                        carrinhoId = carrinhoId,
-                        ts = ts,
-                        from = spec.sellerPeerId,
-                        pedidoId = orderId,
-                    )
-                    peer.publish(placed)
-                    webBridge.deliver(placed)
-                    persistOrder(
-                        orderId = orderId,
-                        ts = ts,
-                        lines = lines,
-                        totalCents = totalCents,
-                        confirmedByMe = true,
-                    )
-                    _state.update {
-                        it.copy(
-                            isFinishingCart = false,
-                            summary = OrderSummaryUi(
-                                orderId = orderId,
-                                ts = ts,
-                                lines = lines,
-                                totalCents = totalCents,
-                                confirmedByMe = true,
-                            ),
-                            showCartDrawer = false,
+                val refreshed = _state.value
+                when (val result = cartApi.finalizeCart(empresaSlug, linkId, carrinhoId)) {
+                    is ApiResult.Fail -> _state.update {
+                        it.copy(isFinishingCart = false, cartError = result.message)
+                    }
+                    is ApiResult.Ok -> {
+                        val ts = Clock.System.now().toEpochMilliseconds()
+                        val lines = refreshed.cart.flatMap { it.toOrderLines() }
+                        val totalCents = refreshed.cartTotalCents
+                        val orderId = "CAR-$carrinhoId"
+                        val placed = DataChannelMessage.OrderPlaced(
+                            carrinhoId = carrinhoId,
+                            ts = ts,
+                            from = spec.sellerPeerId,
+                            pedidoId = orderId,
                         )
+                        refreshed.cart.forEach { completedCartLines[it.itemId] = it }
+                        refreshCartLocked()
+                        peer.publish(placed)
+                        webBridge.deliver(placed)
+                        persistOrder(
+                            orderId = orderId,
+                            ts = ts,
+                            lines = lines,
+                            totalCents = totalCents,
+                            confirmedByMe = true,
+                        )
+                        _state.update {
+                            it.copy(
+                                isFinishingCart = false,
+                                cart = emptyList(),
+                                completedCarrinhoId = carrinhoId,
+                                cartStage = CartStage.Idle,
+                                summary = OrderSummaryUi(
+                                    orderId = orderId,
+                                    ts = ts,
+                                    lines = lines,
+                                    totalCents = totalCents,
+                                    confirmedByMe = true,
+                                ),
+                                showCartDrawer = false,
+                            )
+                        }
                     }
                 }
             }
@@ -262,7 +306,7 @@ class LiveCallScreenModel(
     }
 
     fun hangup() {
-        if (_state.value.wasLive) interestTracker.onCallEnded(_state.value.cart)
+        if (_state.value.wasLive) interestTracker.onCallEnded(completedCartLines.values.toList() + _state.value.cart)
         callAudio.release()
         webBridge.updateStatus(LiveWebBridge.STATUS_CLOSED)
         screenModelScope.launch {
