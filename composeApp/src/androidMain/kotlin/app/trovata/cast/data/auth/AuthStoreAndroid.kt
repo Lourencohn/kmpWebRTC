@@ -2,6 +2,7 @@ package app.trovata.cast.data.auth
 
 import android.content.Context
 import android.content.SharedPreferences
+import app.trovata.cast.config.AppConfig
 
 actual class AuthStore(context: Context) : AuthStorage {
     private val prefs: SharedPreferences =
@@ -16,6 +17,10 @@ actual class AuthStore(context: Context) : AuthStorage {
     }
 
     private companion object {
-        const val PREFS_NAME = "trovatacast.auth"
+        val PREFS_NAME = if (AppConfig.environment == "production") {
+            "trovatacast.production.auth"
+        } else {
+            "trovatacast.auth"
+        }
     }
 }
